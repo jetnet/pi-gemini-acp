@@ -9,7 +9,7 @@ Use this skill to combine `pi-gemini-acp` source discovery with optional `pi-scr
 
 ## Tool Roles
 
-- `gemini_status` — check read-only Gemini ACP command/auth/capability status from explicit persisted/env settings before relying on provider-backed workflows; it is stricter than the legacy search default shim.
+- `gemini_status` — check read-only Gemini ACP command/auth/capability status from explicit persisted/env settings before relying on provider-backed workflows; `/gemini-status` exposes the same preflight state for slash-command flows.
 - `gemini_prompt` — send a general prompt to configured/authenticated Gemini ACP when search grounding is not needed; arbitrary prompts have no local/no-key fallback.
 - `gemini_extract` — extract structured JSON from supplied content with configured/authenticated Gemini ACP and a supported JSON-schema-like shape.
 - `gemini_summarize` — summarize one supplied content item or one safe public HTTP(S) URL; use it for single-page/source summaries, not research synthesis.

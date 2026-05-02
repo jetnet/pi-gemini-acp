@@ -7,10 +7,12 @@ import type {
 import { geminiConfigureAcpCommand } from "./gemini-configure-acp.js";
 import { geminiModelCommand } from "./gemini-model.js";
 import { geminiPermissionsCommand } from "./gemini-permissions.js";
+import { geminiStatusCommand } from "./gemini-status.js";
 
 /** Slash commands exposed by the Gemini ACP Pi extension. */
 export const geminiAcpCommands = [
 	geminiConfigureAcpCommand,
+	geminiStatusCommand,
 	geminiModelCommand,
 	geminiPermissionsCommand,
 ] as const;

@@ -11,6 +11,7 @@ import {
 } from "../gemini-configure-acp.js";
 import { getGeminiModelCompletions, setGeminiModel } from "../gemini-model.js";
 import { setGeminiPermissions } from "../gemini-permissions.js";
+import { showGeminiStatus } from "../gemini-status.js";
 import { geminiAcpCommands, registerGeminiAcpCommands } from "../register.js";
 
 let rootDir: string;
@@ -34,6 +35,7 @@ describe("Gemini ACP command registration", () => {
 
 		expect(registered.map((entry) => entry.name)).toEqual([
 			"gemini-configure-acp",
+			"gemini-status",
 			"gemini-model",
 			"gemini-permissions",
 		]);
@@ -50,6 +52,69 @@ describe("Gemini ACP command registration", () => {
 		expect(
 			geminiAcpCommands.every((command) => command.name.startsWith("gemini-")),
 		).toBe(true);
+	});
+
+	it("reports read-only Gemini ACP status with remediation", async () => {
+		const result = await showGeminiStatus(
+			{},
+			{ config: {}, commandExists: async () => false },
+		);
+
+		expect(result.content[0]?.text).toContain("Gemini ACP needs attention");
+		expect(result.content[0]?.text).toContain("Command:");
+		expect(result.content[0]?.text).toContain("- command: unset");
+		expect(result.content[0]?.text).toContain("- executable: unknown");
+		expect(result.content[0]?.text).toContain("- auth: unknown");
+		expect(result.content[0]?.text).toContain("- search grounding: unknown");
+		expect(result.content[0]?.text).toContain(
+			"- permission policy: restrictive",
+		);
+		expect(result.content[0]?.text).toContain("Future ACP capability flags:");
+		expect(result.content[0]?.text).toContain("Remediation:");
+		expect(
+			((result.details as ResultEnvelope).data as { error?: { code?: string } })
+				.error?.code,
+		).toBe("GEMINI_ACP_MISSING_CONFIG");
+	});
+
+	it("reports configured Gemini ACP status details", async () => {
+		const result = await showGeminiStatus(
+			{},
+			{
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							command: "/opt/homebrew/bin/gemini",
+							args: ["--acp", "--model", "gemini-3-flash-preview"],
+							authenticated: true,
+							searchGroundingAvailable: true,
+							model: "gemini-3-flash-preview",
+							modelSelectionAvailable: true,
+							permissionPolicy: { mode: "file-read", reason: "review docs" },
+						},
+					},
+				},
+				commandExists: async (command) =>
+					command === "/opt/homebrew/bin/gemini",
+			},
+		);
+
+		expect((result.details as ResultEnvelope).error).toBeUndefined();
+		expect(result.content[0]?.text).toContain("- command: gemini");
+		expect(result.content[0]?.text).toContain(
+			"- args: --acp --model gemini-3-flash-preview",
+		);
+		expect(result.content[0]?.text).toContain("- executable: found");
+		expect(result.content[0]?.text).toContain("- auth: confirmed");
+		expect(result.content[0]?.text).toContain("- search grounding: available");
+		expect(result.content[0]?.text).toContain(
+			"Selected model: gemini-3-flash-preview",
+		);
+		expect(result.content[0]?.text).toContain(
+			"- permission policy: file-read: filesystem read",
+		);
+		expect(result.content[0]?.text).toContain("- filesystem read: enabled");
 	});
 
 	it("persists default Gemini ACP command settings", async () => {

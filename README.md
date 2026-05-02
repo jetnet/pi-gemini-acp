@@ -35,6 +35,7 @@ pi install npm:pi-gemini-acp
 | Command                 | Description                                                                                                                                                                          |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `/gemini-configure-acp` | Persist the local Gemini ACP command/args, defaulting to `gemini --acp`, and report whether the command is executable.                                                               |
+| `/gemini-status`        | Show read-only command/auth/search-grounding/model/permission status with remediation and future ACP capability flags.                                                               |
 | `/gemini-model`         | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection. |
 | `/gemini-permissions`   | Persist the restrictive/default ACP permission policy or explicitly confirm broader capabilities when needed.                                                                        |
 
@@ -59,7 +60,7 @@ export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 ```
 
-Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-configure-acp`, `/gemini-model`, and `/gemini-permissions`. Tool calls may also provide local documents/sources for no-key search/research operation; prompt/extract/summarize/code-review/translation workflows require configured/authenticated Gemini ACP and do not provide local/no-key fallback.
+Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-configure-acp`, `/gemini-model`, and `/gemini-permissions`. Use `/gemini-status` any time to inspect the resulting read-only command/auth/capability preflight state. Tool calls may also provide local documents/sources for no-key search/research operation; prompt/extract/summarize/code-review/translation workflows require configured/authenticated Gemini ACP and do not provide local/no-key fallback.
 
 Configure the local ACP command without editing JSON manually:
 
@@ -70,6 +71,12 @@ Configure the local ACP command without editing JSON manually:
 ```
 
 Do not pass API keys or tokens to `/gemini-configure-acp`; use the Gemini CLI's local authentication flow instead.
+
+Check status and remediation without changing settings:
+
+```bash
+/gemini-status
+```
 
 ### Selecting a model
 
