@@ -11,7 +11,7 @@ export const geminiAcpStatusTool = defineGeminiTool({
 	name: "gemini_status",
 	label: "Gemini ACP Status",
 	description:
-		"Report read-only Gemini ACP command/auth/capability status from explicit persisted/env settings. Local supplied-document workflows do not require Gemini ACP; provider-backed search may still use the legacy default `gemini --acp` shim until explicit settings are configured.",
+		"Report read-only Gemini ACP command/auth/capability status after applying the same default `gemini --acp` settings used by provider-backed search. Local supplied-document workflows do not require Gemini ACP.",
 	parameters: geminiAcpStatusSchema,
 	async execute(_toolCallId, _params: Params) {
 		const status = await getGeminiAcpStatus();

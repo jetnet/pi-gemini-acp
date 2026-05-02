@@ -5,6 +5,7 @@ import {
 	configureGeminiAcpSettings,
 } from "../config/configure-acp.js";
 import {
+	type GeminiAcpCommandStatus,
 	type GeminiAcpStatusDeps,
 	type GeminiAcpStatusOptions,
 	type GeminiAcpStatusReport,
@@ -174,11 +175,11 @@ function commandStatusText(status: GeminiAcpStatusReport): string {
 			: `Gemini ACP needs attention: ${status.error?.message ?? status.state}.`,
 		"",
 		"Command:",
-		`- configured: ${yesNo(command.configured)}`,
-		`- command: ${command.command ?? "unset"}`,
-		`- args: ${command.args.length > 0 ? command.args.join(" ") : "(none)"}`,
+		`- settingsPersisted: ${yesNo(command.settingsPersisted)}`,
+		`- command: ${formatCommandDisplay(command)}`,
+		`- args: ${formatArgsDisplay(command)}`,
 		`- executable: ${executableLabel(command.exists)}`,
-		`- command kind: ${command.commandKind}${command.pathRedacted ? " (path redacted to basename)" : ""}`,
+		`- command kind: ${formatCommandKindDisplay(command)}`,
 		"",
 		"Capabilities:",
 		`- auth: ${boolLabel(capabilities.authenticated, "confirmed", "not confirmed")}`,
@@ -250,6 +251,28 @@ function formatCommand(
 
 function quoteArg(arg: string): string {
 	return /\s/u.test(arg) ? JSON.stringify(arg) : arg;
+}
+
+function formatCommandDisplay(status: GeminiAcpCommandStatus): string {
+	const suffix = defaultSuffix(status);
+	return status.command ? `${status.command}${suffix}` : `unset${suffix}`;
+}
+
+function formatArgsDisplay(status: GeminiAcpCommandStatus): string {
+	const suffix = defaultSuffix(status);
+	return status.args.length > 0
+		? `${status.args.join(" ")}${suffix}`
+		: `(none)${suffix}`;
+}
+
+function formatCommandKindDisplay(status: GeminiAcpCommandStatus): string {
+	const suffix = defaultSuffix(status);
+	const redacted = status.pathRedacted ? " (path redacted to basename)" : "";
+	return `${status.commandKind}${suffix}${redacted}`;
+}
+
+function defaultSuffix(status: GeminiAcpCommandStatus): string {
+	return status.settingsPersisted ? "" : " (default)";
 }
 
 function executableLabel(exists: boolean | "unknown"): string {

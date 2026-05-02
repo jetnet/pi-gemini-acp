@@ -52,31 +52,55 @@ describe("Gemini ACP command registration", () => {
 		).toBe(true);
 	});
 
-	it("reports read-only Gemini ACP status with remediation", async () => {
+	it("reports default Gemini ACP status when no settings are persisted and the default command is missing", async () => {
 		const result = await runGeminiConfig(
 			{ action: "status" },
 			{ config: {}, commandExists: async () => false },
 		);
+		const data = (result.details as ResultEnvelope).data as {
+			state?: string;
+			error?: { code?: string };
+		};
 
 		expect(result.content[0]?.text).toContain("Gemini ACP needs attention");
 		expect(result.content[0]?.text).toContain("Command:");
-		expect(result.content[0]?.text).toContain("- command: unset");
-		expect(result.content[0]?.text).toContain("- executable: unknown");
-		expect(result.content[0]?.text).toContain("- auth: unknown");
-		expect(result.content[0]?.text).toContain("- search grounding: unknown");
+		expect(result.content[0]?.text).toContain("- settingsPersisted: no");
+		expect(result.content[0]?.text).toContain("- command: gemini (default)");
+		expect(result.content[0]?.text).toContain("- args: --acp (default)");
+		expect(result.content[0]?.text).toContain("- executable: not found");
+		expect(result.content[0]?.text).toContain("- command kind: name (default)");
+		expect(result.content[0]?.text).toContain("- auth: confirmed");
+		expect(result.content[0]?.text).toContain("- search grounding: available");
 		expect(result.content[0]?.text).toContain("- file analysis: unknown");
 		expect(result.content[0]?.text).toContain(
 			"- image input: unknown (transport: unconfirmed)",
 		);
 		expect(result.content[0]?.text).toContain(
-			"- permission policy: restrictive",
+			"Gemini ACP command is not persisted; using default `gemini --acp`, but it was not found on PATH.",
 		);
-		expect(result.content[0]?.text).toContain("Future ACP capability flags:");
-		expect(result.content[0]?.text).toContain("Remediation:");
-		expect(
-			((result.details as ResultEnvelope).data as { error?: { code?: string } })
-				.error?.code,
-		).toBe("GEMINI_ACP_MISSING_CONFIG");
+		expect(data.state).toBe("command_not_found");
+		expect(data.error?.code).toBe("GEMINI_ACP_COMMAND_NOT_FOUND");
+	});
+
+	it("reports ready default Gemini ACP status when no settings are persisted and the default command exists", async () => {
+		const result = await runGeminiConfig(
+			{ action: "status" },
+			{ config: {}, commandExists: async () => true },
+		);
+		const data = (result.details as ResultEnvelope).data as { state?: string };
+
+		expect((result.details as ResultEnvelope).error).toBeUndefined();
+		expect(data.state).toBe("ready");
+		expect(result.content[0]?.text).toContain(
+			"Gemini ACP is ready for Gemini-backed search/research.",
+		);
+		expect(result.content[0]?.text).toContain("- settingsPersisted: no");
+		expect(result.content[0]?.text).toContain("- command: gemini (default)");
+		expect(result.content[0]?.text).toContain("- args: --acp (default)");
+		expect(result.content[0]?.text).toContain("- executable: found");
+		expect(result.content[0]?.text).toContain("- command kind: name (default)");
+		expect(result.content[0]?.text).toContain("- auth: confirmed");
+		expect(result.content[0]?.text).toContain("- search grounding: available");
 	});
 
 	it("reports configured Gemini ACP status details", async () => {
@@ -103,6 +127,7 @@ describe("Gemini ACP command registration", () => {
 		);
 
 		expect((result.details as ResultEnvelope).error).toBeUndefined();
+		expect(result.content[0]?.text).toContain("- settingsPersisted: yes");
 		expect(result.content[0]?.text).toContain("- command: gemini");
 		expect(result.content[0]?.text).toContain(
 			"- args: --acp --model gemini-3-flash-preview",

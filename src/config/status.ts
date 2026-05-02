@@ -13,7 +13,11 @@ import {
 	type ResolvedPermissionPolicy,
 	resolvePermissionPolicy,
 } from "./permission-policy.js";
-import { configFromEnv, loadConfig } from "./settings.js";
+import {
+	configFromEnv,
+	loadConfig,
+	withDefaultGeminiAcpConfig,
+} from "./settings.js";
 
 export type GeminiAcpStatusState =
 	| "missing_config"
@@ -40,7 +44,7 @@ export interface GeminiAcpProviderPreflightOptions {
 }
 
 export interface GeminiAcpCommandStatus {
-	configured: boolean;
+	settingsPersisted: boolean;
 	command?: string;
 	args: string[];
 	commandKind: "name" | "path" | "unset";
@@ -79,30 +83,41 @@ export interface GeminiAcpStatusReport {
 }
 
 /**
- * Builds a read-only Gemini ACP status report from persisted settings and environment overrides.
+ * Builds a read-only Gemini ACP status report from persisted/env settings plus defaults.
  */
 export async function getGeminiAcpStatus(
 	options: GeminiAcpStatusOptions = {},
 	deps: GeminiAcpStatusDeps = {},
 ): Promise<GeminiAcpStatusReport> {
-	const loadedConfig =
-		options.config ??
-		configFromEnv(await loadConfig({ rootDir: options.rootDir }));
+	const storedConfig =
+		options.config ?? (await loadConfig({ rootDir: options.rootDir }));
+	const loadedConfig = options.config
+		? storedConfig
+		: configFromEnv(storedConfig);
+	const effectiveConfig = withDefaultGeminiAcpConfig(loadedConfig);
 	return evaluateGeminiAcpStatus(
-		loadedConfig.providers?.["gemini-acp"],
+		effectiveConfig.providers?.["gemini-acp"],
 		deps.commandExists ?? defaultGeminiAcpCommandExists,
+		{
+			settingsPersisted: hasPersistedGeminiAcpSettings(
+				storedConfig.providers?.["gemini-acp"],
+			),
+		},
 	);
 }
 
 /**
- * Evaluates configured Gemini ACP command, auth, search, model, and permission state without spawning ACP.
+ * Evaluates effective Gemini ACP command, auth, search, model, and permission state without spawning ACP.
  */
 export async function evaluateGeminiAcpStatus(
 	settings: GeminiAcpProviderSettings | undefined,
 	commandExists: StatusCommandChecker = defaultGeminiAcpCommandExists,
+	options: { settingsPersisted?: boolean } = {},
 ): Promise<GeminiAcpStatusReport> {
 	const command = settings?.command?.trim();
-	const commandStatus = commandShell(settings, "unknown");
+	const settingsPersisted =
+		options.settingsPersisted ?? hasPersistedGeminiAcpSettings(settings);
+	const commandStatus = commandShell(settings, "unknown", settingsPersisted);
 	const capabilities = capabilityShell(settings);
 
 	if (settings?.enabled !== true || !command) {
@@ -111,9 +126,8 @@ export async function evaluateGeminiAcpStatus(
 			commandStatus,
 			capabilities,
 			[
-				"Configure a local Gemini ACP command such as `gemini --acp` before using Gemini-backed discovery.",
-				"This status reports explicit persisted/env settings and does not apply the gemini_search compatibility default; search may still try `gemini --acp` until settings are configured or disabled.",
-				"Local/no-key workflows over supplied documents remain available without Gemini ACP.",
+				"Gemini ACP is disabled or has no effective command after applying defaults.",
+				"Run `/gemini-config persist gemini --acp` to save a local Gemini ACP command, or keep using local/no-key workflows over supplied documents.",
 			],
 			providerError(
 				"GEMINI_ACP_MISSING_CONFIG",
@@ -124,16 +138,13 @@ export async function evaluateGeminiAcpStatus(
 	}
 
 	const exists = await commandExists(command);
-	const checkedCommand = commandShell(settings, exists);
+	const checkedCommand = commandShell(settings, exists, settingsPersisted);
 	if (!exists) {
 		return statusReport(
 			"command_not_found",
 			checkedCommand,
 			capabilities,
-			[
-				`Install the configured Gemini ACP command (${checkedCommand.command ?? "unset"}) or update the command setting.`,
-				"Confirm the command is on PATH, or configure the correct executable path.",
-			],
+			commandNotFoundRemediation(checkedCommand, settings),
 			providerError(
 				"GEMINI_ACP_COMMAND_NOT_FOUND",
 				"provider_preflight",
@@ -269,9 +280,39 @@ function statusReport(
 	};
 }
 
+function hasPersistedGeminiAcpSettings(
+	settings: GeminiAcpProviderSettings | undefined,
+): boolean {
+	return settings?.enabled === true && Boolean(settings.command?.trim());
+}
+
+function commandNotFoundRemediation(
+	command: GeminiAcpCommandStatus,
+	settings: GeminiAcpProviderSettings | undefined,
+): string[] {
+	if (!command.settingsPersisted) {
+		return [
+			`Gemini ACP command is not persisted; using default \`${formatCommandForMessage(settings)}\`, but it was not found on PATH. Install the Gemini CLI or run \`/gemini-config persist\` to set a custom path.`,
+		];
+	}
+	return [
+		`Install the configured Gemini ACP command (${command.command ?? "unset"}) or update the command setting.`,
+		"Confirm the command is on PATH, or configure the correct executable path.",
+	];
+}
+
+function formatCommandForMessage(
+	settings: GeminiAcpProviderSettings | undefined,
+): string {
+	return [settings?.command, ...(settings?.args ?? [])]
+		.filter((part): part is string => Boolean(part))
+		.join(" ");
+}
+
 function commandShell(
 	settings: GeminiAcpProviderSettings | undefined,
 	exists: GeminiAcpCommandStatus["exists"],
+	settingsPersisted: boolean,
 ): GeminiAcpCommandStatus {
 	const command = settings?.command?.trim();
 	const commandKind = command
@@ -280,7 +321,7 @@ function commandShell(
 			: "name"
 		: "unset";
 	return {
-		configured: settings?.enabled === true && Boolean(command),
+		settingsPersisted,
 		command: command ? safeCommandName(command) : undefined,
 		args: sanitizeArgs(settings?.args),
 		commandKind,

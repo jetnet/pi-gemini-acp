@@ -21,7 +21,7 @@ pi install npm:pi-gemini-acp
 
 | Tool                    | Description                                                                                                                                 |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `gemini_status`         | Report read-only Gemini ACP command/auth/capability status from explicit persisted/env settings; stricter than the search default shim.     |
+| `gemini_status`         | Report read-only Gemini ACP command/auth/capability status after applying the same default `gemini --acp` settings used by provider search. |
 | `gemini_prompt`         | Send a general prompt to configured/authenticated Gemini ACP; does not require search grounding and has no local/no-key fallback.           |
 | `gemini_extract`        | Extract structured JSON from supplied content using configured/authenticated Gemini ACP and a supported JSON-schema-like shape.             |
 | `gemini_summarize`      | Summarize one supplied content item or one safe public HTTP(S) URL; does not perform research or multi-source synthesis.                    |

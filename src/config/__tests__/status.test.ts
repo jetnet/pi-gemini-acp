@@ -2,18 +2,22 @@ import { describe, expect, it } from "vitest";
 import { evaluateGeminiAcpStatus } from "../status.js";
 
 describe("Gemini ACP status", () => {
-	it("reports missing config without checking the command", async () => {
+	it("reports missing config without checking the command when provider settings are disabled", async () => {
 		let checked = false;
-		const status = await evaluateGeminiAcpStatus(undefined, async () => {
-			checked = true;
-			return true;
-		});
+		const status = await evaluateGeminiAcpStatus(
+			{ enabled: false },
+			async () => {
+				checked = true;
+				return true;
+			},
+		);
 
 		expect(checked).toBe(false);
 		expect(status.ready).toBe(false);
 		expect(status.state).toBe("missing_config");
 		expect(status.error?.code).toBe("GEMINI_ACP_MISSING_CONFIG");
-		expect(status.remediation.join("\n")).toContain("Configure");
+		expect(status.command.settingsPersisted).toBe(false);
+		expect(status.remediation.join("\n")).toContain("disabled");
 	});
 
 	it("reports a configured command that is missing", async () => {
@@ -25,6 +29,7 @@ describe("Gemini ACP status", () => {
 		expect(status.ready).toBe(false);
 		expect(status.state).toBe("command_not_found");
 		expect(status.error?.code).toBe("GEMINI_ACP_COMMAND_NOT_FOUND");
+		expect(status.command.settingsPersisted).toBe(true);
 		expect(status.command.command).toBe("gemini");
 		expect(status.command.pathRedacted).toBe(true);
 		expect(status.command.exists).toBe(false);
@@ -45,6 +50,7 @@ describe("Gemini ACP status", () => {
 		expect(status.ready).toBe(false);
 		expect(status.state).toBe("unauthenticated");
 		expect(status.error?.code).toBe("GEMINI_ACP_UNAUTHENTICATED");
+		expect(status.command.settingsPersisted).toBe(true);
 		expect(status.command.args).toEqual(["--acp", "--token", "<redacted>"]);
 		expect(status.capabilities.authenticated).toBe(false);
 		expect(status.capabilities.imageInput).toMatchObject({
