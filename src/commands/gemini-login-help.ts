@@ -1,6 +1,10 @@
 import path from "node:path";
 import { type Static, Type } from "@mariozechner/pi-ai";
-import { configFromEnv, loadConfig } from "../config/settings.js";
+import {
+	configFromEnv,
+	loadConfig,
+	withDefaultGeminiAcpConfig,
+} from "../config/settings.js";
 import { toolResult } from "../tools/result.js";
 import type { GeminiAcpConfig, GeminiAcpProviderSettings } from "../types.js";
 import { defineGeminiCommand } from "./define.js";
@@ -110,7 +114,9 @@ export async function runGeminiLoginHelp(
 	params: Params = {},
 	options: GeminiLoginHelpOptions = {},
 ) {
-	const config = options.config ?? configFromEnv(await loadConfig(options));
+	const loadedConfig =
+		options.config ?? configFromEnv(await loadConfig(options));
+	const config = withDefaultGeminiAcpConfig(loadedConfig);
 	const help = buildGeminiLoginHelp(params, config);
 	return toolResult({ text: help.text, data: help.data });
 }

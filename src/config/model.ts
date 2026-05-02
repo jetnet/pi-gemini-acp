@@ -7,10 +7,46 @@ import {
 	configFromEnv,
 	loadConfig,
 	saveGeminiAcpSettings,
+	withDefaultGeminiAcpConfig,
 } from "./settings.js";
 
 const execFileAsync = promisify(execFile);
 const MODEL_PATTERN = /^(?:models\/)?gemini-[a-z0-9][a-z0-9._-]{1,80}$/u;
+
+/** User-facing Gemini model shortcut exposed by `/gemini-set-model` completions. */
+export interface GeminiModelChoice {
+	id: string;
+	label: string;
+	description: string;
+	aliases: readonly string[];
+}
+
+export const GEMINI_MODEL_CHOICES = [
+	{
+		id: "gemini-2.5-pro",
+		label: "Gemini 2.5 Pro",
+		description: "Highest-quality Gemini option for complex reasoning.",
+		aliases: ["pro", "2.5-pro"],
+	},
+	{
+		id: "gemini-2.5-flash",
+		label: "Gemini 2.5 Flash",
+		description: "Fast balanced default for everyday research and prompts.",
+		aliases: ["flash", "2.5-flash"],
+	},
+	{
+		id: "gemini-2.5-flash-lite",
+		label: "Gemini 2.5 Flash-Lite",
+		description: "Lower-latency Gemini option for lightweight tasks.",
+		aliases: ["flash-lite", "lite", "2.5-flash-lite"],
+	},
+	{
+		id: "gemini-2.0-flash",
+		label: "Gemini 2.0 Flash",
+		description: "Compatibility-oriented Flash model choice.",
+		aliases: ["2.0-flash"],
+	},
+] as const satisfies readonly GeminiModelChoice[];
 
 export interface ModelSelectionProbe {
 	supported: boolean;
@@ -46,19 +82,21 @@ export async function setGeminiAcpModel(
 	options: SetModelOptions,
 	deps: ModelSelectionDeps = {},
 ): Promise<SetModelResult> {
-	const model = normalizeModelName(options.model);
+	const model = resolveGeminiModelName(options.model);
 	if (!model) {
 		return {
 			status: modelStatus(undefined),
 			error: providerError(
 				"GEMINI_ACP_INVALID_MODEL",
 				"model_validation",
-				"Model must look like a Gemini model id, for example gemini-2.5-pro or models/gemini-2.5-flash.",
+				`Choose one of: ${describeGeminiModelChoices()}, or pass a full Gemini model id such as models/gemini-2.5-flash.`,
 			),
 		};
 	}
 
-	const config = configFromEnv(await loadConfig({ rootDir: options.rootDir }));
+	const config = withDefaultGeminiAcpConfig(
+		configFromEnv(await loadConfig({ rootDir: options.rootDir })),
+	);
 	const settings = config.providers?.["gemini-acp"];
 	if (settings?.enabled !== true || !settings.command) {
 		return {
@@ -129,6 +167,28 @@ export function modelStatus(
 		modelSelectionCheckedAt: settings?.modelSelectionCheckedAt,
 		message,
 	};
+}
+
+export function listGeminiModelChoices(): readonly GeminiModelChoice[] {
+	return GEMINI_MODEL_CHOICES;
+}
+
+export function describeGeminiModelChoices(): string {
+	return GEMINI_MODEL_CHOICES.map(
+		(choice) => `${choice.id} (${choice.aliases.join("/")})`,
+	).join(", ");
+}
+
+export function resolveGeminiModelName(model: string): string | undefined {
+	const trimmed = model.trim();
+	const normalized = normalizeModelName(trimmed);
+	if (normalized) return normalized;
+	const key = trimmed.toLowerCase();
+	return GEMINI_MODEL_CHOICES.find(
+		(choice) =>
+			choice.id.toLowerCase() === key ||
+			(choice.aliases as readonly string[]).includes(key),
+	)?.id;
 }
 
 export function normalizeModelName(model: string): string | undefined {

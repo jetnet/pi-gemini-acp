@@ -2,10 +2,13 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { loadConfig, saveGeminiAcpSettings } from "../../config/settings.js";
+import { loadConfig } from "../../config/settings.js";
 import type { ResultEnvelope } from "../../types.js";
 import type { PiCommandOptions } from "../define.js";
-import { setGeminiModel } from "../gemini-set-model.js";
+import {
+	getGeminiSetModelCompletions,
+	setGeminiModel,
+} from "../gemini-set-model.js";
 import { setGeminiPermissionPolicy } from "../gemini-set-permission-policy.js";
 import { geminiAcpCommands, registerGeminiAcpCommands } from "../register.js";
 
@@ -37,16 +40,18 @@ describe("Gemini ACP command registration", () => {
 			registered.every((entry) => typeof entry.options.handler === "function"),
 		).toBe(true);
 		expect(
+			registered.every((entry) => entry.options.parameters !== undefined),
+		).toBe(true);
+		expect(
+			registered.find((entry) => entry.name === "gemini-set-model")?.options
+				.getArgumentCompletions,
+		).toBe(getGeminiSetModelCompletions);
+		expect(
 			geminiAcpCommands.every((command) => command.name.startsWith("gemini-")),
 		).toBe(true);
 	});
 
-	it("returns a Pi shell when setting a supported model", async () => {
-		await saveGeminiAcpSettings(
-			{ enabled: true, command: "gemini", args: ["--acp"] },
-			{ rootDir },
-		);
-
+	it("returns a Pi shell when setting a supported explicit model", async () => {
 		const result = await setGeminiModel(
 			{ model: "gemini-2.5-pro" },
 			{
@@ -58,6 +63,40 @@ describe("Gemini ACP command registration", () => {
 
 		expect(result.content[0]?.text).toContain("gemini-2.5-pro");
 		expect((result.details as ResultEnvelope).data).toBeTruthy();
+	});
+
+	it("lists selectable Gemini model choices when no model is provided", async () => {
+		const result = await setGeminiModel({}, { rootDir });
+		expect(result.content[0]?.text).toContain("/gemini-set-model <choice>");
+		expect(result.content[0]?.text).toContain("gemini-2.5-pro");
+		expect((result.details as ResultEnvelope).data).toMatchObject({
+			choices: expect.arrayContaining([
+				expect.objectContaining({ id: "gemini-2.5-flash" }),
+			]),
+		});
+	});
+
+	it("accepts model aliases from selectable choices", async () => {
+		const result = await setGeminiModel(
+			{ model: "pro" },
+			{
+				rootDir,
+				commandExists: async () => true,
+				readCommandHelp: async () => "--model Model [string]",
+			},
+		);
+
+		expect(result.content[0]?.text).toContain("gemini-2.5-pro");
+		expect(
+			(await loadConfig({ rootDir })).providers?.["gemini-acp"]?.model,
+		).toBe("gemini-2.5-pro");
+	});
+
+	it("offers slash-command completions for selectable models", () => {
+		expect(getGeminiSetModelCompletions("pro")).toEqual([
+			expect.objectContaining({ value: "gemini-2.5-pro" }),
+		]);
+		expect(getGeminiSetModelCompletions("missing-model")).toBeNull();
 	});
 
 	it("persists restrictive policy without risk confirmation", async () => {

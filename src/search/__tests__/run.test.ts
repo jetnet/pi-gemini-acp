@@ -34,24 +34,15 @@ describe("runSearch", () => {
 		expect(result.responseId).toBeTruthy();
 	});
 
-	it("runs configured Gemini ACP through an injected client", async () => {
+	it("runs default Gemini ACP config through an injected client", async () => {
 		const result = await runSearch(
 			{
 				query: "x",
 				rootDir,
-				config: {
-					providers: {
-						"gemini-acp": {
-							enabled: true,
-							command: "gemini",
-							authenticated: true,
-							searchGroundingAvailable: true,
-						},
-					},
-				},
+				config: {},
 			},
 			{
-				commandExists: async () => true,
+				commandExists: async (command) => command === "gemini",
 				geminiAcpClient: new FakeGeminiClient(),
 			},
 		);
@@ -59,9 +50,12 @@ describe("runSearch", () => {
 		expect(result.results[0]?.source.provider).toBe("gemini-acp");
 	});
 
-	it("keeps missing Gemini config as a structured error", async () => {
-		const result = await runSearch({ query: "x", rootDir, config: {} });
-		expect(result.error?.code).toBe("GEMINI_ACP_MISSING_CONFIG");
+	it("reports a missing default Gemini command as a structured error", async () => {
+		const result = await runSearch(
+			{ query: "x", rootDir, config: {} },
+			{ commandExists: async () => false },
+		);
+		expect(result.error?.code).toBe("GEMINI_ACP_COMMAND_NOT_FOUND");
 	});
 
 	it("refuses a selected model until model support is confirmed", async () => {

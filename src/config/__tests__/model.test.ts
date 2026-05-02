@@ -16,12 +16,7 @@ afterEach(async () => {
 });
 
 describe("Gemini ACP model configuration", () => {
-	it("persists a model after confirming --model support", async () => {
-		await saveGeminiAcpSettings(
-			{ enabled: true, command: "gemini", args: ["--acp"] },
-			{ rootDir },
-		);
-
+	it("persists a model against the default Gemini ACP command", async () => {
 		const result = await setGeminiAcpModel(
 			{ model: "gemini-2.5-pro", rootDir },
 			{

@@ -9,6 +9,14 @@ import type { GeminiAcpConfig, GeminiAcpProviderSettings } from "../types.js";
 
 const CONFIG_FILE = "settings.json";
 
+export const DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS = {
+	enabled: true,
+	command: "gemini",
+	args: ["--acp"],
+	authenticated: true,
+	searchGroundingAvailable: true,
+} satisfies GeminiAcpProviderSettings;
+
 export async function loadConfig(
 	options: StorageOptions = {},
 ): Promise<GeminiAcpConfig> {
@@ -58,6 +66,24 @@ export function configFromEnv(config: GeminiAcpConfig): GeminiAcpConfig {
 				enabled: true,
 				command: command ?? config.providers?.["gemini-acp"]?.command,
 				args: args ?? config.providers?.["gemini-acp"]?.args,
+			},
+		},
+	};
+}
+
+export function withDefaultGeminiAcpConfig(
+	config: GeminiAcpConfig,
+): GeminiAcpConfig {
+	const configured = config.providers?.["gemini-acp"];
+	if (configured?.enabled === false) return config;
+	return {
+		...config,
+		providers: {
+			...config.providers,
+			"gemini-acp": {
+				...DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS,
+				args: [...DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.args],
+				...configured,
 			},
 		},
 	};

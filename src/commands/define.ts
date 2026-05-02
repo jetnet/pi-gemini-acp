@@ -7,11 +7,23 @@ export type CommandExecute<TParams> = (
 	signal?: AbortSignal,
 ) => Promise<PiToolShell> | PiToolShell;
 
+/** Completion item returned by Pi slash-command argument completion handlers. */
+export interface PiCommandCompletion {
+	value: string;
+	label?: string;
+}
+
+/** Supplies argument completions for a Pi slash command. */
+export type CommandArgumentCompletions = (
+	prefix: string,
+) => PiCommandCompletion[] | null | Promise<PiCommandCompletion[] | null>;
+
 /** Public Pi command definition for Gemini ACP slash commands. */
 export interface GeminiCommand<TParameters extends TSchema = TSchema> {
 	name: `gemini-${string}`;
 	description: string;
 	parameters: TParameters;
+	getArgumentCompletions?: CommandArgumentCompletions;
 	execute: CommandExecute<Static<TParameters>>;
 }
 
@@ -33,6 +45,8 @@ export type PiCommandHandler = (
 /** Options accepted by `pi.registerCommand`, mirroring the host's signature. */
 export interface PiCommandOptions {
 	description?: string;
+	parameters?: TSchema;
+	getArgumentCompletions?: CommandArgumentCompletions;
 	handler: PiCommandHandler;
 }
 

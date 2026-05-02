@@ -23,7 +23,7 @@ npm test
 
 - Node.js `>=22.19.0`
 - Pi `>=0.65.0`
-- A locally installed/authenticated Gemini ACP command for real Gemini-backed search, commonly `gemini --acp`.
+- A locally installed/authenticated Gemini ACP command for real Gemini-backed search. By default, the extension runs `gemini --acp`.
 
 ## Tools
 
@@ -35,15 +35,27 @@ npm test
 
 ## Commands
 
-| Command                         | Description                                                                                                   |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `/gemini-login-help`            | Read-only local Gemini ACP login/auth remediation. It does not run auth flows or print credentials.           |
-| `/gemini-set-model`             | Persist a preferred Gemini model after confirming the configured ACP command advertises model selection.      |
-| `/gemini-set-permission-policy` | Persist the restrictive/default ACP permission policy or explicitly confirm broader capabilities when needed. |
+| Command                         | Description                                                                                                                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/gemini-login-help`            | Read-only local Gemini ACP login/auth remediation. It does not run auth flows or print credentials.                                                                                  |
+| `/gemini-set-model`             | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection. |
+| `/gemini-set-permission-policy` | Persist the restrictive/default ACP permission policy or explicitly confirm broader capabilities when needed.                                                                        |
 
 ## Configuration
 
-For smoke tests and direct config, use environment variables:
+The default Gemini ACP provider config is:
+
+```json
+{
+  "enabled": true,
+  "command": "gemini",
+  "args": ["--acp"],
+  "authenticated": true,
+  "searchGroundingAvailable": true
+}
+```
+
+That means `gemini_search` and `gemini_research` work out of the box when `gemini --acp` is installed, authenticated, and search-capable. Override the command with environment variables when needed:
 
 ```bash
 export PI_GEMINI_ACP_COMMAND=gemini
@@ -51,6 +63,19 @@ export PI_GEMINI_ACP_ARGS="--acp"
 ```
 
 Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-set-model` and `/gemini-set-permission-policy`. Tool calls may also provide local documents/sources for no-key operation.
+
+### Selecting a model
+
+Run `/gemini-set-model` with no argument to see selectable choices. The command also exposes slash-command argument completions for common Gemini models.
+
+```bash
+/gemini-set-model
+/gemini-set-model pro
+/gemini-set-model flash
+/gemini-set-model gemini-2.5-pro
+```
+
+Known aliases include `pro`, `flash`, `flash-lite`, and `lite`. Full Gemini model ids such as `models/gemini-2.5-flash` are still accepted.
 
 ## Validation
 

@@ -2,7 +2,11 @@ import { access } from "node:fs/promises";
 import path from "node:path";
 import { type GeminiAcpClient, StdioGeminiAcpClient } from "../acp/client.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
-import { configFromEnv, loadConfig } from "../config/settings.js";
+import {
+	configFromEnv,
+	loadConfig,
+	withDefaultGeminiAcpConfig,
+} from "../config/settings.js";
 import { storeResult } from "../storage/results.js";
 import type {
 	GeminiAcpConfig,
@@ -53,9 +57,10 @@ export async function runSearch(
 		);
 	}
 
-	const config =
+	const loadedConfig =
 		options.config ??
 		configFromEnv(await loadConfig({ rootDir: options.rootDir }));
+	const config = withDefaultGeminiAcpConfig(loadedConfig);
 	const settings = config.providers?.["gemini-acp"];
 	const preflight = await preflightGemini(
 		settings,
