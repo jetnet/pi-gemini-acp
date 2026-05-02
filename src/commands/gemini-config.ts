@@ -13,12 +13,19 @@ import {
 } from "../config/status.js";
 import { errorResult, providerError, toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
-import { defineGeminiCommand } from "./define.js";
+import { defineGeminiCommand, type PiCommandContext } from "./define.js";
 import {
 	type GeminiConfigPermissionsOptions,
 	type GeminiConfigPermissionsResult,
 	runGeminiConfigPermissions,
+	showGeminiConfigPermissionsPicker,
 } from "./gemini-config-permissions.js";
+import {
+	hasOverlayUi,
+	type InteractiveCommandContext,
+	showPickerOverlay,
+	toastShell,
+} from "./picker.js";
 
 export const geminiConfigSchema = Type.Object({
 	action: Type.Union(
@@ -95,6 +102,7 @@ export const geminiConfigSchema = Type.Object({
 });
 
 type Params = Static<typeof geminiConfigSchema>;
+type CommandParams = Omit<Params, "action"> & { action?: Params["action"] };
 
 export type GeminiConfigCommandOptions = ConfigureGeminiAcpOptions &
 	GeminiAcpStatusOptions &
@@ -103,7 +111,7 @@ export type GeminiConfigCommandOptions = ConfigureGeminiAcpOptions &
 
 /** Runs the selected `/gemini-config` action. */
 export async function runGeminiConfig(
-	params: Params,
+	params: CommandParams,
 	options: GeminiConfigCommandOptions = {},
 ): Promise<
 	PiToolShell<
@@ -115,6 +123,9 @@ export async function runGeminiConfig(
 		>
 	>
 > {
+	if (!params.action) {
+		throw new Error("Expected action 'status', 'persist', or 'permissions'.");
+	}
 	if (params.action === "persist") return persistGeminiConfig(params, options);
 	if (params.action === "permissions") {
 		return runGeminiConfigPermissions(
@@ -130,10 +141,28 @@ export async function runGeminiConfig(
 	return showGeminiConfigStatus(options);
 }
 
+export async function runGeminiConfigCommand(
+	params: CommandParams,
+	ctx?: PiCommandContext,
+	options: GeminiConfigCommandOptions = {},
+) {
+	if (!params.action && hasOverlayUi(ctx)) {
+		return showGeminiConfigActionPicker(ctx, options);
+	}
+	if (
+		params.action === "permissions" &&
+		!params.capability &&
+		hasOverlayUi(ctx)
+	) {
+		return showGeminiConfigPermissionsPicker(ctx, options);
+	}
+	return runGeminiConfig(params, options);
+}
+
 /** Parses raw slash-command text into `/gemini-config` action parameters. */
 export function parseGeminiConfigCommandArgs(raw: string): Params {
 	const trimmed = raw.trim();
-	if (!trimmed) return { action: "status" };
+	if (!trimmed) return {} as Params;
 	if (trimmed.startsWith("{")) return JSON.parse(trimmed) as Params;
 
 	const [action, ...rest] = splitCommandLine(trimmed);
@@ -225,9 +254,60 @@ export const geminiConfigCommand = defineGeminiCommand({
 		"Inspect Gemini ACP status, persist the local command/args, or manage ACP capability permissions with settings-style descriptions.",
 	parameters: geminiConfigSchema,
 	parseArgs: parseGeminiConfigCommandArgs,
-	execute: (params) => runGeminiConfig(params),
+	execute: (params, ctx) => runGeminiConfigCommand(params, ctx),
 });
 
+function showGeminiConfigActionPicker(
+	ctx: InteractiveCommandContext,
+	options: GeminiConfigCommandOptions,
+) {
+	showPickerOverlay(ctx, "Gemini config", [
+		{
+			label: "Status",
+			onClick: () => {
+				void runActionAndToast(ctx, { action: "status" }, options);
+			},
+		},
+		{
+			label: "Persist",
+			onClick: () => {
+				void persistFromEditor(ctx, options);
+			},
+		},
+		{
+			label: "Permissions",
+			onClick: () => {
+				void showGeminiConfigPermissionsPicker(ctx, options);
+			},
+		},
+	]);
+	return toolResult({
+		text: "Choose a Gemini config action from the picker.",
+		data: { actions: ["status", "persist", "permissions"] },
+	});
+}
+
+async function runActionAndToast(
+	ctx: InteractiveCommandContext,
+	params: CommandParams,
+	options: GeminiConfigCommandOptions,
+): Promise<void> {
+	const result = await runGeminiConfig(params, options);
+	toastShell(ctx, result);
+}
+
+async function persistFromEditor(
+	ctx: InteractiveCommandContext,
+	options: GeminiConfigCommandOptions,
+): Promise<void> {
+	const input = (await ctx.ui.openEditor("gemini --acp")).trim();
+	const [command, ...args] = splitCommandLine(input || "gemini --acp");
+	const result = await runGeminiConfig(
+		{ action: "persist", command, args: args.length > 0 ? args : undefined },
+		options,
+	);
+	toastShell(ctx, result);
+}
 async function showGeminiConfigStatus(
 	options: GeminiConfigCommandOptions,
 ): Promise<PiToolShell<ResultEnvelope<GeminiAcpStatusReport>>> {
@@ -241,7 +321,7 @@ async function showGeminiConfigStatus(
 }
 
 async function persistGeminiConfig(
-	params: Params,
+	params: CommandParams,
 	options: GeminiConfigCommandOptions,
 ): Promise<PiToolShell<ResultEnvelope<ConfigureGeminiAcpResult | null>>> {
 	const result = await configureGeminiAcpSettings(

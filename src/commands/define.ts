@@ -4,7 +4,7 @@ import type { PiToolShell } from "../types.js";
 /** Executes a Pi slash command with parsed command parameters. */
 export type CommandExecute<TParams> = (
 	params: TParams,
-	signal?: AbortSignal,
+	ctx?: PiCommandContext,
 ) => Promise<PiToolShell> | PiToolShell;
 
 /** Completion item returned by Pi slash-command argument completion handlers. */
@@ -31,13 +31,32 @@ export interface GeminiCommand<TParameters extends TSchema = TSchema> {
 	execute: CommandExecute<Static<TParameters>>;
 }
 
+/** Pi overlay configuration used by command pickers. */
+export interface PiOverlayConfig {
+	render: () => PiComponentTree;
+	zIndex?: number;
+	onClickOutside?: () => void;
+}
+
+/** Minimal Pi component tree nodes used by picker overlays. */
+export type PiComponentTree =
+	| { type: "text"; text: string }
+	| { type: "vstack"; children: PiComponentTree[] }
+	| { type: "hstack"; children: PiComponentTree[] }
+	| { type: "button"; label: string; onClick: () => void };
+
 /** Minimal subset of the Pi extension command context the handler relies on. */
 export interface PiCommandContext {
 	hasUI?: boolean;
-	ui?: {
-		notify(message: string, type?: "info" | "warning" | "error"): void;
-	};
 	signal?: AbortSignal;
+	session?: unknown;
+	settings?: unknown;
+	auth?: unknown;
+	ui?: {
+		showToast(msg: string): void;
+		openEditor(text?: string): Promise<string>;
+		showOverlay(config: PiOverlayConfig): void;
+	};
 }
 
 /** Slash command handler shape expected by the Pi host. */

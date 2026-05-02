@@ -1,15 +1,20 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadConfig } from "../../config/settings.js";
 import type { ResultEnvelope } from "../../types.js";
-import type { PiCommandOptions } from "../define.js";
+import type { PiCommandContext, PiCommandOptions } from "../define.js";
 import {
 	parseGeminiConfigCommandArgs,
 	runGeminiConfig,
+	runGeminiConfigCommand,
 } from "../gemini-config.js";
-import { getGeminiModelCompletions, setGeminiModel } from "../gemini-model.js";
+import {
+	getGeminiModelCompletions,
+	runGeminiModelCommand,
+	setGeminiModel,
+} from "../gemini-model.js";
 import { geminiAcpCommands, registerGeminiAcpCommands } from "../register.js";
 
 let rootDir: string;
@@ -21,6 +26,23 @@ beforeEach(async () => {
 afterEach(async () => {
 	await rm(rootDir, { recursive: true, force: true });
 });
+
+function makeInteractiveCtx(
+	openEditorValue = "gemini --acp",
+): PiCommandContext {
+	return {
+		hasUI: true,
+		ui: {
+			showToast: vi.fn(),
+			openEditor: vi.fn(async () => openEditorValue),
+			showOverlay: vi.fn(),
+		},
+	};
+}
+
+function showOverlayMock(ctx: PiCommandContext): ReturnType<typeof vi.fn> {
+	return ctx.ui?.showOverlay as ReturnType<typeof vi.fn>;
+}
 
 describe("Gemini ACP command registration", () => {
 	it("registers explicit Gemini ACP configuration commands", () => {
@@ -48,6 +70,80 @@ describe("Gemini ACP command registration", () => {
 		expect(
 			geminiAcpCommands.every((command) => command.name.startsWith("gemini-")),
 		).toBe(true);
+	});
+
+	it("shows a config action picker when /gemini-config has no args and UI is available", async () => {
+		const registered: Array<{ name: string; options: PiCommandOptions }> = [];
+		registerGeminiAcpCommands({
+			registerCommand: (name, options) => registered.push({ name, options }),
+		});
+		const ctx = makeInteractiveCtx();
+		const command = registered.find((entry) => entry.name === "gemini-config");
+
+		await command?.options.handler("", ctx);
+
+		expect(showOverlayMock(ctx)).toHaveBeenCalledTimes(1);
+		const config = showOverlayMock(ctx).mock.calls[0]?.[0];
+		const tree = config?.render();
+		expect(tree).toMatchObject({
+			type: "vstack",
+			children: expect.arrayContaining([
+				expect.objectContaining({ label: "Status" }),
+				expect.objectContaining({ label: "Persist" }),
+				expect.objectContaining({ label: "Permissions" }),
+			]),
+		});
+	});
+
+	it("shows a permissions settings picker when permissions action has UI", async () => {
+		const ctx = makeInteractiveCtx();
+
+		await runGeminiConfigCommand({ action: "permissions" }, ctx, { rootDir });
+
+		expect(showOverlayMock(ctx)).toHaveBeenCalledTimes(1);
+		const config = showOverlayMock(ctx).mock.calls[0]?.[0];
+		const tree = config?.render();
+		expect(tree).toMatchObject({
+			type: "vstack",
+			children: expect.arrayContaining([
+				expect.objectContaining({ text: "[ ] filesystemRead" }),
+				expect.objectContaining({ label: "Toggle filesystemRead" }),
+				expect.objectContaining({
+					label: "Confirm risk and toggle filesystemWrite",
+				}),
+				expect.objectContaining({ label: "Done" }),
+			]),
+		});
+	});
+
+	it("shows a model picker when /gemini-model has no args and UI is available", async () => {
+		const registered: Array<{ name: string; options: PiCommandOptions }> = [];
+		registerGeminiAcpCommands({
+			registerCommand: (name, options) => registered.push({ name, options }),
+		});
+		const ctx = makeInteractiveCtx();
+		const command = registered.find((entry) => entry.name === "gemini-model");
+
+		await command?.options.handler("", ctx);
+
+		expect(showOverlayMock(ctx)).toHaveBeenCalledTimes(1);
+		const config = showOverlayMock(ctx).mock.calls[0]?.[0];
+		const tree = config?.render();
+		expect(tree).toMatchObject({
+			type: "vstack",
+			children: expect.arrayContaining([
+				expect.objectContaining({
+					label: "Gemini 3.1 Pro Preview — gemini-3.1-pro-preview",
+				}),
+			]),
+		});
+	});
+
+	it("falls back to text model choices when UI is unavailable", async () => {
+		const result = await runGeminiModelCommand({}, undefined);
+
+		expect(result.content[0]?.text).toContain("/gemini-model <choice>");
+		expect(result.content[0]?.text).toContain("gemini-3.1-pro-preview");
 	});
 
 	it("reports default Gemini ACP status when no settings are persisted and the default command is missing", async () => {

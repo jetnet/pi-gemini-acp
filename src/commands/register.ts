@@ -30,7 +30,7 @@ export function buildCommandHandler(command: GeminiCommand): PiCommandHandler {
 	return async (args, ctx) => {
 		try {
 			const params = parseCommandArgs(command, args);
-			const result = await command.execute(params, ctx.signal);
+			const result = await command.execute(params, ctx);
 			emitResult(ctx, result);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
@@ -77,10 +77,11 @@ function emit(
 	message: string,
 	type: "info" | "warning" | "error",
 ): void {
-	if (ctx?.hasUI && ctx.ui) {
-		ctx.ui.notify(message, type);
+	const rendered = type === "error" ? `Error: ${message}` : message;
+	if (ctx?.hasUI && ctx.ui?.showToast) {
+		ctx.ui.showToast(rendered);
 		return;
 	}
 	const stream = type === "error" ? process.stderr : process.stdout;
-	stream.write(`${message}\n`);
+	stream.write(`${rendered}\n`);
 }

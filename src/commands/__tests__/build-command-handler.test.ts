@@ -25,21 +25,31 @@ function makeCommand(overrides: Partial<GeminiCommand> = {}): {
 
 function makeCtx(): {
 	ctx: PiCommandContext;
-	notify: ReturnType<typeof vi.fn>;
+	showToast: ReturnType<typeof vi.fn>;
 } {
-	const notify = vi.fn();
-	return { ctx: { hasUI: true, ui: { notify } }, notify };
+	const showToast = vi.fn();
+	return {
+		ctx: {
+			hasUI: true,
+			ui: {
+				showToast,
+				openEditor: vi.fn(async () => ""),
+				showOverlay: vi.fn(),
+			},
+		},
+		showToast,
+	};
 }
 
 describe("buildCommandHandler", () => {
 	it("passes empty params object when args string is empty", async () => {
 		const { command, execute } = makeCommand();
-		const { ctx, notify } = makeCtx();
+		const { ctx, showToast } = makeCtx();
 
 		await buildCommandHandler(command)("", ctx);
 
-		expect(execute).toHaveBeenCalledWith({}, undefined);
-		expect(notify).toHaveBeenCalledWith("ok", "info");
+		expect(execute).toHaveBeenCalledWith({}, ctx);
+		expect(showToast).toHaveBeenCalledWith("ok");
 	});
 
 	it("assigns a bare string to the schema's first property", async () => {
@@ -48,10 +58,7 @@ describe("buildCommandHandler", () => {
 
 		await buildCommandHandler(command)("gemini-2.5-pro", ctx);
 
-		expect(execute).toHaveBeenCalledWith(
-			{ model: "gemini-2.5-pro" },
-			undefined,
-		);
+		expect(execute).toHaveBeenCalledWith({ model: "gemini-2.5-pro" }, ctx);
 	});
 
 	it("parses JSON args into the params object", async () => {
@@ -60,7 +67,7 @@ describe("buildCommandHandler", () => {
 
 		await buildCommandHandler(command)('{"model":"gemini-flash"}', ctx);
 
-		expect(execute).toHaveBeenCalledWith({ model: "gemini-flash" }, undefined);
+		expect(execute).toHaveBeenCalledWith({ model: "gemini-flash" }, ctx);
 	});
 
 	it("uses a command-specific raw argument parser when provided", async () => {
@@ -71,7 +78,7 @@ describe("buildCommandHandler", () => {
 		await buildCommandHandler(command)("raw command args", ctx);
 
 		expect(parseArgs).toHaveBeenCalledWith("raw command args");
-		expect(execute).toHaveBeenCalledWith({ model: "parsed-model" }, undefined);
+		expect(execute).toHaveBeenCalledWith({ model: "parsed-model" }, ctx);
 	});
 
 	it("surfaces an error notification when execute throws and does not reject", async () => {
@@ -80,12 +87,12 @@ describe("buildCommandHandler", () => {
 				throw new Error("boom");
 			},
 		});
-		const { ctx, notify } = makeCtx();
+		const { ctx, showToast } = makeCtx();
 
 		await expect(
 			buildCommandHandler(command)("", ctx),
 		).resolves.toBeUndefined();
-		expect(notify).toHaveBeenCalledWith("/gemini-test failed: boom", "error");
+		expect(showToast).toHaveBeenCalledWith("Error: /gemini-test failed: boom");
 	});
 
 	it("surfaces an error notification when the result envelope carries an error code", async () => {
@@ -100,10 +107,10 @@ describe("buildCommandHandler", () => {
 					"policy refused",
 				),
 		});
-		const { ctx, notify } = makeCtx();
+		const { ctx, showToast } = makeCtx();
 
 		await buildCommandHandler(command)("", ctx);
 
-		expect(notify).toHaveBeenCalledWith("policy refused", "error");
+		expect(showToast).toHaveBeenCalledWith("Error: policy refused");
 	});
 });

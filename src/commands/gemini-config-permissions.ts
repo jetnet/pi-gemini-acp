@@ -14,6 +14,13 @@ import type {
 	PiToolShell,
 	ResultEnvelope,
 } from "../types.js";
+import type { PiCommandContext, PiComponentTree } from "./define.js";
+import {
+	closePickerToast,
+	hasOverlayUi,
+	type InteractiveCommandContext,
+	toastShell,
+} from "./picker.js";
 
 export interface PermissionToggle {
 	capability: PermissionCapability;
@@ -87,6 +94,84 @@ export async function runGeminiConfigPermissions(
 	);
 	const stored = config.providers?.["gemini-acp"]?.permissionPolicy;
 	return permissionsDisplayResult(stored ?? permissionPolicy, "updated");
+}
+
+export async function showGeminiConfigPermissionsPicker(
+	ctx: PiCommandContext,
+	options: GeminiConfigPermissionsOptions = {},
+): Promise<PiToolShell<ResultEnvelope<GeminiConfigPermissionsResult | null>>> {
+	if (!hasOverlayUi(ctx)) return runGeminiConfigPermissions({}, options);
+	const result = await runGeminiConfigPermissions({}, options);
+	const data = (result.details as ResultEnvelope<GeminiConfigPermissionsResult>)
+		.data;
+	if (data) renderPermissionsPicker(ctx, data, options);
+	return result;
+}
+
+function renderPermissionsPicker(
+	ctx: InteractiveCommandContext,
+	data: GeminiConfigPermissionsResult,
+	options: GeminiConfigPermissionsOptions,
+): void {
+	ctx.ui.showOverlay({
+		render: () => ({
+			type: "vstack",
+			children: [
+				{ type: "text", text: "Gemini ACP permissions" },
+				...data.capabilities.flatMap((setting) =>
+					capabilityPickerSection(ctx, options, setting),
+				),
+				{ type: "button", label: "Done", onClick: () => closePickerToast(ctx) },
+			],
+		}),
+		zIndex: 100,
+		onClickOutside: () => {},
+	});
+}
+
+function capabilityPickerSection(
+	ctx: InteractiveCommandContext,
+	options: GeminiConfigPermissionsOptions,
+	setting: PermissionCapabilitySetting,
+): PiComponentTree[] {
+	return [
+		{ type: "text", text: `[${setting.enabled ? "x" : " "}] ${setting.capability}` },
+		{ type: "text", text: `  ${setting.description}` },
+		{
+			type: "button",
+			label: `Toggle ${setting.capability}`,
+			onClick: () => {
+				void toggleAndRefresh(ctx, options, { capability: setting.capability });
+			},
+		},
+		...(setting.requiresConfirmation
+			? [confirmRiskButton(ctx, options, setting.capability)]
+			: []),
+	];
+}
+
+function confirmRiskButton(
+	ctx: InteractiveCommandContext,
+	options: GeminiConfigPermissionsOptions,
+	capability: PermissionCapability,
+): PiComponentTree {
+	return {
+		type: "button",
+		label: `Confirm risk and toggle ${capability}`,
+		onClick: () => {
+			void toggleAndRefresh(ctx, options, { capability, confirmRisk: true });
+		},
+	};
+}
+
+async function toggleAndRefresh(
+	ctx: InteractiveCommandContext,
+	options: GeminiConfigPermissionsOptions,
+	toggle: PermissionToggleInput,
+): Promise<void> {
+	const result = await runGeminiConfigPermissions(toggle, options);
+	toastShell(ctx, result);
+	await showGeminiConfigPermissionsPicker(ctx, options);
 }
 
 async function loadCurrentPermissionPolicy(

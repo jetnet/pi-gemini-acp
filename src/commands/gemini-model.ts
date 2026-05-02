@@ -6,7 +6,8 @@ import {
 	setGeminiAcpModel,
 } from "../config/model.js";
 import { errorResult, toolResult } from "../tools/result.js";
-import { defineGeminiCommand } from "./define.js";
+import { defineGeminiCommand, type PiCommandContext } from "./define.js";
+import { hasOverlayUi, showPickerOverlay, toastShell } from "./picker.js";
 
 export const geminiModelSchema = Type.Object({
 	model: Type.Optional(
@@ -40,6 +41,15 @@ export async function setGeminiModel(
 	});
 }
 
+export async function runGeminiModelCommand(
+	params: Params,
+	ctx?: PiCommandContext,
+) {
+	const model = params.model?.trim();
+	if (!model && hasOverlayUi(ctx)) return showGeminiModelPicker(ctx);
+	return setGeminiModel(params);
+}
+
 export function getGeminiModelCompletions(prefix: string) {
 	const normalized = prefix.trim().toLowerCase();
 	const completions = listGeminiModelChoices().flatMap((choice) => {
@@ -56,6 +66,34 @@ export function getGeminiModelCompletions(prefix: string) {
 		];
 	});
 	return completions.length > 0 ? completions : null;
+}
+
+function showGeminiModelPicker(ctx: ReturnType<typeof assertOverlayCtx>) {
+	const choices = listGeminiModelChoices();
+	showPickerOverlay(
+		ctx,
+		"Choose a Gemini model",
+		choices.map((choice) => ({
+			label: `${choice.label || choice.id} — ${choice.id}`,
+			onClick: () => {
+				void (async () => {
+					const result = await setGeminiModel({ model: choice.id });
+					toastShell(ctx, result);
+				})();
+			},
+		})),
+		[
+			"Gemini ACP will use the selected model when the command supports --model.",
+		],
+	);
+	return toolResult({
+		text: "Choose a Gemini model from the picker.",
+		data: { choices },
+	});
+}
+
+function assertOverlayCtx(ctx: PiCommandContext) {
+	return ctx as PiCommandContext & { ui: NonNullable<PiCommandContext["ui"]> };
 }
 
 function modelChoiceResult() {
@@ -79,5 +117,5 @@ export const geminiModelCommand = defineGeminiCommand({
 		"Persist the preferred Gemini model after confirming the configured ACP command supports model selection.",
 	parameters: geminiModelSchema,
 	getArgumentCompletions: getGeminiModelCompletions,
-	execute: (params) => setGeminiModel(params),
+	execute: (params, ctx) => runGeminiModelCommand(params, ctx),
 });
