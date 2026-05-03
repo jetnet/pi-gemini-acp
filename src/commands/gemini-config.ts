@@ -10,20 +10,20 @@ import {
 import { toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { defineGeminiCommand, type PiCommandContext } from "./define.js";
+import type {
+	GeminiConfigAcpCommandOptions,
+	GeminiConfigAcpCommandResult,
+} from "./gemini-config-command.js";
+import {
+	runAcpCommandConfig,
+	showAcpCommandPicker,
+} from "./gemini-config-command.js";
 import {
 	type GeminiConfigPermissionsOptions,
 	type GeminiConfigPermissionsResult,
 	runGeminiConfigPermissions,
 	showGeminiConfigPermissionsPicker,
 } from "./gemini-config-permissions.js";
-import type {
-	GeminiConfigPersistOptions,
-	GeminiConfigPersistResult,
-} from "./gemini-config-persist.js";
-import {
-	runGeminiConfigPersist,
-	showGeminiConfigPersistPicker,
-} from "./gemini-config-persist.js";
 import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.js";
 
 export const geminiConfigSchema = Type.Object({
@@ -33,9 +33,8 @@ export const geminiConfigSchema = Type.Object({
 				description:
 					"Show read-only Gemini ACP command/auth/capability preflight state.",
 			}),
-			Type.Literal("persist", {
-				description:
-					"Persist Gemini ACP command/args to ~/.pi/gemini-acp/settings.json.",
+			Type.Literal("command", {
+				description: "Configure the local Gemini ACP command/args.",
 			}),
 			Type.Literal("permissions", {
 				description:
@@ -44,13 +43,12 @@ export const geminiConfigSchema = Type.Object({
 		],
 		{
 			description:
-				"Choose whether to inspect status, persist command settings, or manage Gemini ACP permissions.",
+				"Choose whether to inspect status, configure command settings, or manage Gemini ACP permissions.",
 		},
 	),
-	command: Type.Optional(
+	executable: Type.Optional(
 		Type.String({
-			description:
-				"Gemini ACP executable name or path for action=persist. Defaults to gemini.",
+			description: "Gemini ACP executable name or path. Defaults to gemini.",
 			examples: ["gemini", "/opt/homebrew/bin/gemini"],
 		}),
 	),
@@ -58,7 +56,7 @@ export const geminiConfigSchema = Type.Object({
 		Type.Array(
 			Type.String({
 				description:
-					"Argument passed to the Gemini ACP command for action=persist. Defaults to --acp.",
+					"Argument passed to the Gemini ACP command for action=command. Defaults to --acp.",
 			}),
 			{
 				description:
@@ -107,7 +105,7 @@ export type GeminiConfigCommandOptions = ConfigureGeminiAcpOptions &
 	GeminiAcpStatusOptions &
 	GeminiAcpStatusDeps &
 	GeminiConfigPermissionsOptions &
-	GeminiConfigPersistOptions;
+	GeminiConfigAcpCommandOptions;
 
 /** Runs the selected `/gemini-config` action. */
 export async function runGeminiConfig(
@@ -117,17 +115,16 @@ export async function runGeminiConfig(
 	PiToolShell<
 		ResultEnvelope<
 			| GeminiAcpStatusReport
-			| GeminiConfigPersistResult
+			| GeminiConfigAcpCommandResult
 			| GeminiConfigPermissionsResult
 			| null
 		>
 	>
 > {
 	if (!params.action) {
-		throw new Error("Expected action 'status', 'persist', or 'permissions'.");
+		throw new Error("Expected action 'status', 'command', or 'permissions'.");
 	}
-	if (params.action === "persist")
-		return runGeminiConfigPersist(params, options);
+	if (params.action === "command") return runAcpCommandConfig(params, options);
 	if (params.action === "permissions") {
 		return runGeminiConfigPermissions(
 			{
@@ -158,12 +155,12 @@ export async function runGeminiConfigCommand(
 		return showGeminiConfigPermissionsPicker(ctx, options);
 	}
 	if (
-		params.action === "persist" &&
-		!params.command &&
+		params.action === "command" &&
+		!params.executable &&
 		!params.args &&
 		hasInteractiveUi(ctx)
 	) {
-		return showGeminiConfigPersistPicker(ctx, options);
+		return showAcpCommandPicker(ctx, options);
 	}
 	return runGeminiConfig(params, options);
 }
@@ -175,8 +172,8 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 	if (trimmed.startsWith("{")) return JSON.parse(trimmed) as Params;
 
 	const [action, ...rest] = splitCommandLine(trimmed);
-	if (action !== "status" && action !== "persist" && action !== "permissions") {
-		throw new Error("Expected action 'status', 'persist', or 'permissions'.");
+	if (action !== "status" && action !== "command" && action !== "permissions") {
+		throw new Error("Expected action 'status', 'command', or 'permissions'.");
 	}
 	if (action === "status") {
 		if (rest.length > 0) {
@@ -186,10 +183,10 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 	}
 	if (action === "permissions") return parsePermissionsArgs(rest);
 
-	const [command, ...args] = rest;
+	const [executable, ...args] = rest;
 	return {
 		action,
-		command,
+		executable,
 		args: args.length > 0 ? args : undefined,
 	};
 }
@@ -260,7 +257,7 @@ function parseBooleanToken(value: string): boolean | undefined {
 export const geminiConfigCommand = defineGeminiCommand({
 	name: "gemini-config",
 	description:
-		"Inspect Gemini ACP status, persist the local command/args, or manage ACP capability permissions with settings-style descriptions.",
+		"Inspect Gemini ACP status, configure the local ACP command/args, or manage ACP capability permissions with settings-style descriptions.",
 	parameters: geminiConfigSchema,
 	parseArgs: parseGeminiConfigCommandArgs,
 	execute: (params, ctx) => runGeminiConfigCommand(params, ctx),
@@ -272,7 +269,7 @@ async function showGeminiConfigActionPicker(
 ) {
 	const picked = await ctx.ui.select(
 		"Gemini config",
-		["Status", "Persist", "Permissions"],
+		["Status", "ACP command", "Permissions"],
 		{ signal: ctx.signal },
 	);
 	if (!picked) {
@@ -281,7 +278,7 @@ async function showGeminiConfigActionPicker(
 	if (picked === "Permissions") {
 		return showGeminiConfigPermissionsPicker(ctx, options);
 	}
-	if (picked === "Persist") return showGeminiConfigPersistPicker(ctx, options);
+	if (picked === "ACP command") return showAcpCommandPicker(ctx, options);
 	return runGeminiConfig({ action: "status" }, options);
 }
 async function showGeminiConfigStatus(
@@ -295,7 +292,6 @@ async function showGeminiConfigStatus(
 		status: status.ready ? "ok" : "needs_attention",
 	});
 }
-
 
 function commandStatusText(status: GeminiAcpStatusReport): string {
 	const command = status.command;
@@ -370,7 +366,6 @@ function splitCommandLine(input: string): string[] {
 	if (currentPart) parts.push(currentPart);
 	return parts;
 }
-
 
 function formatCommandDisplay(status: GeminiAcpCommandStatus): string {
 	const suffix = defaultSuffix(status);

@@ -127,7 +127,7 @@ export async function evaluateGeminiAcpStatus(
 			capabilities,
 			[
 				"Gemini ACP is disabled or has no effective command after applying defaults.",
-				"Run `/gemini-config persist gemini --acp` to save a local Gemini ACP command, or keep using local/no-key workflows over supplied documents.",
+				"Run `/gemini-config command gemini --acp` to save a local Gemini ACP command, or keep using local/no-key workflows over supplied documents.",
 			],
 			providerError(
 				"GEMINI_ACP_MISSING_CONFIG",
@@ -292,7 +292,7 @@ function commandNotFoundRemediation(
 ): string[] {
 	if (!command.settingsPersisted) {
 		return [
-			`Gemini ACP command is not persisted; using default \`${formatCommandForMessage(settings)}\`, but it was not found on PATH. Install the Gemini CLI or run \`/gemini-config persist\` to set a custom path.`,
+			`Gemini ACP command is not persisted; using default \`${formatCommandForMessage(settings)}\`, but it was not found on PATH. Install the Gemini CLI or run \`/gemini-config command\` to set a custom path.`,
 		];
 	}
 	return [

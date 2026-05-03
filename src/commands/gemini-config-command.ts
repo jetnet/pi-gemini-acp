@@ -12,36 +12,37 @@ import type { GeminiAcpConfig, PiToolShell, ResultEnvelope } from "../types.js";
 import type { PiCommandContext } from "./define.js";
 import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.js";
 
-export interface GeminiConfigPersistParams {
-	command?: string;
+export interface GeminiConfigAcpCommandParams {
+	executable?: string;
 	args?: string[];
 }
 
-export interface GeminiConfigPersistOptions extends ConfigureGeminiAcpOptions {
+export interface GeminiConfigAcpCommandOptions
+	extends ConfigureGeminiAcpOptions {
 	config?: GeminiAcpConfig;
 }
 
-export type GeminiConfigPersistResult =
+export type GeminiConfigAcpCommandResult =
 	| ConfigureGeminiAcpResult
 	| { cancelled: true }
 	| null;
 
 /** Shows a settings-style picker for staging Gemini ACP command/args before saving. */
-export async function showGeminiConfigPersistPicker(
+export async function showAcpCommandPicker(
 	ctx: PiCommandContext,
-	options: GeminiConfigPersistOptions = {},
-): Promise<PiToolShell<ResultEnvelope<GeminiConfigPersistResult>>> {
-	if (!hasInteractiveUi(ctx)) return runGeminiConfigPersist({}, options);
-	return showInteractivePersistPicker(ctx, options);
+	options: GeminiConfigAcpCommandOptions = {},
+): Promise<PiToolShell<ResultEnvelope<GeminiConfigAcpCommandResult>>> {
+	if (!hasInteractiveUi(ctx)) return runAcpCommandConfig({}, options);
+	return showInteractiveAcpCommandPicker(ctx, options);
 }
 
-/** Persists Gemini ACP command settings and reports command preflight status. */
-export async function runGeminiConfigPersist(
-	params: GeminiConfigPersistParams,
-	options: GeminiConfigPersistOptions = {},
-): Promise<PiToolShell<ResultEnvelope<GeminiConfigPersistResult>>> {
+/** Saves Gemini ACP command settings and reports command preflight status. */
+export async function runAcpCommandConfig(
+	params: GeminiConfigAcpCommandParams,
+	options: GeminiConfigAcpCommandOptions = {},
+): Promise<PiToolShell<ResultEnvelope<GeminiConfigAcpCommandResult>>> {
 	const result = await configureGeminiAcpSettings(
-		{ command: params.command, args: params.args },
+		{ command: params.executable, args: params.args },
 		options,
 	);
 	if ("error" in result) return errorResult(result.error);
@@ -63,17 +64,17 @@ export async function runGeminiConfigPersist(
 	});
 }
 
-async function showInteractivePersistPicker(
+async function showInteractiveAcpCommandPicker(
 	ctx: InteractiveCommandContext,
-	options: GeminiConfigPersistOptions,
-): Promise<PiToolShell<ResultEnvelope<GeminiConfigPersistResult>>> {
-	const current = await loadCurrentPersistSettings(options);
+	options: GeminiConfigAcpCommandOptions,
+): Promise<PiToolShell<ResultEnvelope<GeminiConfigAcpCommandResult>>> {
+	const current = await loadCurrentAcpCommandSettings(options);
 	let localCommand = current.command;
 	let localArgs = [...current.args];
 
 	while (true) {
 		const picked = await ctx.ui.select(
-			"Gemini ACP command settings",
+			"ACP command settings",
 			settingsChoices(localCommand, localArgs),
 			{ signal: ctx.signal },
 		);
@@ -90,8 +91,8 @@ async function showInteractivePersistPicker(
 			continue;
 		}
 		if (picked === "Save and apply") {
-			return runGeminiConfigPersist(
-				{ command: localCommand, args: localArgs },
+			return runAcpCommandConfig(
+				{ executable: localCommand, args: localArgs },
 				options,
 			);
 		}
@@ -122,8 +123,8 @@ async function editArgs(
 	}
 }
 
-async function loadCurrentPersistSettings(
-	options: GeminiConfigPersistOptions,
+async function loadCurrentAcpCommandSettings(
+	options: GeminiConfigAcpCommandOptions,
 ): Promise<{ command: string; args: string[] }> {
 	const config =
 		options.config ?? (await loadConfig({ rootDir: options.rootDir }));

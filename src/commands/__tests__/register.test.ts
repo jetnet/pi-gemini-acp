@@ -159,9 +159,9 @@ describe("Gemini ACP command registration", () => {
 		expect(result.content[0]?.text).toContain("- filesystem read: enabled");
 	});
 
-	it("persists default Gemini ACP command settings", async () => {
+	it("persists default ACP command settings", async () => {
 		const result = await runGeminiConfig(
-			{ action: "persist" },
+			{ action: "command" },
 			{
 				rootDir,
 				commandExists: async (command) => command === "gemini",
@@ -188,8 +188,8 @@ describe("Gemini ACP command registration", () => {
 	it("persists custom Gemini ACP command args", async () => {
 		const result = await runGeminiConfig(
 			{
-				action: "persist",
-				command: "/usr/local/bin/gemini",
+				action: "command",
+				executable: "/usr/local/bin/gemini",
 				args: ["--acp", "--model", "gemini-2.5-flash"],
 			},
 			{
@@ -208,7 +208,7 @@ describe("Gemini ACP command registration", () => {
 
 	it("reports a missing configured command after saving valid settings", async () => {
 		const result = await runGeminiConfig(
-			{ action: "persist", command: "missing-gemini", args: ["--acp"] },
+			{ action: "command", executable: "missing-gemini", args: ["--acp"] },
 			{ rootDir, commandExists: async () => false },
 		);
 
@@ -226,11 +226,11 @@ describe("Gemini ACP command registration", () => {
 	it("parses command and args from raw slash-command text", () => {
 		expect(
 			parseGeminiConfigCommandArgs(
-				"persist gemini --acp --model gemini-2.5-flash",
+				"command gemini --acp --model gemini-2.5-flash",
 			),
 		).toEqual({
-			action: "persist",
-			command: "gemini",
+			action: "command",
+			executable: "gemini",
 			args: ["--acp", "--model", "gemini-2.5-flash"],
 		});
 	});
@@ -251,7 +251,7 @@ describe("Gemini ACP command registration", () => {
 
 	it("refuses secret-like args instead of persisting them", async () => {
 		const result = await runGeminiConfig(
-			{ action: "persist", command: "gemini", args: ["--api-key=abc123"] },
+			{ action: "command", executable: "gemini", args: ["--api-key=abc123"] },
 			{ rootDir, commandExists: async () => true },
 		);
 

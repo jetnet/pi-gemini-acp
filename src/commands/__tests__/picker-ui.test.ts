@@ -57,15 +57,15 @@ describe("Gemini ACP command pickers", () => {
 
 		expect(select).toHaveBeenCalledWith(
 			"Gemini config",
-			["Status", "Persist", "Permissions"],
+			["Status", "ACP command", "Permissions"],
 			{ signal: undefined },
 		);
 		expect(result.content[0]?.text).toBe("Cancelled.");
 	});
 
-	it("stages command edits before saving persist settings", async () => {
+	it("stages command edits before saving ACP command settings", async () => {
 		const { ctx, select, input } = makeInteractiveCtx({
-			select: ["Persist", "Command: gemini", "Save and apply"],
+			select: ["ACP command", "Command: gemini", "Save and apply"],
 			input: "gemini-dev",
 		});
 
@@ -79,7 +79,7 @@ describe("Gemini ACP command pickers", () => {
 		});
 		expect(select).toHaveBeenNthCalledWith(
 			3,
-			"Gemini ACP command settings",
+			"ACP command settings",
 			expect.arrayContaining(["Command: gemini-dev"]),
 			{ signal: undefined },
 		);
@@ -94,9 +94,15 @@ describe("Gemini ACP command pickers", () => {
 		});
 	});
 
-	it("stages added args before saving persist settings", async () => {
+	it("stages added args before saving ACP command settings", async () => {
 		const { ctx, select, input } = makeInteractiveCtx({
-			select: ["Persist", "Args: --acp", "Add new arg", "Done", "Save and apply"],
+			select: [
+				"ACP command",
+				"Args: --acp",
+				"Add new arg",
+				"Done",
+				"Save and apply",
+			],
 			input: "--verbose",
 		});
 
@@ -114,7 +120,7 @@ describe("Gemini ACP command pickers", () => {
 			{ signal: undefined },
 		);
 		expect(select).toHaveBeenCalledWith(
-			"Gemini ACP command settings",
+			"ACP command settings",
 			expect.arrayContaining(["Args: --acp --verbose"]),
 			{ signal: undefined },
 		);
@@ -123,11 +129,11 @@ describe("Gemini ACP command pickers", () => {
 		).toMatchObject({ args: ["--acp", "--verbose"] });
 	});
 
-	it("stages removed args before saving persist settings", async () => {
+	it("stages removed args before saving ACP command settings", async () => {
 		await runGeminiConfigCommand(
 			{
-				action: "persist",
-				command: "gemini",
+				action: "command",
+				executable: "gemini",
 				args: ["--acp", "--model", "gemini-3.1-pro"],
 			},
 			undefined,
@@ -135,7 +141,7 @@ describe("Gemini ACP command pickers", () => {
 		);
 		const { ctx, select } = makeInteractiveCtx({
 			select: [
-				"Persist",
+				"ACP command",
 				"Args: --acp --model gemini-3.1-pro",
 				"Remove --model",
 				"Done",
@@ -158,18 +164,18 @@ describe("Gemini ACP command pickers", () => {
 		).toMatchObject({ args: ["--acp", "gemini-3.1-pro"] });
 	});
 
-	it("opens persist settings directly for /gemini-config persist with no command", async () => {
+	it("opens ACP command settings directly for /gemini-config command with no executable", async () => {
 		const { ctx, select } = makeInteractiveCtx({
 			select: ["Save and apply"],
 		});
 
-		await runGeminiConfigCommand({ action: "persist" }, ctx, {
+		await runGeminiConfigCommand({ action: "command" }, ctx, {
 			rootDir,
 			commandExists: async () => true,
 		});
 
 		expect(select).toHaveBeenCalledWith(
-			"Gemini ACP command settings",
+			"ACP command settings",
 			["Command: gemini", "Args: --acp", "Save and apply", "Cancel"],
 			{ signal: undefined },
 		);
@@ -178,22 +184,22 @@ describe("Gemini ACP command pickers", () => {
 		).toMatchObject({ command: "gemini", args: ["--acp"] });
 	});
 
-	it("cancels persist settings without saving", async () => {
+	it("cancels ACP command settings without saving", async () => {
 		const { ctx } = makeInteractiveCtx({ select: [undefined] });
 
-		const result = await runGeminiConfigCommand(
-			{ action: "persist" },
-			ctx,
-			{ rootDir },
-		);
+		const result = await runGeminiConfigCommand({ action: "command" }, ctx, {
+			rootDir,
+		});
 
 		expect(result.content[0]?.text).toBe("Cancelled.");
-		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]).toBeUndefined();
+		expect(
+			(await loadConfig({ rootDir })).providers?.["gemini-acp"],
+		).toBeUndefined();
 	});
 
-	it("persists default settings for headless /gemini-config persist", async () => {
+	it("persists default settings for headless /gemini-config command", async () => {
 		const result = await runGeminiConfigCommand(
-			{ action: "persist" },
+			{ action: "command" },
 			undefined,
 			{ rootDir, commandExists: async () => true },
 		);

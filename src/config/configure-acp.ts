@@ -14,13 +14,13 @@ const SECRET_FLAG_PATTERN =
 const SECRET_ENV_PATTERN =
 	/^[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*=/iu;
 
-/** User-provided command settings accepted by `/gemini-config persist`. */
+/** User-provided command settings accepted by `/gemini-config command`. */
 export interface ConfigureGeminiAcpInput {
 	command?: string;
 	args?: readonly string[];
 }
 
-/** Lightweight post-save command preflight reported by `/gemini-config persist`. */
+/** Lightweight post-save command preflight reported by `/gemini-config command`. */
 export interface GeminiAcpCommandPreflight {
 	commandFound: boolean;
 	checkedAt: string;
@@ -34,7 +34,7 @@ export interface ConfigureGeminiAcpOptions extends StorageOptions {
 	now?: () => Date;
 }
 
-/** Result persisted and reported by `/gemini-config persist`. */
+/** Result persisted and reported by `/gemini-config command`. */
 export interface ConfigureGeminiAcpResult {
 	settings: GeminiAcpProviderSettings;
 	preflight: GeminiAcpCommandPreflight;
@@ -76,7 +76,7 @@ export async function configureGeminiAcpSettings(
 					checkedAt,
 					message: `Command '${settings.command}' was saved but was not found or is not executable.`,
 					remediation:
-						"Install and authenticate the Gemini CLI, ensure it is on PATH, or rerun /gemini-config persist with an executable path.",
+						"Install and authenticate the Gemini CLI, ensure it is on PATH, or rerun /gemini-config command with an executable path.",
 				},
 	};
 }
