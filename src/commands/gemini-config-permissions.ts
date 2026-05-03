@@ -14,12 +14,11 @@ import type {
 	PiToolShell,
 	ResultEnvelope,
 } from "../types.js";
-import type { PiCommandContext, PiComponentTree } from "./define.js";
+import type { PiCommandContext } from "./define.js";
 import {
-	closePickerToast,
-	hasOverlayUi,
+	hasInteractiveUi,
 	type InteractiveCommandContext,
-	toastShell,
+	notifyResult,
 } from "./picker.js";
 
 export interface PermissionToggle {
@@ -100,78 +99,69 @@ export async function showGeminiConfigPermissionsPicker(
 	ctx: PiCommandContext,
 	options: GeminiConfigPermissionsOptions = {},
 ): Promise<PiToolShell<ResultEnvelope<GeminiConfigPermissionsResult | null>>> {
-	if (!hasOverlayUi(ctx)) return runGeminiConfigPermissions({}, options);
-	const result = await runGeminiConfigPermissions({}, options);
-	const data = (result.details as ResultEnvelope<GeminiConfigPermissionsResult>)
-		.data;
-	if (data) renderPermissionsPicker(ctx, data, options);
-	return result;
+	if (!hasInteractiveUi(ctx)) return runGeminiConfigPermissions({}, options);
+	return showInteractivePermissionsPicker(ctx, options);
 }
 
-function renderPermissionsPicker(
+async function showInteractivePermissionsPicker(
 	ctx: InteractiveCommandContext,
-	data: GeminiConfigPermissionsResult,
 	options: GeminiConfigPermissionsOptions,
-): void {
-	ctx.ui.showOverlay({
-		render: () => ({
-			type: "vstack",
-			children: [
-				{ type: "text", text: "Gemini ACP permissions" },
-				...data.capabilities.flatMap((setting) =>
-					capabilityPickerSection(ctx, options, setting),
-				),
-				{ type: "button", label: "Done", onClick: () => closePickerToast(ctx) },
-			],
-		}),
-		zIndex: 100,
-		onClickOutside: () => {},
-	});
+): Promise<PiToolShell<ResultEnvelope<GeminiConfigPermissionsResult | null>>> {
+	while (true) {
+		const result = await runGeminiConfigPermissions({}, options);
+		const data = (
+			result.details as ResultEnvelope<GeminiConfigPermissionsResult>
+		).data;
+		if (!data) return result;
+
+		const choices = permissionsChoices(data.capabilities);
+		const picked = await ctx.ui.select("Gemini ACP permissions", choices, {
+			signal: ctx.signal,
+		});
+		if (!picked || picked === "Done") {
+			return toolResult({ text: data.summary, data });
+		}
+
+		const setting = data.capabilities[choices.indexOf(picked)];
+		if (!setting) continue;
+		const enabled = !setting.enabled;
+		const confirmRisk = await confirmPermissionRisk(ctx, setting, enabled);
+		if (confirmRisk === undefined) continue;
+		const toggleResult = await runGeminiConfigPermissions(
+			{ capability: setting.capability, enabled, confirmRisk },
+			options,
+		);
+		if ((toggleResult.details as ResultEnvelope).error) {
+			notifyResult(ctx, toggleResult);
+		}
+	}
 }
 
-function capabilityPickerSection(
-	ctx: InteractiveCommandContext,
-	options: GeminiConfigPermissionsOptions,
-	setting: PermissionCapabilitySetting,
-): PiComponentTree[] {
+function permissionsChoices(settings: PermissionCapabilitySetting[]): string[] {
 	return [
-		{ type: "text", text: `[${setting.enabled ? "x" : " "}] ${setting.capability}` },
-		{ type: "text", text: `  ${setting.description}` },
-		{
-			type: "button",
-			label: `Toggle ${setting.capability}`,
-			onClick: () => {
-				void toggleAndRefresh(ctx, options, { capability: setting.capability });
-			},
-		},
-		...(setting.requiresConfirmation
-			? [confirmRiskButton(ctx, options, setting.capability)]
-			: []),
+		...settings.map((setting) => {
+			const mark = setting.enabled ? "[x]" : "[ ]";
+			const warning = setting.requiresConfirmation
+				? " (⚠️ requires confirmation)"
+				: "";
+			return `${mark} ${setting.label}${warning}`;
+		}),
+		"Done",
 	];
 }
 
-function confirmRiskButton(
+async function confirmPermissionRisk(
 	ctx: InteractiveCommandContext,
-	options: GeminiConfigPermissionsOptions,
-	capability: PermissionCapability,
-): PiComponentTree {
-	return {
-		type: "button",
-		label: `Confirm risk and toggle ${capability}`,
-		onClick: () => {
-			void toggleAndRefresh(ctx, options, { capability, confirmRisk: true });
-		},
-	};
-}
-
-async function toggleAndRefresh(
-	ctx: InteractiveCommandContext,
-	options: GeminiConfigPermissionsOptions,
-	toggle: PermissionToggleInput,
-): Promise<void> {
-	const result = await runGeminiConfigPermissions(toggle, options);
-	toastShell(ctx, result);
-	await showGeminiConfigPermissionsPicker(ctx, options);
+	setting: PermissionCapabilitySetting,
+	enabled: boolean,
+): Promise<boolean | undefined> {
+	if (!enabled || !setting.requiresConfirmation) return false;
+	const confirmed = await ctx.ui.confirm(
+		`Enable ${setting.label}?`,
+		`${setting.description}\n\nThis allows ACP to ${setting.requiredFor}.`,
+		{ signal: ctx.signal },
+	);
+	return confirmed ? true : undefined;
 }
 
 async function loadCurrentPermissionPolicy(

@@ -21,10 +21,9 @@ import {
 	showGeminiConfigPermissionsPicker,
 } from "./gemini-config-permissions.js";
 import {
-	hasOverlayUi,
+	hasInteractiveUi,
 	type InteractiveCommandContext,
-	showPickerOverlay,
-	toastShell,
+	notifyResult,
 } from "./picker.js";
 
 export const geminiConfigSchema = Type.Object({
@@ -146,13 +145,13 @@ export async function runGeminiConfigCommand(
 	ctx?: PiCommandContext,
 	options: GeminiConfigCommandOptions = {},
 ) {
-	if (!params.action && hasOverlayUi(ctx)) {
+	if (!params.action && hasInteractiveUi(ctx)) {
 		return showGeminiConfigActionPicker(ctx, options);
 	}
 	if (
 		params.action === "permissions" &&
 		!params.capability &&
-		hasOverlayUi(ctx)
+		hasInteractiveUi(ctx)
 	) {
 		return showGeminiConfigPermissionsPicker(ctx, options);
 	}
@@ -257,56 +256,42 @@ export const geminiConfigCommand = defineGeminiCommand({
 	execute: (params, ctx) => runGeminiConfigCommand(params, ctx),
 });
 
-function showGeminiConfigActionPicker(
+async function showGeminiConfigActionPicker(
 	ctx: InteractiveCommandContext,
 	options: GeminiConfigCommandOptions,
 ) {
-	showPickerOverlay(ctx, "Gemini config", [
-		{
-			label: "Status",
-			onClick: () => {
-				void runActionAndToast(ctx, { action: "status" }, options);
-			},
-		},
-		{
-			label: "Persist",
-			onClick: () => {
-				void persistFromEditor(ctx, options);
-			},
-		},
-		{
-			label: "Permissions",
-			onClick: () => {
-				void showGeminiConfigPermissionsPicker(ctx, options);
-			},
-		},
-	]);
-	return toolResult({
-		text: "Choose a Gemini config action from the picker.",
-		data: { actions: ["status", "persist", "permissions"] },
-	});
+	const picked = await ctx.ui.select(
+		"Gemini config",
+		["Status", "Persist", "Permissions"],
+		{ signal: ctx.signal },
+	);
+	if (!picked) {
+		return toolResult({ text: "Cancelled.", data: { cancelled: true } });
+	}
+	if (picked === "Permissions") {
+		return showGeminiConfigPermissionsPicker(ctx, options);
+	}
+	if (picked === "Persist") return persistFromInput(ctx, options);
+	return runGeminiConfig({ action: "status" }, options);
 }
 
-async function runActionAndToast(
-	ctx: InteractiveCommandContext,
-	params: CommandParams,
-	options: GeminiConfigCommandOptions,
-): Promise<void> {
-	const result = await runGeminiConfig(params, options);
-	toastShell(ctx, result);
-}
-
-async function persistFromEditor(
+async function persistFromInput(
 	ctx: InteractiveCommandContext,
 	options: GeminiConfigCommandOptions,
-): Promise<void> {
-	const input = (await ctx.ui.openEditor("gemini --acp")).trim();
-	const [command, ...args] = splitCommandLine(input || "gemini --acp");
-	const result = await runGeminiConfig(
+) {
+	const input = (
+		await ctx.ui.input("Gemini ACP command", "gemini --acp", {
+			signal: ctx.signal,
+		})
+	)?.trim();
+	if (!input) {
+		return toolResult({ text: "Cancelled.", data: { cancelled: true } });
+	}
+	const [command, ...args] = splitCommandLine(input);
+	return runGeminiConfig(
 		{ action: "persist", command, args: args.length > 0 ? args : undefined },
 		options,
 	);
-	toastShell(ctx, result);
 }
 async function showGeminiConfigStatus(
 	options: GeminiConfigCommandOptions,

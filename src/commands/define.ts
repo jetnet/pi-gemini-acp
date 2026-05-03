@@ -31,21 +31,13 @@ export interface GeminiCommand<TParameters extends TSchema = TSchema> {
 	execute: CommandExecute<Static<TParameters>>;
 }
 
-/** Pi overlay configuration used by command pickers. */
-export interface PiOverlayConfig {
-	render: () => PiComponentTree;
-	zIndex?: number;
-	onClickOutside?: () => void;
+/** Options accepted by Pi UI dialog methods. */
+export interface PiUIDialogOptions {
+	signal?: AbortSignal;
+	timeout?: number;
 }
 
-/** Minimal Pi component tree nodes used by picker overlays. */
-export type PiComponentTree =
-	| { type: "text"; text: string }
-	| { type: "vstack"; children: PiComponentTree[] }
-	| { type: "hstack"; children: PiComponentTree[] }
-	| { type: "button"; label: string; onClick: () => void };
-
-/** Minimal subset of the Pi extension command context the handler relies on. */
+/** Minimal subset of the real Pi extension command context the handler relies on. */
 export interface PiCommandContext {
 	hasUI?: boolean;
 	signal?: AbortSignal;
@@ -53,9 +45,22 @@ export interface PiCommandContext {
 	settings?: unknown;
 	auth?: unknown;
 	ui?: {
-		showToast(msg: string): void;
-		openEditor(text?: string): Promise<string>;
-		showOverlay(config: PiOverlayConfig): void;
+		select(
+			title: string,
+			options: string[],
+			opts?: PiUIDialogOptions,
+		): Promise<string | undefined>;
+		confirm(
+			title: string,
+			message: string,
+			opts?: PiUIDialogOptions,
+		): Promise<boolean>;
+		input(
+			title: string,
+			placeholder?: string,
+			opts?: PiUIDialogOptions,
+		): Promise<string | undefined>;
+		notify(message: string, type?: "info" | "warning" | "error"): void;
 	};
 }
 

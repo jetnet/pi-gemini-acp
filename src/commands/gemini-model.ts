@@ -7,7 +7,7 @@ import {
 } from "../config/model.js";
 import { errorResult, toolResult } from "../tools/result.js";
 import { defineGeminiCommand, type PiCommandContext } from "./define.js";
-import { hasOverlayUi, showPickerOverlay, toastShell } from "./picker.js";
+import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.js";
 
 export const geminiModelSchema = Type.Object({
 	model: Type.Optional(
@@ -36,7 +36,7 @@ export async function setGeminiModel(
 	);
 	if (result.error) return errorResult(result.error);
 	return toolResult({
-		text: `${result.status.message} Gemini ACP tools will pass this model when the configured command supports --model.`,
+		text: `Selected model: ${result.status.selectedModel ?? model}.`,
 		data: result,
 	});
 }
@@ -44,10 +44,11 @@ export async function setGeminiModel(
 export async function runGeminiModelCommand(
 	params: Params,
 	ctx?: PiCommandContext,
+	deps: ModelSelectionDeps & { rootDir?: string } = {},
 ) {
 	const model = params.model?.trim();
-	if (!model && hasOverlayUi(ctx)) return showGeminiModelPicker(ctx);
-	return setGeminiModel(params);
+	if (!model && hasInteractiveUi(ctx)) return showGeminiModelPicker(ctx, deps);
+	return setGeminiModel(params, deps);
 }
 
 export function getGeminiModelCompletions(prefix: string) {
@@ -68,32 +69,24 @@ export function getGeminiModelCompletions(prefix: string) {
 	return completions.length > 0 ? completions : null;
 }
 
-function showGeminiModelPicker(ctx: ReturnType<typeof assertOverlayCtx>) {
+async function showGeminiModelPicker(
+	ctx: InteractiveCommandContext,
+	deps: ModelSelectionDeps & { rootDir?: string },
+) {
 	const choices = listGeminiModelChoices();
-	showPickerOverlay(
-		ctx,
-		"Choose a Gemini model",
-		choices.map((choice) => ({
-			label: `${choice.label || choice.id} — ${choice.id}`,
-			onClick: () => {
-				void (async () => {
-					const result = await setGeminiModel({ model: choice.id });
-					toastShell(ctx, result);
-				})();
-			},
-		})),
-		[
-			"Gemini ACP will use the selected model when the command supports --model.",
-		],
-	);
-	return toolResult({
-		text: "Choose a Gemini model from the picker.",
-		data: { choices },
+	const labels = choices.map((choice) => `${choice.label} — ${choice.id}`);
+	const picked = await ctx.ui.select("Choose a Gemini model", labels, {
+		signal: ctx.signal,
 	});
-}
-
-function assertOverlayCtx(ctx: PiCommandContext) {
-	return ctx as PiCommandContext & { ui: NonNullable<PiCommandContext["ui"]> };
+	if (!picked) {
+		return toolResult({
+			text: "Model selection cancelled.",
+			data: { cancelled: true },
+		});
+	}
+	const choice = choices[labels.indexOf(picked)];
+	const modelId = choice?.id ?? picked;
+	return setGeminiModel({ model: modelId }, deps);
 }
 
 function modelChoiceResult() {

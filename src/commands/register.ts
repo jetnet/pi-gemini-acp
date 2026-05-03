@@ -77,11 +77,10 @@ function emit(
 	message: string,
 	type: "info" | "warning" | "error",
 ): void {
-	const rendered = type === "error" ? `Error: ${message}` : message;
-	if (ctx?.hasUI && ctx.ui?.showToast) {
-		ctx.ui.showToast(rendered);
+	if (ctx?.hasUI && ctx.ui?.notify) {
+		ctx.ui.notify(message, type);
 		return;
 	}
 	const stream = type === "error" ? process.stderr : process.stdout;
-	stream.write(`${rendered}\n`);
+	stream.write(`${message}\n`);
 }

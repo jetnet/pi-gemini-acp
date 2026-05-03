@@ -25,31 +25,32 @@ function makeCommand(overrides: Partial<GeminiCommand> = {}): {
 
 function makeCtx(): {
 	ctx: PiCommandContext;
-	showToast: ReturnType<typeof vi.fn>;
+	notify: ReturnType<typeof vi.fn>;
 } {
-	const showToast = vi.fn();
+	const notify = vi.fn();
 	return {
 		ctx: {
 			hasUI: true,
 			ui: {
-				showToast,
-				openEditor: vi.fn(async () => ""),
-				showOverlay: vi.fn(),
+				select: vi.fn(async () => undefined),
+				confirm: vi.fn(async () => false),
+				input: vi.fn(async () => undefined),
+				notify,
 			},
 		},
-		showToast,
+		notify,
 	};
 }
 
 describe("buildCommandHandler", () => {
 	it("passes empty params object when args string is empty", async () => {
 		const { command, execute } = makeCommand();
-		const { ctx, showToast } = makeCtx();
+		const { ctx, notify } = makeCtx();
 
 		await buildCommandHandler(command)("", ctx);
 
 		expect(execute).toHaveBeenCalledWith({}, ctx);
-		expect(showToast).toHaveBeenCalledWith("ok");
+		expect(notify).toHaveBeenCalledWith("ok", "info");
 	});
 
 	it("assigns a bare string to the schema's first property", async () => {
@@ -87,12 +88,12 @@ describe("buildCommandHandler", () => {
 				throw new Error("boom");
 			},
 		});
-		const { ctx, showToast } = makeCtx();
+		const { ctx, notify } = makeCtx();
 
 		await expect(
 			buildCommandHandler(command)("", ctx),
 		).resolves.toBeUndefined();
-		expect(showToast).toHaveBeenCalledWith("Error: /gemini-test failed: boom");
+		expect(notify).toHaveBeenCalledWith("/gemini-test failed: boom", "error");
 	});
 
 	it("surfaces an error notification when the result envelope carries an error code", async () => {
@@ -107,10 +108,10 @@ describe("buildCommandHandler", () => {
 					"policy refused",
 				),
 		});
-		const { ctx, showToast } = makeCtx();
+		const { ctx, notify } = makeCtx();
 
 		await buildCommandHandler(command)("", ctx);
 
-		expect(showToast).toHaveBeenCalledWith("Error: policy refused");
+		expect(notify).toHaveBeenCalledWith("policy refused", "error");
 	});
 });

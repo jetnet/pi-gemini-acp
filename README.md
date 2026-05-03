@@ -63,9 +63,10 @@ export PI_GEMINI_ACP_ARGS="--acp"
 
 Runtime config is stored under `~/.pi/gemini-acp/` when persisted by commands such as `/gemini-config persist`, `/gemini-config permissions`, and `/gemini-model`. Use `/gemini-config status` any time to inspect the resulting read-only command/auth/capability preflight state, including file-analysis and unconfirmed image-input transport status. Tool calls may also provide local documents/sources for no-key search/research operation; prompt/extract/summarize/code-review/translation workflows require configured/authenticated Gemini ACP and do not provide local/no-key fallback. `gemini_file_analyze` does not read file contents yet; it rejects directories, hidden paths, symlinks, and secret-like file names by default before reporting unsupported ACP file transport. `gemini_image_describe` validates only explicit image input paths or base64 data and returns a structured unsupported-capability error instead of sending image bytes to ACP.
 
-Inspect status or configure the local ACP command without editing JSON manually:
+Inspect status or configure the local ACP command without editing JSON manually. Run `/gemini-config` with no arguments in interactive Pi to choose `status`, `persist`, or `permissions` from Pi's picker UI.
 
 ```bash
+/gemini-config
 /gemini-config status
 /gemini-config persist
 /gemini-config persist gemini --acp
@@ -79,7 +80,7 @@ Do not pass API keys or tokens to `/gemini-config persist`; use the Gemini CLI's
 
 ### Selecting a model
 
-Run `/gemini-model` with no argument to see selectable choices. The command also exposes slash-command argument completions for common Gemini models.
+Run `/gemini-model` with no argument in interactive Pi to choose from Pi's picker UI; headless sessions print selectable choices. The command also exposes slash-command argument completions for common Gemini models.
 
 ```bash
 /gemini-model
