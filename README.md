@@ -2,7 +2,7 @@
 
 Gemini ACP prompt, search, and research provider for Pi.
 
-`pi-gemini-acp` owns the optional Gemini ACP subprocess/runtime integration so other Pi extensions can stay local-first. It exposes standalone Gemini-backed prompt, extraction, summarization, search, research, code review, translation, and status tools while keeping local/no-key search over supplied documents available for tests and offline workflows.
+`pi-gemini-acp` adds optional Gemini ACP tools for prompt, search, research, extraction, summarization, code review, translation, and status while preserving local/no-key search over supplied documents.
 
 ## Install
 
