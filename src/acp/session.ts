@@ -1,4 +1,6 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import { lstat, readFile } from "node:fs/promises";
+import path from "node:path";
 import {
 	permissionPolicyCapabilities,
 	requirePermissionCapability,
@@ -6,6 +8,7 @@ import {
 import type { GeminiAcpPermissionPolicy } from "../types.js";
 import type {
 	GeminiAcpCommandSettings,
+	GeminiAcpPromptPart,
 	GeminiAcpPromptUpdateHandler,
 } from "./client.js";
 
@@ -23,13 +26,24 @@ interface PendingRequest {
 	reject: (error: Error) => void;
 }
 
+const MAX_CLIENT_READ_BYTES = 1_000_000;
+
+/** Normalized subset of ACP initialize capabilities used for feature preflight. */
+export interface GeminiAcpInitializeResult {
+	promptCapabilities: {
+		embeddedContext: boolean;
+		image: boolean;
+		audio: boolean;
+	};
+}
+
 /** Minimal ACP process/session operations used by one-shot and cached clients. */
 export interface GeminiAcpProcessSession {
-	initialize(): Promise<void>;
+	initialize(): Promise<GeminiAcpInitializeResult>;
 	newSession(cwd: string): Promise<string>;
 	prompt(
 		sessionId: string,
-		text: string,
+		prompt: string | GeminiAcpPromptPart[],
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string>;
 	close(): Promise<void>;
@@ -50,11 +64,17 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	private stdoutBuffer = "";
 	private stderrBuffer = "";
 	private closed = false;
+	private sessionCwd = process.cwd();
+	private readonly allowedReadPaths: Set<string>;
 
 	private constructor(
 		private readonly child: ChildProcessWithoutNullStreams,
 		private readonly permissionPolicy?: GeminiAcpPermissionPolicy,
+		allowedReadPaths: readonly string[] = [],
 	) {
+		this.allowedReadPaths = new Set(
+			allowedReadPaths.map((filePath) => path.resolve(filePath)),
+		);
 		child.stdout.setEncoding("utf8");
 		child.stderr.setEncoding("utf8");
 		child.stdout.on("data", (chunk: string) => this.readStdout(chunk));
@@ -80,7 +100,11 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 			stdio: "pipe",
 			env: process.env,
 		});
-		const session = new AcpProcessSession(child, settings.permissionPolicy);
+		const session = new AcpProcessSession(
+			child,
+			settings.permissionPolicy,
+			settings.allowedReadPaths,
+		);
 		if (signal?.aborted) {
 			child.kill("SIGTERM");
 			throw abortError();
@@ -91,15 +115,17 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		return session;
 	}
 
-	async initialize(): Promise<void> {
-		await this.request("initialize", {
+	async initialize(): Promise<GeminiAcpInitializeResult> {
+		const result = await this.request("initialize", {
 			protocolVersion: 1,
 			clientInfo: { name: "pi-gemini-acp", version: "0.1.0" },
 			clientCapabilities: permissionPolicyCapabilities(this.permissionPolicy),
 		});
+		return normalizeInitializeResult(result);
 	}
 
 	async newSession(cwd: string): Promise<string> {
+		this.sessionCwd = path.resolve(cwd);
 		const result = await this.request("session/new", { cwd, mcpServers: [] });
 		const sessionId = asRecord(result)?.sessionId;
 		if (typeof sessionId !== "string") {
@@ -110,7 +136,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 
 	async prompt(
 		sessionId: string,
-		text: string,
+		prompt: string | GeminiAcpPromptPart[],
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
 		this.agentText.length = 0;
@@ -118,7 +144,10 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		try {
 			await this.request("session/prompt", {
 				sessionId,
-				prompt: [{ type: "text", text }],
+				prompt:
+					typeof prompt === "string"
+						? [{ type: "text", text: prompt }]
+						: prompt,
 			});
 			return this.agentText.join("").trim();
 		} finally {
@@ -176,7 +205,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 
 	private handleMessage(message: JsonRpcMessage): void {
 		if (message.id !== undefined && message.method) {
-			this.handleAgentRequest(message);
+			void this.handleAgentRequest(message);
 			return;
 		}
 		if (message.id !== undefined) {
@@ -195,7 +224,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		if (message.method === "session/update") this.collectUpdate(message.params);
 	}
 
-	private handleAgentRequest(message: JsonRpcMessage): void {
+	private async handleAgentRequest(message: JsonRpcMessage): Promise<void> {
 		if (message.method === "session/request_permission") {
 			const optionId = permissionOptionId(
 				message.params,
@@ -208,10 +237,72 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 			});
 			return;
 		}
+		if (message.method === "fs/read_text_file") {
+			await this.handleReadTextFileRequest(message);
+			return;
+		}
 		this.respond(message.id, undefined, {
 			code: -32601,
 			message: `Method not found: ${message.method}`,
 		});
+	}
+
+	private async handleReadTextFileRequest(
+		message: JsonRpcMessage,
+	): Promise<void> {
+		const requestedPath = stringValue(asRecord(message.params)?.path);
+		const normalizedPath = requestedPath
+			? normalizeRequestedFilePath(requestedPath)
+			: undefined;
+		const resolvedPath = normalizedPath
+			? this.allowedReadPathForRequest(normalizedPath)
+			: undefined;
+		if (!resolvedPath) {
+			this.respond(message.id, undefined, {
+				code: -32000,
+				message: "Gemini ACP file read was denied by the Pi allowlist.",
+			});
+			return;
+		}
+		try {
+			const stat = await lstat(resolvedPath);
+			if (stat.isSymbolicLink() || !stat.isFile()) {
+				this.respond(message.id, undefined, {
+					code: -32000,
+					message: "Gemini ACP file read was denied for a non-regular file.",
+				});
+				return;
+			}
+			if (stat.size > MAX_CLIENT_READ_BYTES) {
+				this.respond(message.id, undefined, {
+					code: -32000,
+					message:
+						"Gemini ACP file read was denied because the file is too large.",
+				});
+				return;
+			}
+			this.respond(message.id, {
+				content: await readFile(resolvedPath, "utf8"),
+			});
+		} catch (cause) {
+			this.respond(message.id, undefined, {
+				code: -32000,
+				message:
+					cause instanceof Error
+						? cause.message
+						: "Gemini ACP file read failed.",
+			});
+		}
+	}
+
+	private allowedReadPathForRequest(requestedPath: string): string | undefined {
+		const candidates = path.isAbsolute(requestedPath)
+			? [path.resolve(requestedPath)]
+			: [
+					path.resolve(this.sessionCwd, requestedPath),
+					path.resolve(requestedPath),
+				];
+		return candidates.find((candidate) => this.allowedReadPaths.has(candidate));
 	}
 
 	private respond(
@@ -294,6 +385,31 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
 		? (value as Record<string, unknown>)
 		: undefined;
+}
+
+function normalizeInitializeResult(result: unknown): GeminiAcpInitializeResult {
+	const capabilities = asRecord(asRecord(result)?.agentCapabilities);
+	const promptCapabilities = asRecord(capabilities?.promptCapabilities);
+	return {
+		promptCapabilities: {
+			embeddedContext: promptCapabilities?.embeddedContext === true,
+			image: promptCapabilities?.image === true,
+			audio: promptCapabilities?.audio === true,
+		},
+	};
+}
+
+function stringValue(value: unknown): string | undefined {
+	return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function normalizeRequestedFilePath(value: string): string {
+	if (!value.startsWith("file://")) return value;
+	try {
+		return decodeURI(value.slice("file://".length));
+	} catch {
+		return value.slice("file://".length);
+	}
 }
 
 function abortError(): Error {

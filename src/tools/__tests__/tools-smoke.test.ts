@@ -28,21 +28,6 @@ describe("gemini ACP tools smoke", () => {
 		]);
 	});
 
-	it("exposes custom renderers for long-running Gemini tools", () => {
-		for (const name of [
-			"gemini_prompt",
-			"gemini_extract",
-			"gemini_summarize",
-			"gemini_research",
-			"gemini_code_review",
-			"gemini_translate",
-		] as const) {
-			const tool = geminiAcpTools.find((candidate) => candidate.name === name);
-			expect(tool?.renderCall).toBeTypeOf("function");
-			expect(tool?.renderResult).toBeTypeOf("function");
-		}
-	});
-
 	it("returns Pi shell with visible data and progress for local search", async () => {
 		const tool = geminiAcpTools.find(
 			(candidate) => candidate.name === "gemini_search",
@@ -379,23 +364,29 @@ describe("gemini ACP tools smoke", () => {
 		).toBe("chunk");
 	});
 
-	it("returns Pi shell for unsupported file analysis", async () => {
+	it("returns Pi shell for file analysis validation errors", async () => {
 		const tool = geminiAcpTools.find(
 			(candidate) => candidate.name === "gemini_file_analyze",
 		);
+		const progress: PiToolShell[] = [];
 		const result = await tool?.execute(
 			"x",
-			{ paths: ["README.md"], instructions: "Summarize this file." } as never,
+			{ paths: [".env"], instructions: "Summarize this file." } as never,
 			new AbortController().signal,
+			(update) => {
+				progress.push(update);
+			},
 		);
 		assertShell(result);
 		expect(result?.content[0]?.text).toContain(
-			"file/document input support is not confirmed",
+			"Hidden files or directories are rejected",
 		);
 		expect(result?.details).toMatchObject({
 			status: "error",
-			error: { code: "GEMINI_ACP_FILE_ANALYSIS_UNAVAILABLE" },
+			error: { code: "GEMINI_FILE_ANALYZE_HIDDEN_PATH_REJECTED" },
 		});
+		expect(progress[0]?.content[0]?.text).toContain(".env");
+		expect(progress[0]?.content[0]?.text).toContain("Instructions length");
 	});
 
 	it("returns explicit unsupported-capability shell for image description", async () => {

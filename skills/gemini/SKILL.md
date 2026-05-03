@@ -15,7 +15,7 @@ Use this skill to combine `pi-gemini-acp` source discovery with optional `pi-scr
 - `gemini_summarize` — summarize one supplied content item or one safe public HTTP(S) URL; use it for single-page/source summaries, not research synthesis.
 - `gemini_search` — find candidate URLs with Gemini ACP web/search grounding, or search supplied documents locally when provided.
 - `gemini_research` — run a Gemini ACP-backed research pass with source/citation tracking.
-- `gemini_file_analyze` — capability-gated file/document analysis seam; currently validates explicit local file paths, rejects directories/hidden/secret-like paths by default, and returns unsupported until ACP file input support is confirmed.
+- `gemini_file_analyze` — capability-gated file/document analysis; validates explicit local file paths, rejects directories/hidden/symlink/secret-like paths by default, requires ACP filesystem-read permission, and sends only allowlisted files as resource links.
 - `gemini_code_review` — analyze caller-provided code, diffs, or excerpts with Gemini ACP; analysis-only and does not read paths, edit files, or apply fixes.
 - `gemini_translate` — translate/localize single text or ordered batches with glossary and preservation constraints; it requires configured/authenticated Gemini ACP and has no local/no-key fallback.
 - `gemini_image_describe` — validate explicit PNG/JPEG/WebP/GIF image inputs and report unsupported Gemini ACP image capability until ACP image transport is confirmed; do not rely on it for actual caption/OCR/object extraction yet.
@@ -33,7 +33,7 @@ Use this skill to combine `pi-gemini-acp` source discovery with optional `pi-scr
 5. Use scraped markdown/text to verify facts, extract quotes, and resolve ambiguity.
 6. Cite final answers with source URLs. Distinguish Gemini ACP-discovered snippets from content verified by scraper reads.
 7. If `web_scrape`/`web_batch` are not available, continue with Gemini ACP citations/snippets and say that full-page verification was not available.
-8. Use `gemini_file_analyze` only to check whether explicit file paths are acceptable for future file analysis; do not claim it reads or analyzes file contents until the tool reports supported ACP file/document transport.
+8. Use `gemini_file_analyze` only for explicit user-provided local files; set `cwd` when relative path resolution matters, and do not imply it can scan directories or inspect unlisted files.
 9. Use `gemini_translate` only for user-requested translation/localization; provide target language, glossary, and preserve terms explicitly when needed.
 10. Use `gemini_image_describe` only as a capability/status check for explicit image inputs until `/gemini-config status` reports confirmed image input transport support.
 11. Use `/gemini-config command` only when the local Gemini ACP command or args need to differ from the default `gemini --acp`; interactive Pi opens a settings picker and saves only after explicit confirmation.

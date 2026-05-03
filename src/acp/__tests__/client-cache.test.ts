@@ -251,8 +251,15 @@ class FakeSession implements GeminiAcpProcessSession {
 
 	constructor(private readonly factory: FakeSessionFactory) {}
 
-	async initialize(): Promise<void> {
+	async initialize() {
 		this.initializeCalls += 1;
+		return {
+			promptCapabilities: {
+				embeddedContext: true,
+				image: false,
+				audio: false,
+			},
+		};
 	}
 
 	async newSession(cwd: string): Promise<string> {

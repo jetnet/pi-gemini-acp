@@ -15,6 +15,7 @@ export interface GeminiAcpCommandSettings {
 	command: string;
 	args?: string[];
 	permissionPolicy?: GeminiAcpPermissionPolicy;
+	allowedReadPaths?: readonly string[];
 }
 
 /** Search prompt request normalized before sending through ACP. */
@@ -24,10 +25,26 @@ export interface GeminiAcpSearchRequest {
 	cwd?: string;
 }
 
-/** Plain text prompt request sent through a Gemini ACP session. */
+/** ACP prompt content block that lets Gemini request one allowlisted local file. */
+export interface GeminiAcpResourceLinkPart {
+	type: "resource_link";
+	uri: string;
+	name: string;
+	title?: string;
+	mimeType?: string;
+	size?: number;
+}
+
+/** ACP prompt content block accepted by the narrow Pi Gemini client. */
+export type GeminiAcpPromptPart =
+	| { type: "text"; text: string }
+	| GeminiAcpResourceLinkPart;
+
+/** Plain text or multipart prompt request sent through a Gemini ACP session. */
 export interface GeminiAcpPromptRequest {
 	prompt: string;
 	cwd?: string;
+	parts?: GeminiAcpPromptPart[];
 }
 
 /** Streaming assistant text emitted by a Gemini ACP session update. */
@@ -92,7 +109,11 @@ export class StdioGeminiAcpClient implements GeminiAcpClient {
 		try {
 			await session.initialize();
 			const sessionId = await session.newSession(sessionCwd(request.cwd));
-			return await session.prompt(sessionId, request.prompt, onUpdate);
+			return await session.prompt(
+				sessionId,
+				request.parts ?? [{ type: "text", text: request.prompt }],
+				onUpdate,
+			);
 		} finally {
 			await session.close();
 		}

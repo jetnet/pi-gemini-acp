@@ -145,7 +145,7 @@ describe("Gemini ACP command registration", () => {
 		expect(result.content[0]?.text).toContain("- auth: confirmed");
 		expect(result.content[0]?.text).toContain("- search grounding: available");
 		expect(result.content[0]?.text).toContain(
-			"- file analysis: unknown (tool returns unsupported",
+			"- file analysis: unknown (ACP resource-link transport",
 		);
 		expect(result.content[0]?.text).toContain(
 			"- image input: unknown (transport: unconfirmed)",

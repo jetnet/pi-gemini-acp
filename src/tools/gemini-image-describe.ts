@@ -4,7 +4,17 @@ import {
 	runImageDescribe,
 } from "../prompt/image-describe.js";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
+import type { PiToolShell } from "../types.js";
 import { defineGeminiTool, type ToolUpdate } from "./define.js";
+import {
+	appendExpansionHint,
+	renderPromptToolResult,
+	resultMetadataLines,
+} from "./gemini-prompt-rendering.js";
+import {
+	renderGeminiToolCallTitle,
+	truncateToolText,
+} from "./gemini-rendering.js";
 import { errorResult, toolResult } from "./result.js";
 
 const imageModeSchema = Type.Union([
@@ -66,7 +76,81 @@ export const geminiAcpImageDescribeTool = defineGeminiTool({
 			fullOutputPath: result.fullOutputPath,
 		});
 	},
+	renderCall(_args, theme, context) {
+		return renderGeminiToolCallTitle(context, theme, {
+			toolName: "gemini_image_describe",
+			stateKey: "geminiImageDescribeTitle",
+		});
+	},
+	renderResult(result, options, theme) {
+		return renderPromptToolResult(result, options, theme, {
+			toolName: "gemini_image_describe",
+			isData: isImageDescribeResult,
+			collapsed: formatImageDescribeCollapsed,
+			expanded: formatImageDescribeExpanded,
+		});
+	},
 });
+
+function formatImageDescribeCollapsed(result: ImageDescribeResult): string {
+	const input = result.image
+		? `${result.image.kind} ${result.image.mimeType} (${result.image.sizeBytes} bytes)`
+		: "no validated image";
+	if (result.error) {
+		return appendExpansionHint(
+			[
+				`Image input ${result.image ? "validated" : "not accepted"}: ${input}`,
+				truncateToolText(result.error.message, 220),
+			],
+			"image validation and capability details",
+		).join("\n");
+	}
+	return appendExpansionHint(
+		[
+			`Image description completed: ${input}`,
+			truncateToolText(result.caption ?? "", 240),
+		],
+		"full image description",
+	).join("\n");
+}
+
+function formatImageDescribeExpanded(
+	result: ImageDescribeResult,
+	shell: PiToolShell,
+): string {
+	const imageLines = result.image
+		? [
+				`image.kind: ${result.image.kind}`,
+				`image.mimeType: ${result.image.mimeType}`,
+				`image.sizeBytes: ${result.image.sizeBytes}`,
+				result.image.path ? `image.path: ${result.image.path}` : undefined,
+			]
+		: ["image: none"];
+	return [
+		resultText(result),
+		`mode: ${result.mode}`,
+		...imageLines,
+		result.error ? `code: ${result.error.code}` : undefined,
+		result.error?.phase ? `phase: ${result.error.phase}` : undefined,
+		...resultMetadataLines(shell),
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+function isImageDescribeResult(value: unknown): value is ImageDescribeResult {
+	return (
+		isRecord(value) &&
+		value.provider === "gemini-acp" &&
+		typeof value.mode === "string" &&
+		typeof value.responseLength === "number" &&
+		typeof value.truncated === "boolean"
+	);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 function resultText(result: ImageDescribeResult): string {
 	if (result.error?.code === "GEMINI_ACP_IMAGE_INPUT_UNSUPPORTED") {

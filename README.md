@@ -15,23 +15,23 @@ pi install npm:pi-gemini-acp
 - Node.js `>=22.18.0`
 - Pi `>=0.65.0`
 - Local authenticated Gemini ACP, defaulting to `gemini --acp`, for Gemini-backed tools.
-- `gemini_file_analyze` and `gemini_image_describe` validate inputs only until ACP file/image transport is confirmed.
+- `gemini_file_analyze` requires ACP filesystem-read permission and passes only validated explicit local files as resource links; `gemini_image_describe` still validates inputs only until ACP image transport is confirmed.
 
 ## Tools
 
-| Tool                    | Description                                                                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `gemini_status`         | Report read-only Gemini ACP command/auth/capability status after applying the same default `gemini --acp` settings used by provider search. |
-| `gemini_prompt`         | Send a general prompt to configured/authenticated Gemini ACP; does not require search grounding and has no local/no-key fallback.           |
-| `gemini_extract`        | Extract structured JSON from supplied content using configured/authenticated Gemini ACP and a supported JSON-schema-like shape.             |
-| `gemini_summarize`      | Summarize one supplied content item or one safe public HTTP(S) URL; does not perform research or multi-source synthesis.                    |
-| `gemini_search`         | Run structured search through configured Gemini ACP, or local documents when supplied.                                                      |
-| `gemini_research`       | Run Gemini ACP-backed research with source/citation tracking. Can optionally hydrate missing source text via safe direct fetch.             |
-| `gemini_file_analyze`   | Validate explicit local file paths for future Gemini ACP file/document analysis, then return unsupported until ACP file input is confirmed. |
-| `gemini_code_review`    | Analyze caller-provided code, diffs, or excerpts with Gemini ACP. Analysis-only; it does not read paths, edit files, or apply fixes.        |
-| `gemini_translate`      | Translate/localize single text or ordered batches with glossary/preservation constraints through configured/authenticated Gemini ACP.       |
-| `gemini_image_describe` | Validate explicit PNG/JPEG/WebP/GIF inputs and report unsupported Gemini ACP image capability until image transport is confirmed.           |
-| `gemini_get_result`     | Retrieve stored full output by `responseId`.                                                                                                |
+| Tool                    | Description                                                                                                                                               |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gemini_status`         | Report read-only Gemini ACP command/auth/capability status after applying the same default `gemini --acp` settings used by provider search.               |
+| `gemini_prompt`         | Send a general prompt to configured/authenticated Gemini ACP; does not require search grounding and has no local/no-key fallback.                         |
+| `gemini_extract`        | Extract structured JSON from supplied content using configured/authenticated Gemini ACP and a supported JSON-schema-like shape.                           |
+| `gemini_summarize`      | Summarize one supplied content item or one safe public HTTP(S) URL; does not perform research or multi-source synthesis.                                  |
+| `gemini_search`         | Run structured search through configured Gemini ACP, or local documents when supplied.                                                                    |
+| `gemini_research`       | Run Gemini ACP-backed research with source/citation tracking. Can optionally hydrate missing source text via safe direct fetch.                           |
+| `gemini_file_analyze`   | Analyze explicit local text/document files through Gemini ACP resource links after conservative path validation and filesystem-read permission preflight. |
+| `gemini_code_review`    | Analyze caller-provided code, diffs, or excerpts with Gemini ACP. Analysis-only; it does not read paths, edit files, or apply fixes.                      |
+| `gemini_translate`      | Translate/localize single text or ordered batches with glossary/preservation constraints through configured/authenticated Gemini ACP.                     |
+| `gemini_image_describe` | Validate explicit PNG/JPEG/WebP/GIF inputs and report unsupported Gemini ACP image capability until image transport is confirmed.                         |
+| `gemini_get_result`     | Retrieve stored full output by `responseId`.                                                                                                              |
 
 ## Commands
 
@@ -77,7 +77,7 @@ export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 ```
 
-Search, prompt, and research source collection reuse short-lived warm ACP subprocesses; `gemini_prompt` still uses a fresh ACP session per prompt. Prompt/search sessions use a neutral working directory unless a workflow explicitly supplies a project cwd, so project trust is only triggered when project context is needed. Local/no-key mode is limited to supplied documents/sources for search/research. `gemini_file_analyze` and `gemini_image_describe` only validate inputs until ACP file/image transport is confirmed.
+Search, prompt, and research source collection reuse short-lived warm ACP subprocesses; `gemini_prompt` still uses a fresh ACP session per prompt. Prompt/search sessions use a neutral working directory unless a workflow explicitly supplies a project cwd, so project trust is only triggered when project context is needed. Local/no-key mode is limited to supplied documents/sources for search/research. `gemini_file_analyze` validates explicit files under `cwd`, rejects hidden/secret-like/symlink/directory inputs, requires filesystem-read permission, and uses ACP resource links with a per-request read allowlist. `gemini_image_describe` only validates inputs until ACP image transport is confirmed.
 
 ### Selecting a model
 

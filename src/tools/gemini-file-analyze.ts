@@ -5,8 +5,21 @@ import {
 	type FileAnalyzeResult,
 	runFileAnalyze,
 } from "../prompt/file-analyze.js";
-import { defineGeminiTool } from "./define.js";
-import { errorResult } from "./result.js";
+import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
+import {
+	defineGeminiTool,
+	type ToolRenderResultOptions,
+	type ToolUpdate,
+} from "./define.js";
+import {
+	boxedToolText,
+	dimToolText,
+	expandedToolOutputHint,
+	formatCollapsedOrExpanded,
+	renderGeminiToolCallTitle,
+	truncateToolText,
+} from "./gemini-rendering.js";
+import { errorResult, toolResult } from "./result.js";
 
 export const geminiAcpFileAnalyzeSchema = Type.Object({
 	paths: Type.Array(
@@ -19,13 +32,13 @@ export const geminiAcpFileAnalyzeSchema = Type.Object({
 			minItems: 1,
 			maxItems: FILE_ANALYZE_MAX_FILES,
 			description:
-				"Explicit user-provided file paths. The current implementation validates paths but does not read or send file contents until ACP file/document input support is confirmed.",
+				"Explicit user-provided file paths. Files must resolve under cwd and pass conservative safety checks before ACP receives file resource links.",
 		},
 	),
 	instructions: Type.String({
 		minLength: 1,
 		description:
-			"User-provided analysis instructions. Required even though file transport is currently unsupported.",
+			"User-provided analysis instructions for Gemini to apply to the attached files.",
 	}),
 	cwd: Type.Optional(
 		Type.String({
@@ -41,32 +54,203 @@ export const geminiAcpFileAnalyzeTool = defineGeminiTool({
 	name: "gemini_file_analyze",
 	label: "Gemini ACP File Analyze",
 	description:
-		"Capability-gated local file/document analysis. This version validates explicit paths and returns an unsupported-capability error until Gemini ACP file input support is confirmed.",
+		"Analyze caller-provided local text/document files through confirmed Gemini ACP resource links after conservative path validation and filesystem-read permission preflight.",
 	parameters: geminiAcpFileAnalyzeSchema,
-	async execute(_toolCallId, params: Params, signal) {
-		const result = await runFileAnalyze(params as FileAnalyzeOptions, signal);
+	async execute(_toolCallId, params: Params, signal, onUpdate) {
+		await emitFileAnalyzeProgress(params, onUpdate);
+		const result = await runFileAnalyze(
+			params as FileAnalyzeOptions,
+			{},
+			signal,
+		);
 		if (result.error) {
 			return errorResult(result.error, resultText(result), { data: result });
 		}
-		return errorResult(
-			{
-				code: "GEMINI_ACP_FILE_ANALYSIS_UNAVAILABLE",
-				phase: "capability_preflight",
-				message:
-					"Gemini ACP file/document input support is not confirmed; no file contents were read or sent.",
-				retryable: false,
-				provider: "gemini-acp",
-			},
-			resultText(result),
-			{ data: result },
+		return toolResult({
+			text: resultText(result),
+			data: result,
+			responseId: result.responseId,
+			fullOutputPath: result.fullOutputPath,
+		});
+	},
+	renderCall(_args, theme, context) {
+		return renderGeminiToolCallTitle(context, theme, {
+			toolName: "gemini_file_analyze",
+			stateKey: "geminiFileAnalyzeTitle",
+		});
+	},
+	renderResult(result, options, theme) {
+		return boxedToolText(
+			dimToolText(formatFileAnalyzeToolDisplay(result, options), theme),
 		);
 	},
 });
 
+async function emitFileAnalyzeProgress(
+	params: Params,
+	onUpdate: ToolUpdate | undefined,
+): Promise<void> {
+	if (!onUpdate) return;
+	const fileList = params.paths.join(", ");
+	await onUpdate(
+		toolResult({
+			text: `Analyzing ${params.paths.length} explicit file${params.paths.length === 1 ? "" : "s"} via Gemini ACP resource links: ${fileList}. Instructions length: ${params.instructions.length} chars.`,
+			status: "streaming",
+			data: {
+				progress: {
+					type: "file-analyze-start",
+					paths: params.paths,
+					cwd: params.cwd,
+					instructionLength: params.instructions.length,
+				},
+			},
+		}),
+	);
+}
+
+interface FileAnalyzeProgressData {
+	progress: {
+		type: "file-analyze-start";
+		paths: string[];
+		cwd?: string;
+		instructionLength: number;
+	};
+}
+
+function formatFileAnalyzeToolDisplay(
+	result: PiToolShell,
+	options: ToolRenderResultOptions,
+): string {
+	const details = result.details as Partial<ResultEnvelope<unknown>>;
+	if (isFileAnalyzeProgressData(details.data)) {
+		return formatCollapsedOrExpanded(details.data, options, {
+			collapsed: formatFileAnalyzeProgressCollapsed,
+			expanded: formatFileAnalyzeProgressExpanded,
+		});
+	}
+	if (isFileAnalyzeResult(details.data)) {
+		return formatCollapsedOrExpanded(details.data, options, {
+			collapsed: formatFileAnalyzeResultCollapsed,
+			expanded: (value) => formatFileAnalyzeResultExpanded(value, result),
+		});
+	}
+	if (details.error) return formatError(details.error, options);
+	return result.content[0]?.text ?? "gemini_file_analyze";
+}
+
+function formatFileAnalyzeProgressCollapsed(
+	value: FileAnalyzeProgressData,
+): string {
+	return `Analyzing ${value.progress.paths.length} file${value.progress.paths.length === 1 ? "" : "s"}: ${truncateToolText(value.progress.paths.join(", "), 180)}`;
+}
+
+function formatFileAnalyzeProgressExpanded(
+	value: FileAnalyzeProgressData,
+): string {
+	return [
+		"gemini_file_analyze progress",
+		`phase: ${value.progress.type}`,
+		`paths: ${value.progress.paths.join(", ")}`,
+		value.progress.cwd ? `cwd: ${value.progress.cwd}` : undefined,
+		`instructionLength: ${value.progress.instructionLength}`,
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+function formatFileAnalyzeResultCollapsed(value: FileAnalyzeResult): string {
+	if (value.error) {
+		return `${value.error.message} ${expandedToolOutputHint("error details")}`;
+	}
+	const files = value.files.map((file) => file.path).join(", ");
+	return [
+		`Analyzed ${value.files.length} file${value.files.length === 1 ? "" : "s"}: ${truncateToolText(files, 140)}`,
+		truncateToolText(value.text, 260),
+		expandedToolOutputHint("full file-analysis output"),
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+function formatFileAnalyzeResultExpanded(
+	value: FileAnalyzeResult,
+	result: PiToolShell,
+): string {
+	const details = result.details as Partial<ResultEnvelope<unknown>>;
+	const lines = [
+		resultText(value),
+		`transport: ${value.transport}`,
+		`supported: ${value.supported}`,
+		value.responseLength !== undefined
+			? `responseLength: ${value.responseLength}`
+			: undefined,
+		value.responseId ? `responseId: ${value.responseId}` : undefined,
+		value.fullOutputPath
+			? `fullOutputPath: ${value.fullOutputPath}`
+			: undefined,
+		details.error ? formatStructuredError(details.error) : undefined,
+	];
+	return lines.filter(Boolean).join("\n");
+}
+
+function formatError(
+	error: StructuredError,
+	options: ToolRenderResultOptions,
+): string {
+	return formatCollapsedOrExpanded(error, options, {
+		collapsed: (value) => value.message,
+		expanded: formatStructuredError,
+	});
+}
+
+function formatStructuredError(error: StructuredError): string {
+	return [
+		error.message,
+		`code: ${error.code}`,
+		error.phase ? `phase: ${error.phase}` : undefined,
+		error.provider ? `provider: ${error.provider}` : undefined,
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+function isFileAnalyzeProgressData(
+	value: unknown,
+): value is FileAnalyzeProgressData {
+	if (!isRecord(value) || !isRecord(value.progress)) return false;
+	return (
+		value.progress.type === "file-analyze-start" &&
+		Array.isArray(value.progress.paths)
+	);
+}
+
+function isFileAnalyzeResult(value: unknown): value is FileAnalyzeResult {
+	return (
+		isRecord(value) &&
+		value.provider === "gemini-acp" &&
+		Array.isArray(value.files) &&
+		typeof value.text === "string" &&
+		typeof value.supported === "boolean"
+	);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function resultText(result: FileAnalyzeResult): string {
-	const fileCount = result.files.length;
-	const suffix = fileCount
-		? ` Validated ${fileCount} explicit file path${fileCount === 1 ? "" : "s"}; no file contents were read or sent.`
-		: " No file contents were read or sent.";
-	return `${result.error?.message ?? result.text}${suffix}`;
+	if (result.error) {
+		const fileCount = result.files.length;
+		const suffix = fileCount
+			? ` Validated ${fileCount} explicit file path${fileCount === 1 ? "" : "s"}.`
+			: "";
+		return `${result.error.message}${suffix}`;
+	}
+	const files = result.files
+		.map((file) => `${file.path} (${file.sizeBytes} bytes)`)
+		.join(", ");
+	const stored = result.truncated
+		? `\nFull output stored as responseId ${result.responseId}.`
+		: "";
+	return `Gemini ACP file analysis completed for ${result.files.length} file${result.files.length === 1 ? "" : "s"}: ${files}\n\n${result.text}${stored}`;
 }
