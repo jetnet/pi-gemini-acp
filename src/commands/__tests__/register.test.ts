@@ -249,6 +249,24 @@ describe("Gemini ACP command registration", () => {
 		});
 	});
 
+	it("parses trust action from raw slash-command text", () => {
+		expect(parseGeminiConfigCommandArgs("trust")).toEqual({
+			action: "trust",
+		});
+	});
+
+	it("adds Gemini CLI trust arg in headless config mode", async () => {
+		const result = await runGeminiConfig(
+			{ action: "trust" },
+			{ rootDir, commandExists: async () => true },
+		);
+
+		expect(result.content[0]?.text).toContain("--skip-trust");
+		expect(
+			(await loadConfig({ rootDir })).providers?.["gemini-acp"],
+		).toMatchObject({ command: "gemini", args: ["--acp", "--skip-trust"] });
+	});
+
 	it("refuses secret-like args instead of persisting them", async () => {
 		const result = await runGeminiConfig(
 			{ action: "command", executable: "gemini", args: ["--api-key=abc123"] },

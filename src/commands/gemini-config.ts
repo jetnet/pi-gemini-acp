@@ -24,6 +24,10 @@ import {
 	runGeminiConfigPermissions,
 	showGeminiConfigPermissionsPicker,
 } from "./gemini-config-permissions.js";
+import {
+	type GeminiConfigTrustResult,
+	runGeminiConfigTrust,
+} from "./gemini-config-trust.js";
 import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.js";
 
 export const geminiConfigSchema = Type.Object({
@@ -40,10 +44,14 @@ export const geminiConfigSchema = Type.Object({
 				description:
 					"Show and optionally modify Gemini ACP capability settings with descriptions.",
 			}),
+			Type.Literal("trust", {
+				description:
+					"Confirm and add Gemini CLI --skip-trust for local ACP sessions in this workspace.",
+			}),
 		],
 		{
 			description:
-				"Choose whether to inspect status, configure command settings, or manage Gemini ACP permissions.",
+				"Choose whether to inspect status, configure command settings, manage Gemini ACP permissions, or trust the current folder for local ACP sessions.",
 		},
 	),
 	executable: Type.Optional(
@@ -117,14 +125,20 @@ export async function runGeminiConfig(
 			| GeminiAcpStatusReport
 			| GeminiConfigAcpCommandResult
 			| GeminiConfigPermissionsResult
+			| GeminiConfigTrustResult
+			| { cancelled: true }
 			| null
 		>
 	>
 > {
 	if (!params.action) {
-		throw new Error("Expected action 'status', 'command', or 'permissions'.");
+		throw new Error(
+			"Expected action 'status', 'command', 'permissions', or 'trust'.",
+		);
 	}
 	if (params.action === "command") return runAcpCommandConfig(params, options);
+	if (params.action === "trust")
+		return runGeminiConfigTrust(undefined, options);
 	if (params.action === "permissions") {
 		return runGeminiConfigPermissions(
 			{
@@ -162,6 +176,7 @@ export async function runGeminiConfigCommand(
 	) {
 		return showAcpCommandPicker(ctx, options);
 	}
+	if (params.action === "trust") return runGeminiConfigTrust(ctx, options);
 	return runGeminiConfig(params, options);
 }
 
@@ -172,12 +187,19 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 	if (trimmed.startsWith("{")) return JSON.parse(trimmed) as Params;
 
 	const [action, ...rest] = splitCommandLine(trimmed);
-	if (action !== "status" && action !== "command" && action !== "permissions") {
-		throw new Error("Expected action 'status', 'command', or 'permissions'.");
+	if (
+		action !== "status" &&
+		action !== "command" &&
+		action !== "permissions" &&
+		action !== "trust"
+	) {
+		throw new Error(
+			"Expected action 'status', 'command', 'permissions', or 'trust'.",
+		);
 	}
-	if (action === "status") {
+	if (action === "status" || action === "trust") {
 		if (rest.length > 0) {
-			throw new Error("Action 'status' does not accept command arguments.");
+			throw new Error(`Action '${action}' does not accept command arguments.`);
 		}
 		return { action };
 	}
@@ -257,7 +279,7 @@ function parseBooleanToken(value: string): boolean | undefined {
 export const geminiConfigCommand = defineGeminiCommand({
 	name: "gemini-config",
 	description:
-		"Inspect Gemini ACP status, configure the local ACP command/args, or manage ACP capability permissions with settings-style descriptions.",
+		"Inspect Gemini ACP status, configure the local ACP command/args, manage ACP capability permissions, or trust the current folder for local ACP sessions.",
 	parameters: geminiConfigSchema,
 	parseArgs: parseGeminiConfigCommandArgs,
 	execute: (params, ctx) => runGeminiConfigCommand(params, ctx),
@@ -269,7 +291,7 @@ async function showGeminiConfigActionPicker(
 ) {
 	const picked = await ctx.ui.select(
 		"Gemini config",
-		["Status", "ACP command", "Permissions"],
+		["Status", "ACP command", "Permissions", "Trust current folder"],
 		{ signal: ctx.signal },
 	);
 	if (!picked) {
@@ -279,6 +301,9 @@ async function showGeminiConfigActionPicker(
 		return showGeminiConfigPermissionsPicker(ctx, options);
 	}
 	if (picked === "ACP command") return showAcpCommandPicker(ctx, options);
+	if (picked === "Trust current folder") {
+		return runGeminiConfigTrust(ctx, options);
+	}
 	return runGeminiConfig({ action: "status" }, options);
 }
 async function showGeminiConfigStatus(

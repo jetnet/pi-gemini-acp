@@ -57,7 +57,7 @@ describe("Gemini ACP command pickers", () => {
 
 		expect(select).toHaveBeenCalledWith(
 			"Gemini config",
-			["Status", "ACP command", "Permissions"],
+			["Status", "ACP command", "Permissions", "Trust current folder"],
 			{ signal: undefined },
 		);
 		expect(result.content[0]?.text).toBe("Cancelled.");
@@ -233,6 +233,43 @@ describe("Gemini ACP command pickers", () => {
 		expect(result.content[0]?.text).toBe(
 			"Selected model: gemini-3.1-pro-preview.",
 		);
+	});
+
+	it("uses Pi confirm before trusting the current folder for Gemini ACP", async () => {
+		const { ctx, confirm } = makeInteractiveCtx({
+			select: ["Trust current folder"],
+			confirm: true,
+		});
+
+		const result = await runGeminiConfigCommand({}, ctx, {
+			rootDir,
+			commandExists: async () => true,
+		});
+
+		expect(confirm).toHaveBeenCalledWith(
+			"Trust this folder for Gemini ACP?",
+			expect.stringContaining("Gemini ACP starts a local Gemini CLI session"),
+			{ signal: undefined },
+		);
+		expect(result.content[0]?.text).toContain("--skip-trust");
+		expect(
+			(await loadConfig({ rootDir })).providers?.["gemini-acp"],
+		).toMatchObject({ args: ["--acp", "--skip-trust"] });
+	});
+
+	it("stops trust configuration when the user declines", async () => {
+		const { ctx, confirm } = makeInteractiveCtx({
+			select: ["Trust current folder"],
+			confirm: false,
+		});
+
+		const result = await runGeminiConfigCommand({}, ctx, { rootDir });
+
+		expect(confirm).toHaveBeenCalled();
+		expect(result.content[0]?.text).toContain("Cancelled");
+		expect(
+			(await loadConfig({ rootDir })).providers?.["gemini-acp"],
+		).toBeUndefined();
 	});
 
 	it("uses Pi confirm before enabling write permissions", async () => {

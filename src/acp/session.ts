@@ -154,8 +154,23 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		while (newline >= 0) {
 			const line = this.stdoutBuffer.slice(0, newline).trim();
 			this.stdoutBuffer = this.stdoutBuffer.slice(newline + 1);
-			if (line) this.handleMessage(JSON.parse(line) as JsonRpcMessage);
+			if (line) this.handleStdoutLine(line);
 			newline = this.stdoutBuffer.indexOf("\n");
+		}
+	}
+
+	private handleStdoutLine(line: string): void {
+		try {
+			this.handleMessage(JSON.parse(line) as JsonRpcMessage);
+		} catch (cause) {
+			// ACP requires stdout to be JSON-RPC only; provider diagnostics must fail
+			// clearly because otherwise a local trust/auth warning can crash the stream.
+			this.rejectAll(
+				new Error(
+					`Gemini ACP emitted non-JSON stdout before a JSON-RPC message. This often means the Gemini CLI printed a local workspace trust/auth warning; run /gemini-config trust or configure Gemini to keep diagnostics off stdout. First stdout line: ${line.slice(0, 240)}`,
+					{ cause },
+				),
+			);
 		}
 	}
 

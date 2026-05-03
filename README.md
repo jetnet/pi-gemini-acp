@@ -35,10 +35,10 @@ pi install npm:pi-gemini-acp
 
 ## Commands
 
-| Command          | Description                                                                                                                                                                                       |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/gemini-config` | Choose `status` for a read-only command/auth/search-grounding/model/permission report, `command` to configure the local ACP command/args, or `permissions` to show/modify ACP capability toggles. |
-| `/gemini-model`  | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection.              |
+| Command          | Description                                                                                                                                                                                                                                                       |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/gemini-config` | Choose `status` for a read-only command/auth/search-grounding/model/permission report, `command` to configure the local ACP command/args, `permissions` to show/modify ACP capability toggles, or `trust` to confirm Gemini CLI workspace trust for ACP sessions. |
+| `/gemini-model`  | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection.                                                                              |
 
 ## Configuration
 
@@ -54,7 +54,7 @@ The default Gemini ACP provider config is:
 }
 ```
 
-With authenticated, search-capable `gemini --acp`, Gemini-backed tools work from the default config. Use `/gemini-config` to inspect status, edit the ACP command/args, or manage permissions. Interactive Pi opens picker UIs; `/gemini-config command` stages command/arg edits before saving custom settings to `~/.pi/gemini-acp/config/settings.json`.
+With authenticated, search-capable `gemini --acp`, Gemini-backed tools work from the default config. Use `/gemini-config` to inspect status, edit the ACP command/args, manage permissions, or confirm workspace trust. Interactive Pi opens picker UIs; `/gemini-config command` stages command/arg edits before saving custom settings to `~/.pi/gemini-acp/config/settings.json`.
 
 ```bash
 /gemini-config
@@ -65,9 +65,10 @@ With authenticated, search-capable `gemini --acp`, Gemini-backed tools work from
 /gemini-config permissions
 /gemini-config permissions filesystemRead
 /gemini-config permissions filesystemWrite true confirmRisk=true reason="modify generated docs"
+/gemini-config trust
 ```
 
-Do not pass API keys/tokens to `/gemini-config command`; use Gemini CLI local auth. `permissions` controls ACP filesystem/terminal access, and write/terminal access requires `confirmRisk=true`.
+Do not pass API keys/tokens to `/gemini-config command`; use Gemini CLI local auth. `permissions` controls ACP filesystem/terminal access, and write/terminal access requires `confirmRisk=true`. `/gemini-config trust` explains why Gemini ACP needs a working folder for local sessions and, after confirmation, adds Gemini CLI `--skip-trust` to avoid untrusted-folder diagnostics corrupting ACP JSON-RPC stdout.
 
 You can also override the command with environment variables:
 
@@ -76,7 +77,7 @@ export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 ```
 
-Search, prompt, and research source collection reuse short-lived warm ACP subprocesses; `gemini_prompt` still uses a fresh ACP session per prompt. Local/no-key mode is limited to supplied documents/sources for search/research. `gemini_file_analyze` and `gemini_image_describe` only validate inputs until ACP file/image transport is confirmed.
+Search, prompt, and research source collection reuse short-lived warm ACP subprocesses; `gemini_prompt` still uses a fresh ACP session per prompt. Prompt/search sessions use a neutral working directory unless a workflow explicitly supplies a project cwd, so project trust is only triggered when project context is needed. Local/no-key mode is limited to supplied documents/sources for search/research. `gemini_file_analyze` and `gemini_image_describe` only validate inputs until ACP file/image transport is confirmed.
 
 ### Selecting a model
 

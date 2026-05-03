@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import type {
 	GeminiAcpPermissionPolicy,
 	SearchProviderMetadata,
@@ -65,7 +66,7 @@ export class StdioGeminiAcpClient implements GeminiAcpClient {
 		const session = await AcpProcessSession.start(this.settings, signal);
 		try {
 			await session.initialize();
-			const sessionId = await session.newSession(request.cwd ?? process.cwd());
+			const sessionId = await session.newSession(sessionCwd(request.cwd));
 			const text = await session.prompt(sessionId, searchPrompt(request));
 			return normalizeGeminiAcpSearchResults(
 				parseSearchPayload(text),
@@ -84,7 +85,7 @@ export class StdioGeminiAcpClient implements GeminiAcpClient {
 		const session = await AcpProcessSession.start(this.settings, signal);
 		try {
 			await session.initialize();
-			const sessionId = await session.newSession(request.cwd ?? process.cwd());
+			const sessionId = await session.newSession(sessionCwd(request.cwd));
 			return await session.prompt(sessionId, request.prompt, onUpdate);
 		} finally {
 			await session.close();
@@ -154,6 +155,12 @@ export function parseSearchPayload(text: string): unknown {
 		}
 	}
 	return [];
+}
+
+function sessionCwd(cwd: string | undefined): string {
+	// Use a neutral existing directory unless a workflow explicitly needs a project cwd;
+	// this avoids triggering Gemini CLI project-trust/agent discovery for text-only ACP tools.
+	return cwd ?? (homedir() || process.cwd());
 }
 
 function firstJsonStart(value: string): number {
