@@ -134,6 +134,8 @@ function formatSearchProgressExpanded(update: SearchProgressUpdate): string {
 	];
 	if (update.provider) lines.push(`provider: ${update.provider}`);
 	if (update.model) lines.push(`model: ${update.model}`);
+	if (update.maxResults !== undefined)
+		lines.push(`maxResults: ${update.maxResults}`);
 	if (update.resultCount !== undefined)
 		lines.push(`resultCount: ${update.resultCount}`);
 	if (update.responseId) lines.push(`responseId: ${update.responseId}`);

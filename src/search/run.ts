@@ -54,6 +54,7 @@ export interface SearchProgressUpdate {
 	query: string;
 	provider?: "local" | "gemini-acp";
 	model?: string;
+	maxResults?: number;
 	resultCount?: number;
 	chunk?: GeminiAcpPromptChunk;
 	responseId?: string;
@@ -136,15 +137,17 @@ export async function runSearch(
 		deps.geminiAcpClient ??
 		(deps.geminiAcpClientFactory ?? getCachedGeminiAcpClient)(commandSettings);
 	try {
+		const maxResults = options.maxResults ?? 5;
 		await emitProgress(deps.onProgress, {
 			phase: "provider_search",
-			message: `Sending gemini search prompt via ${model}.`,
+			message: `Sending search prompt: "${options.query}" with ${maxResults} max results via ${model}.`,
 			query: options.query,
 			provider: "gemini-acp",
 			model,
+			maxResults,
 		});
 		const results = await client.search(
-			{ query: options.query, maxResults: options.maxResults ?? 5 },
+			{ query: options.query, maxResults },
 			signal,
 			async (chunk) => {
 				await emitProgress(deps.onProgress, {

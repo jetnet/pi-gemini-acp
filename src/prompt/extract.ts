@@ -62,6 +62,15 @@ export async function runExtract(
 			...options,
 			prompt: buildExtractionPrompt(options),
 			inlineLimit: Number.POSITIVE_INFINITY,
+			requestSummary: {
+				toolName: "gemini_extract",
+				action: "Sending extraction prompt",
+				subject: options.prompt.trim(),
+				arguments: {
+					contentLength: options.content.length,
+					schema: schemaSummary(options.schema),
+				},
+			},
 		},
 		deps,
 		signal,
@@ -118,6 +127,14 @@ function buildExtractionPrompt(options: ExtractOptions): string {
 		"Content:",
 		options.content,
 	].join("\n");
+}
+
+function schemaSummary(schema: unknown): string {
+	if (typeof schema !== "object" || schema === null || Array.isArray(schema)) {
+		return typeof schema;
+	}
+	const type = (schema as { type?: unknown }).type;
+	return typeof type === "string" ? type : "object";
 }
 
 function validateExtractInputs(

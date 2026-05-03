@@ -118,8 +118,12 @@ describe("runPrompt", () => {
 		expect(client?.promptText).toBe("two");
 	});
 
-	it("forwards progress and streaming chunk updates", async () => {
-		const updates: Array<{ type: string; text: string }> = [];
+	it("forwards progress, request summaries, and streaming chunk updates", async () => {
+		const updates: Array<{
+			type: string;
+			text: string;
+			request?: unknown;
+		}> = [];
 		const result = await runPrompt(
 			{ prompt: "Stream", rootDir, config: {} },
 			{
@@ -128,16 +132,34 @@ describe("runPrompt", () => {
 			},
 			undefined,
 			async (update) => {
-				updates.push({ type: update.type, text: update.text });
+				updates.push({
+					type: update.type,
+					text: update.text,
+					request: update.type === "progress" ? update.request : undefined,
+				});
 			},
 		);
 
 		expect(result.text).toBe("AB");
 		expect(updates).toEqual([
-			{ type: "progress", text: "Checking Gemini ACP configuration." },
-			{ type: "progress", text: "Sending prompt to Gemini ACP." },
-			{ type: "chunk", text: "A" },
-			{ type: "chunk", text: "B" },
+			{
+				type: "progress",
+				text: "Checking Gemini ACP configuration.",
+				request: undefined,
+			},
+			expect.objectContaining({
+				type: "progress",
+				text: "Sending prompt with promptLength 6 via Gemini ACP default.",
+				request: expect.objectContaining({
+					toolName: "gemini_prompt",
+					arguments: expect.objectContaining({
+						promptLength: 6,
+						model: "Gemini ACP default",
+					}),
+				}),
+			}),
+			{ type: "chunk", text: "A", request: undefined },
+			{ type: "chunk", text: "B", request: undefined },
 		]);
 	});
 

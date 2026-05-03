@@ -15,9 +15,23 @@ import {
 	type StatusCommandChecker,
 } from "../config/status.js";
 import { storeResult } from "../storage/results.js";
-import type { GeminiAcpConfig, StructuredError } from "../types.js";
+import type {
+	GeminiAcpConfig,
+	GeminiAcpProviderSettings,
+	StructuredError,
+} from "../types.js";
 
 export const PROMPT_RESPONSE_INLINE_LIMIT = 4_000;
+
+export type PromptRequestArgument = string | number | boolean | undefined;
+
+/** Sanitized request metadata shown in progress without exposing full prompt content. */
+export interface PromptRequestSummary {
+	toolName: `gemini_${string}`;
+	action: string;
+	subject?: string;
+	arguments?: Record<string, PromptRequestArgument>;
+}
 
 /** Inputs for a generic Gemini ACP prompt run. */
 export interface PromptOptions {
@@ -27,6 +41,7 @@ export interface PromptOptions {
 	cwd?: string;
 	inlineLimit?: number;
 	useDefaultConfig?: boolean;
+	requestSummary?: PromptRequestSummary;
 }
 
 /** Injectable dependencies for prompt tests and future shared status wiring. */
@@ -41,7 +56,12 @@ export interface PromptDeps {
 
 /** Streaming or phase update emitted by the prompt workflow. */
 export type PromptWorkflowUpdate =
-	| { type: "progress"; phase: string; text: string }
+	| {
+			type: "progress";
+			phase: string;
+			text: string;
+			request?: PromptRequestSummary;
+	  }
 	| { type: "chunk"; text: string; accumulatedText: string };
 
 /** Compact prompt result returned to tools; large full text is stored by responseId. */
@@ -97,6 +117,10 @@ export async function runPrompt(
 	if (preflight) return { ...emptyPromptResult(), error: preflight };
 
 	const commandSettings = buildGeminiAcpCommandSettings(settings);
+	const requestSummary = promptRequestSummary(
+		options,
+		geminiAcpModelLabel(settings, commandSettings),
+	);
 	const client =
 		deps.geminiAcpClient ??
 		(
@@ -107,7 +131,8 @@ export async function runPrompt(
 		await onUpdate?.({
 			type: "progress",
 			phase: "provider_prompt",
-			text: "Sending prompt to Gemini ACP.",
+			text: formatPromptRequestSummary(requestSummary),
+			request: requestSummary,
 		});
 		const text = await client.prompt(
 			{ prompt: options.prompt, cwd: options.cwd },
@@ -163,6 +188,79 @@ async function compactPromptResult(
 		responseId: stored.responseId,
 		fullOutputPath: stored.path,
 	};
+}
+
+function promptRequestSummary(
+	options: PromptOptions,
+	model: string,
+): PromptRequestSummary {
+	const summary = options.requestSummary ?? {
+		toolName: "gemini_prompt" as const,
+		action: "Sending prompt",
+		arguments: { promptLength: options.prompt.length },
+	};
+	return {
+		...summary,
+		arguments: { ...summary.arguments, model },
+	};
+}
+
+/** Formats sanitized prompt request metadata for visible progress text. */
+export function formatPromptRequestSummary(
+	summary: PromptRequestSummary,
+): string {
+	const args = Object.entries(summary.arguments ?? {}).flatMap(
+		([key, value]) =>
+			value === undefined ? [] : `${key} ${formatRequestArgument(value)}`,
+	);
+	const model = summary.arguments?.model;
+	const withoutModel = args.filter((arg) => !arg.startsWith("model "));
+	const subject = summary.subject
+		? `: "${truncateSummaryText(summary.subject)}"`
+		: "";
+	const withArgs = withoutModel.length
+		? ` with ${withoutModel.join(", ")}`
+		: "";
+	const via = model ? ` via ${formatRequestArgument(model)}` : "";
+	return `${summary.action}${subject}${withArgs}${via}.`;
+}
+
+function truncateSummaryText(value: string): string {
+	return value.length <= 160 ? value : `${value.slice(0, 159)}…`;
+}
+
+function formatRequestArgument(
+	value: Exclude<PromptRequestArgument, undefined>,
+): string {
+	return typeof value === "string" ? value : String(value);
+}
+
+function geminiAcpModelLabel(
+	settings: GeminiAcpProviderSettings | undefined,
+	commandSettings: GeminiAcpCommandSettings,
+): string {
+	return (
+		settings?.model?.trim() ||
+		modelFromArgs(commandSettings.args) ||
+		"Gemini ACP default"
+	);
+}
+
+function modelFromArgs(
+	args: readonly string[] | undefined,
+): string | undefined {
+	if (!args) return undefined;
+	for (let index = 0; index < args.length; index += 1) {
+		const arg = args[index];
+		if ((arg === "--model" || arg === "-m") && args[index + 1]?.trim()) {
+			return args[index + 1].trim();
+		}
+		if (arg?.startsWith("--model=")) {
+			const value = arg.slice("--model=".length).trim();
+			if (value) return value;
+		}
+	}
+	return undefined;
 }
 
 function emptyPromptResult(): PromptRunResult {

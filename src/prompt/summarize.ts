@@ -89,7 +89,11 @@ export async function runSummarize(
 
 	const prompt = buildSummaryPrompt(options, prepared.source, prepared.text);
 	const promptResult = await runPrompt(
-		{ ...options, prompt },
+		{
+			...options,
+			prompt,
+			requestSummary: summaryRequestSummary(options, prepared.source),
+		},
 		deps,
 		signal,
 		onUpdate,
@@ -240,13 +244,33 @@ function prepareSummarySource(
 	};
 }
 
+function summaryRequestSummary(
+	options: SummarizeOptions,
+	source: PreparedSummarySource,
+) {
+	return {
+		toolName: "gemini_summarize" as const,
+		action: "Sending summarize prompt",
+		subject: source.url ?? source.title ?? source.kind,
+		arguments: {
+			source: source.kind,
+			style: summaryStyle(options),
+			sentenceCount: options.sentenceCount,
+			bulletCount: options.bulletCount,
+			contentLength: source.contentLength,
+			preparedLength: source.preparedLength,
+			maxSourceCharacters: source.maxSourceCharacters,
+			truncated: source.truncated,
+		},
+	};
+}
+
 function buildSummaryPrompt(
 	options: SummarizeOptions,
 	source: PreparedSummarySource,
 	text: string,
 ): string {
-	const style =
-		options.style ?? (options.bulletCount ? "bullets" : "paragraph");
+	const style = summaryStyle(options);
 	const instructions = [
 		"Summarize exactly one supplied source. Do not perform web research or synthesize across multiple sources.",
 		`Style: ${style}.`,
@@ -271,6 +295,10 @@ function buildSummaryPrompt(
 			? `Title: ${source.title}`
 			: "Content";
 	return `${instructions.join("\n")}\n\n${sourceLabel}\n\nSOURCE:\n${text}`;
+}
+
+function summaryStyle(options: SummarizeOptions): SummaryStyle {
+	return options.style ?? (options.bulletCount ? "bullets" : "paragraph");
 }
 
 function normalizeSourceText(text: string): string {

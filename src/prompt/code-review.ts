@@ -121,12 +121,33 @@ export async function runCodeReview(
 			config: options.config,
 			rootDir: options.rootDir,
 			cwd: options.cwd,
+			requestSummary: codeReviewRequestSummary(options),
 		},
 		deps,
 		signal,
 		onUpdate,
 	);
 	return { ...result, prompt, sections: CODE_REVIEW_SECTIONS };
+}
+
+function codeReviewRequestSummary(options: CodeReviewOptions) {
+	const focus = normalizeFocus(options.focus);
+	return {
+		toolName: "gemini_code_review" as const,
+		action: "Sending code review prompt",
+		subject:
+			options.filename?.trim() || options.language?.trim() || "provided text",
+		arguments: {
+			language: options.language?.trim() || undefined,
+			filename: options.filename?.trim() || undefined,
+			focus: focus.join("/"),
+			severity: options.severityThreshold ?? "all",
+			maxFindings: normalizeMaxFindings(options.maxFindings),
+			diffLength: options.diff?.length,
+			codeLength: options.code?.length,
+			contextLength: options.context?.length,
+		},
+	};
 }
 
 function hasReviewInput(options: CodeReviewOptions): boolean {

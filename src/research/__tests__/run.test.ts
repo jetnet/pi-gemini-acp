@@ -79,12 +79,19 @@ describe("runResearch", () => {
 		expect(result.findings[0]?.text).toBe("hydrated text");
 	});
 
-	it("emits progress for research phases", async () => {
-		const phases: string[] = [];
+	it("emits progress for research phases with request metadata", async () => {
+		const updates: Array<{
+			phase: string;
+			message: string;
+			query?: string;
+			mode?: string;
+			hydrateSources?: boolean;
+		}> = [];
 		await runResearch(
 			{
 				query: "alpha",
 				rootDir,
+				hydrateSources: true,
 				sources: [
 					{
 						title: "Alpha",
@@ -94,20 +101,32 @@ describe("runResearch", () => {
 				],
 			},
 			{
+				hydrator: {
+					hydrate: async (source: ResearchSource) => source,
+				},
 				onProgress: (update) => {
-					phases.push(update.phase);
+					updates.push(update);
 				},
 			},
 		);
 
-		expect(phases).toEqual([
+		expect(updates.map((update) => update.phase)).toEqual([
 			"search",
 			"search",
+			"hydrate",
 			"hydrate",
 			"assemble",
 			"store",
 			"done",
 		]);
+		expect(updates[0]).toMatchObject({
+			message: 'Using 1 supplied source(s) for research query: "alpha".',
+			query: "alpha",
+			mode: "local",
+			hydrateSources: true,
+			hydrationMode: "fetch",
+			totalSources: 1,
+		});
 	});
 
 	it("adds provider citation markers without dropping structured citations", async () => {

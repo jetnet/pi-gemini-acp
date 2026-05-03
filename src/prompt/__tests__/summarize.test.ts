@@ -44,7 +44,12 @@ describe("runSummarize", () => {
 	});
 
 	it("emits preparation, prompt, streaming, and store progress updates", async () => {
-		const updates: Array<{ phase?: string; type: string; text: string }> = [];
+		const updates: Array<{
+			phase?: string;
+			type: string;
+			text: string;
+			request?: unknown;
+		}> = [];
 		const result = await runSummarize(
 			{
 				content: "x".repeat(1500),
@@ -62,6 +67,7 @@ describe("runSummarize", () => {
 					type: update.type,
 					phase: update.type === "progress" ? update.phase : undefined,
 					text: update.text,
+					request: update.type === "progress" ? update.request : undefined,
 				});
 			},
 		);
@@ -79,6 +85,22 @@ describe("runSummarize", () => {
 			"store",
 		]);
 		expect(updates[1]?.text).toContain("Source truncated from 1500 to 1000");
+		const providerPrompt = updates.find(
+			(update) => update.phase === "provider_prompt",
+		);
+		expect(providerPrompt?.text).toContain(
+			'Sending summarize prompt: "content"',
+		);
+		expect(providerPrompt?.text).toContain("contentLength 1500");
+		expect(providerPrompt?.text).toContain("preparedLength 1000");
+		expect(providerPrompt?.text).toContain("truncated true");
+		expect(providerPrompt?.request).toMatchObject({
+			toolName: "gemini_summarize",
+			arguments: expect.objectContaining({
+				style: "paragraph",
+				maxSourceCharacters: 1000,
+			}),
+		});
 		const stored = await getStoredResult<{
 			preparedSource: string;
 			summary: string;

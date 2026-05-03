@@ -33,6 +33,11 @@ export type ResearchProgressPhase =
 export interface ResearchProgressUpdate {
 	phase: ResearchProgressPhase;
 	message: string;
+	query?: string;
+	mode?: "local" | "gemini-acp";
+	maxResults?: number;
+	hydrateSources?: boolean;
+	hydrationMode?: "none" | "fetch";
 	completedSources?: number;
 	totalSources?: number;
 	responseId?: string;
@@ -71,12 +76,16 @@ export async function runResearch(
 	deps: ResearchDeps = {},
 	signal?: AbortSignal,
 ): Promise<ResearchResult> {
+	const request = researchRequest(options);
 	await emitProgress(deps.onProgress, {
 		phase: "search",
-		message: options.sources?.length
-			? "Using supplied sources."
-			: "Searching with configured Gemini ACP provider.",
-		totalSources: options.sources?.length ?? options.maxResults,
+		message: request.message,
+		query: options.query,
+		mode: request.mode,
+		maxResults: request.maxResults,
+		hydrateSources: request.hydrateSources,
+		hydrationMode: request.hydrationMode,
+		totalSources: options.sources?.length ?? request.maxResults,
 	});
 	const sources = options.sources?.length
 		? sourcesFromInput(options.sources)
@@ -152,7 +161,7 @@ async function sourcesFromSearch(
 	const result = await runSearch(
 		{
 			query: options.query,
-			maxResults: options.maxResults,
+			maxResults: options.maxResults ?? 5,
 			rootDir: options.rootDir,
 		},
 		{
@@ -165,6 +174,33 @@ async function sourcesFromSearch(
 	);
 	if (result.error) return [];
 	return result.results.map(sourceFromSearchResult);
+}
+
+function researchRequest(options: ResearchOptions): {
+	message: string;
+	mode: "local" | "gemini-acp";
+	maxResults?: number;
+	hydrateSources: boolean;
+	hydrationMode: "none" | "fetch";
+} {
+	const hydrateSources = Boolean(options.hydrateSources);
+	const hydrationMode = hydrateSources ? "fetch" : "none";
+	if (options.sources?.length) {
+		return {
+			message: `Using ${options.sources.length} supplied source(s) for research query: "${options.query}".`,
+			mode: "local",
+			hydrateSources,
+			hydrationMode,
+		};
+	}
+	const maxResults = options.maxResults ?? 5;
+	return {
+		message: `Searching research query: "${options.query}" with ${maxResults} max results.`,
+		mode: "gemini-acp",
+		maxResults,
+		hydrateSources,
+		hydrationMode,
+	};
 }
 
 function sourcesFromInput(

@@ -142,6 +142,14 @@ function formatResearchProgressExpanded(
 		`phase: ${researchPhaseLabel(update.phase)}`,
 		`message: ${update.message}`,
 	];
+	if (update.query) lines.push(`query: ${update.query}`);
+	if (update.mode) lines.push(`mode: ${update.mode}`);
+	if (update.maxResults !== undefined)
+		lines.push(`maxResults: ${update.maxResults}`);
+	if (update.hydrateSources !== undefined)
+		lines.push(`hydrateSources: ${update.hydrateSources}`);
+	if (update.hydrationMode)
+		lines.push(`hydrationMode: ${update.hydrationMode}`);
 	const counts = progressCounts(update);
 	if (counts) lines.push(`sources: ${counts}`);
 	if (update.responseId) lines.push(`responseId: ${update.responseId}`);

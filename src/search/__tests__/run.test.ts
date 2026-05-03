@@ -60,6 +60,7 @@ describe("runSearch", () => {
 		const result = await runSearch(
 			{
 				query: "weather",
+				maxResults: 7,
 				rootDir,
 				config: {
 					providers: {
@@ -86,6 +87,15 @@ describe("runSearch", () => {
 		expect(result.model).toBe("gemini-test");
 		expect(updates).toEqual(
 			expect.arrayContaining([
+				expect.objectContaining({
+					phase: "provider_search",
+					provider: "gemini-acp",
+					model: "gemini-test",
+					query: "weather",
+					maxResults: 7,
+					message:
+						'Sending search prompt: "weather" with 7 max results via gemini-test.',
+				}),
 				expect.objectContaining({
 					phase: "provider_stream",
 					provider: "gemini-acp",

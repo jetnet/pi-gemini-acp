@@ -77,6 +77,7 @@ export async function runTranslate(
 			rootDir: options.rootDir,
 			cwd: options.cwd,
 			useDefaultConfig: false,
+			requestSummary: translateRequestSummary(options, mode),
 		},
 		deps,
 		signal,
@@ -140,6 +141,42 @@ export function buildTranslatePrompt(options: TranslateOptions): string {
 		);
 	}
 	return lines.join("\n");
+}
+
+function translateRequestSummary(
+	options: TranslateOptions,
+	mode: "single" | "batch",
+) {
+	const itemCount = mode === "batch" ? (options.batch?.length ?? 0) : 1;
+	const totalChars =
+		mode === "batch"
+			? (options.batch ?? []).reduce((sum, item) => sum + item.text.length, 0)
+			: (options.text?.length ?? 0);
+	return {
+		toolName: "gemini_translate" as const,
+		action: "Sending translation prompt",
+		subject: options.targetLanguage.trim(),
+		arguments: {
+			targetLanguage: options.targetLanguage.trim(),
+			sourceLanguage:
+				normalizedOptional(options.sourceLanguage) ?? "auto-detect",
+			mode,
+			itemCount,
+			totalChars,
+			glossaryTerms: normalizedGlossaryCount(options.glossary),
+			preserveTerms: normalizedList(options.preserve).length,
+			preservationRules: normalizedList(options.preservationRules).length,
+			tone: normalizedOptional(options.tone),
+		},
+	};
+}
+
+function normalizedGlossaryCount(
+	entries: TranslateGlossaryEntry[] | undefined,
+): number {
+	return (entries ?? []).filter(
+		(entry) => entry.source.trim() && entry.target.trim(),
+	).length;
 }
 
 function validateTranslateOptions(

@@ -36,6 +36,8 @@ afterEach(async () => {
 describe("runTranslate", () => {
 	it("translates provided text through an injected Gemini ACP client", async () => {
 		const client = new FakeGeminiClient("Hola mundo");
+		const updates: Array<{ phase?: string; text: string; request?: unknown }> =
+			[];
 		const result = await runTranslate(
 			{
 				text: "Hello world",
@@ -44,6 +46,14 @@ describe("runTranslate", () => {
 				config: configuredGeminiAcp,
 			},
 			{ commandExists: async () => true, geminiAcpClient: client },
+			undefined,
+			(update) => {
+				updates.push({
+					phase: update.type === "progress" ? update.phase : undefined,
+					text: update.text,
+					request: update.type === "progress" ? update.request : undefined,
+				});
+			},
 		);
 
 		expect(result.error).toBeUndefined();
@@ -53,6 +63,24 @@ describe("runTranslate", () => {
 		expect(client.promptText).toContain(
 			'Source text JSON: {"text":"Hello world"}',
 		);
+		const providerPrompt = updates.find(
+			(update) => update.phase === "provider_prompt",
+		);
+		expect(providerPrompt?.text).toContain(
+			'Sending translation prompt: "Spanish"',
+		);
+		expect(providerPrompt?.text).toContain("targetLanguage Spanish");
+		expect(providerPrompt?.text).toContain("mode single");
+		expect(providerPrompt?.text).toContain("itemCount 1");
+		expect(providerPrompt?.text).toContain("totalChars 11");
+		expect(providerPrompt?.text).not.toContain("Hello world");
+		expect(providerPrompt?.request).toMatchObject({
+			toolName: "gemini_translate",
+			arguments: expect.objectContaining({
+				targetLanguage: "Spanish",
+				itemCount: 1,
+			}),
+		});
 	});
 
 	it("builds deterministic glossary and preservation instructions", () => {

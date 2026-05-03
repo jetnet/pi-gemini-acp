@@ -57,10 +57,29 @@ describe("runCodeReview", () => {
 			"- Run npm test.",
 		].join("\n");
 		const client = new FakeGeminiClient([review]);
+		const updates: Array<{ phase?: string; text: string; request?: unknown }> =
+			[];
 
 		const result = await runCodeReview(
-			{ diff: "@@ -1 +1 @@\n-old\n+new", rootDir, config: {} },
+			{
+				diff: "@@ -1 +1 @@\n-old\n+new",
+				filename: "src/example.ts",
+				language: "TypeScript",
+				focus: ["security", "tests"],
+				severityThreshold: "important",
+				maxFindings: 3,
+				rootDir,
+				config: {},
+			},
 			{ commandExists: async () => true, geminiAcpClient: client },
+			undefined,
+			(update) => {
+				updates.push({
+					phase: update.type === "progress" ? update.phase : undefined,
+					text: update.text,
+					request: update.type === "progress" ? update.request : undefined,
+				});
+			},
 		);
 
 		expect(result.error).toBeUndefined();
@@ -73,6 +92,24 @@ describe("runCodeReview", () => {
 		]);
 		expect(client.promptText).toContain("@@ -1 +1 @@");
 		expect(client.promptText).toContain("analysis-only code review");
+		const providerPrompt = updates.find(
+			(update) => update.phase === "provider_prompt",
+		);
+		expect(providerPrompt?.text).toContain(
+			'Sending code review prompt: "src/example.ts"',
+		);
+		expect(providerPrompt?.text).toContain("language TypeScript");
+		expect(providerPrompt?.text).toContain("focus security/tests");
+		expect(providerPrompt?.text).toContain("maxFindings 3");
+		expect(providerPrompt?.text).toContain("diffLength 21");
+		expect(providerPrompt?.text).not.toContain("-old");
+		expect(providerPrompt?.request).toMatchObject({
+			toolName: "gemini_code_review",
+			arguments: expect.objectContaining({
+				filename: "src/example.ts",
+				severity: "important",
+			}),
+		});
 	});
 
 	it("rejects empty review input without contacting Gemini ACP", async () => {
