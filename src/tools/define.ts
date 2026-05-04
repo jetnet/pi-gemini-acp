@@ -5,12 +5,25 @@ import type { PiToolShell } from "../types.js";
 /** Receives partial Pi tool shells emitted while a long-running tool executes. */
 export type ToolUpdate = (result: PiToolShell) => void | Promise<void>;
 
+/** Minimal Pi execution context used by tools that need interactive confirmation. */
+export interface ToolExecutionContext {
+	hasUI?: boolean;
+	ui?: {
+		confirm(
+			title: string,
+			message: string,
+			options?: { signal?: AbortSignal; timeout?: number },
+		): Promise<boolean>;
+	};
+}
+
 /** Executes a Gemini tool with typed params and optional streaming updates. */
 export type ToolExecute<TParams> = (
 	toolCallId: string,
 	params: TParams,
 	signal: AbortSignal,
 	onUpdate?: ToolUpdate,
+	ctx?: ToolExecutionContext,
 ) => Promise<PiToolShell>;
 
 // Mirrors Pi extension runtime ToolDefinition.renderCall/renderResult from

@@ -251,7 +251,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 	): Promise<string> {
 		return this.withWarmProcess(signal, async (active) => {
 			const sessionId = await active.session.newSession(cwd);
-			return active.session.prompt(sessionId, text, onUpdate);
+			return active.session.prompt(sessionId, text, onUpdate, { signal });
 		});
 	}
 

@@ -8,7 +8,10 @@ import {
 	defaultGeminiAcpIdleTtlMs,
 	GeminiAcpClientCache,
 } from "../client-cache.js";
-import type { GeminiAcpProcessSession } from "../session.js";
+import type {
+	GeminiAcpProcessSession,
+	GeminiAcpPromptOptions,
+} from "../session.js";
 
 const originalCwd = process.cwd();
 
@@ -137,6 +140,25 @@ describe("GeminiAcpClientCache", () => {
 			await cache.close();
 			await rm(cwdRoot, { recursive: true, force: true });
 		}
+	});
+
+	it("passes prompt AbortSignal into fresh cached prompt sessions", async () => {
+		const factory = new FakeSessionFactory({ waitForClosePrompt: true });
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const controller = new AbortController();
+		const client = cache.get(settings("gemini"), "prompt");
+
+		const aborted = client.prompt({ prompt: "slow" }, controller.signal);
+		await factory.waitForPromptStart();
+		controller.abort();
+
+		await expect(aborted).rejects.toMatchObject({ name: "AbortError" });
+		expect(factory.sessions[0]?.promptSignals).toEqual([controller.signal]);
+		expect(factory.sessions[0]?.closeCalls).toBe(1);
+
+		await cache.get(settings("gemini"), "prompt").prompt({ prompt: "ok" });
+		expect(factory.sessions).toHaveLength(2);
+		await cache.close();
 	});
 
 	it("keeps search and prompt cache entries separate", async () => {
@@ -351,6 +373,7 @@ class FakeSession implements GeminiAcpProcessSession {
 	closeCalls = 0;
 	maxConcurrentPrompts = 0;
 	readonly cwds: string[] = [];
+	readonly promptSignals: Array<AbortSignal | undefined> = [];
 	private activePrompts = 0;
 	private closePromptReject?: (error: Error) => void;
 
@@ -373,7 +396,13 @@ class FakeSession implements GeminiAcpProcessSession {
 		return `session-${this.newSessionCalls}`;
 	}
 
-	async prompt(): Promise<string> {
+	async prompt(
+		_sessionId?: string,
+		_prompt?: unknown,
+		_onUpdate?: unknown,
+		options?: GeminiAcpPromptOptions,
+	): Promise<string> {
+		this.promptSignals.push(options?.signal);
 		this.promptCalls += 1;
 		if (this.factory.shouldFailPrompt()) throw new Error("planned failure");
 		this.activePrompts += 1;

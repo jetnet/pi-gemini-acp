@@ -1,4 +1,5 @@
 import { type Static, Type } from "@mariozechner/pi-ai";
+import { trustGeminiCliFolder } from "../config/gemini-cli-trust.js";
 import {
 	FILE_ANALYZE_MAX_FILES,
 	type FileAnalyzeOptions,
@@ -8,6 +9,7 @@ import {
 import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
 import {
 	defineGeminiTool,
+	type ToolExecutionContext,
 	type ToolRenderResultOptions,
 	type ToolUpdate,
 } from "./define.js";
@@ -56,11 +58,11 @@ export const geminiAcpFileAnalyzeTool = defineGeminiTool({
 	description:
 		"Analyze caller-provided local text/document files through confirmed Gemini ACP resource links after conservative path validation and filesystem-read permission preflight.",
 	parameters: geminiAcpFileAnalyzeSchema,
-	async execute(_toolCallId, params: Params, signal, onUpdate) {
+	async execute(_toolCallId, params: Params, signal, onUpdate, ctx) {
 		await emitFileAnalyzeProgress(params, onUpdate);
 		const result = await runFileAnalyze(
 			params as FileAnalyzeOptions,
-			{},
+			{ trustFolder: fileAnalyzeTrustHandler(ctx) },
 			signal,
 		);
 		if (result.error) {
@@ -85,6 +87,25 @@ export const geminiAcpFileAnalyzeTool = defineGeminiTool({
 		);
 	},
 });
+
+function fileAnalyzeTrustHandler(ctx: ToolExecutionContext | undefined) {
+	if (!ctx?.hasUI || !ctx.ui) return undefined;
+	return async (folderPath: string, signal?: AbortSignal): Promise<boolean> => {
+		const confirmed = await ctx.ui?.confirm(
+			"Trust folder for Gemini ACP file analysis?",
+			[
+				`Gemini CLI reported that folder trust may be required for: ${folderPath}`,
+				"Trusting this exact folder lets Gemini CLI load local workspace configuration for ACP sessions in that folder.",
+				"Pi filesystem permissions remain separate: this tool will still allow only the explicit validated file paths for this request.",
+				"Decline to stop file analysis without changing Gemini CLI trust settings.",
+			].join("\n\n"),
+			{ signal },
+		);
+		if (!confirmed) return false;
+		await trustGeminiCliFolder(folderPath);
+		return true;
+	};
+}
 
 async function emitFileAnalyzeProgress(
 	params: Params,

@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { GeminiAcpCommandSettings } from "../../acp/client.js";
 import type { GeminiAcpConfig } from "../../types.js";
@@ -42,7 +43,7 @@ describe("runFileAnalyze", () => {
 							},
 						}),
 						newSession: async (cwd: string) => {
-							expect(cwd).toBe(rootDir);
+							expect(cwd).not.toBe(rootDir);
 							return "session-1";
 						},
 						prompt: async (_sessionId, prompt) => {
@@ -71,7 +72,131 @@ describe("runFileAnalyze", () => {
 			path.join(rootDir, "notes.txt"),
 		]);
 		expect(JSON.stringify(prompts[0])).toContain('"resource_link"');
-		expect(JSON.stringify(prompts[0])).toContain("file://notes.txt");
+		expect(JSON.stringify(prompts[0])).toContain(
+			pathToFileURL(path.join(rootDir, "notes.txt")).href,
+		);
+	});
+
+	it("passes AbortSignal into ACP file prompt and returns aborted", async () => {
+		await writeFile(path.join(rootDir, "notes.txt"), "alpha beta", "utf8");
+		const controller = new AbortController();
+
+		const result = await runFileAnalyze(
+			{
+				paths: ["notes.txt"],
+				instructions: "Summarize this file.",
+				cwd: rootDir,
+				config: fileReadConfig(),
+			},
+			{
+				commandExists: async () => true,
+				acpSessionFactory: async () => ({
+					initialize: async () => ({
+						promptCapabilities: {
+							embeddedContext: true,
+							image: false,
+							audio: false,
+						},
+					}),
+					newSession: async () => "session-1",
+					prompt: async (_sessionId, _prompt, _onUpdate, options) => {
+						expect(options?.signal).toBe(controller.signal);
+						throw new DOMException("cancelled", "AbortError");
+					},
+					close: async () => undefined,
+				}),
+			},
+			controller.signal,
+		);
+
+		expect(result.error).toMatchObject({
+			code: "GEMINI_ACP_ABORTED",
+			phase: "provider_prompt",
+			retryable: true,
+			provider: "gemini-acp",
+		});
+	});
+
+	it("can trust the exact cwd and retry once after trust-shaped failure", async () => {
+		await writeFile(path.join(rootDir, "notes.txt"), "alpha beta", "utf8");
+		const sessionCwds: string[] = [];
+		let trustedFolder: string | undefined;
+
+		const result = await runFileAnalyze(
+			{
+				paths: ["notes.txt"],
+				instructions: "Summarize this file.",
+				cwd: rootDir,
+				config: fileReadConfig(),
+			},
+			{
+				commandExists: async () => true,
+				trustFolder: async (folder) => {
+					trustedFolder = folder;
+					return true;
+				},
+				acpSessionFactory: async () => ({
+					initialize: async () => ({
+						promptCapabilities: {
+							embeddedContext: true,
+							image: false,
+							audio: false,
+						},
+					}),
+					newSession: async (cwd) => {
+						sessionCwds.push(cwd);
+						return `session-${sessionCwds.length}`;
+					},
+					prompt: async () => {
+						if (sessionCwds.length === 1) {
+							throw new Error("FatalUntrustedWorkspaceError: not trusted");
+						}
+						return "Trusted retry worked.";
+					},
+					close: async () => undefined,
+				}),
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.text).toBe("Trusted retry worked.");
+		expect(trustedFolder).toBe(rootDir);
+		expect(sessionCwds[0]).not.toBe(rootDir);
+		expect(sessionCwds[1]).toBe(rootDir);
+	});
+
+	it("returns trust remediation when trust-shaped failure is not approved", async () => {
+		await writeFile(path.join(rootDir, "notes.txt"), "alpha beta", "utf8");
+
+		const result = await runFileAnalyze(
+			{
+				paths: ["notes.txt"],
+				instructions: "Summarize this file.",
+				cwd: rootDir,
+				config: fileReadConfig(),
+			},
+			{
+				commandExists: async () => true,
+				trustFolder: async () => false,
+				acpSessionFactory: async () => ({
+					initialize: async () => ({
+						promptCapabilities: {
+							embeddedContext: true,
+							image: false,
+							audio: false,
+						},
+					}),
+					newSession: async () => "session-1",
+					prompt: async () => {
+						throw new Error("Gemini CLI is not running in a trusted directory.");
+					},
+					close: async () => undefined,
+				}),
+			},
+		);
+
+		expect(result.error?.code).toBe("GEMINI_ACP_TRUST_REQUIRED");
+		expect(result.error?.message).toContain("/gemini-config trust");
 	});
 
 	it("requires ACP embedded context capability before sending file references", async () => {

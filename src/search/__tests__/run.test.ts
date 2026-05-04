@@ -211,6 +211,36 @@ describe("runSearch", () => {
 		expect(authProbes).toBe(2);
 	});
 
+	it("maps provider search aborts to GEMINI_ACP_ABORTED", async () => {
+		const result = await runSearch(
+			{
+				query: "x",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							command: "gemini",
+							authenticated: true,
+							searchGroundingAvailable: true,
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => true,
+				geminiAcpClient: new AbortSearchClient(),
+			},
+		);
+
+		expect(result.error).toMatchObject({
+			code: "GEMINI_ACP_ABORTED",
+			phase: "provider_search",
+			retryable: true,
+			provider: "gemini-acp",
+		});
+	});
+
 	it("uses the default Gemini ACP client factory when no client is injected", async () => {
 		let factoryCalls = 0;
 		const result = await runSearch(
@@ -311,6 +341,16 @@ class StreamingFakeGeminiClient implements GeminiAcpClient {
 			accumulatedText: "streamed search chunk",
 		});
 		return [searchResult()];
+	}
+}
+
+class AbortSearchClient implements GeminiAcpClient {
+	async prompt(request: GeminiAcpPromptRequest): Promise<string> {
+		return request.prompt;
+	}
+
+	async search(): Promise<SearchResultItem[]> {
+		throw new DOMException("cancelled", "AbortError");
 	}
 }
 

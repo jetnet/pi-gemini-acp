@@ -1,8 +1,9 @@
-import { lstat } from "node:fs/promises";
 import path from "node:path";
-import type {
-	GeminiAcpCommandSettings,
-	GeminiAcpPromptPart,
+import { pathToFileURL } from "node:url";
+import {
+	searchSessionCwd,
+	type GeminiAcpCommandSettings,
+	type GeminiAcpPromptPart,
 } from "../acp/client.js";
 import {
 	AcpProcessSession,
@@ -22,9 +23,14 @@ import {
 } from "../config/status.js";
 import { storeResult } from "../storage/results.js";
 import type { GeminiAcpConfig, StructuredError } from "../types.js";
+import {
+	type ValidatedAnalyzeFile,
+	validateAnalyzeFiles,
+} from "./file-analyze-validation.js";
+export { FILE_ANALYZE_MAX_BYTES } from "./file-analyze-validation.js";
+export type { ValidatedAnalyzeFile } from "./file-analyze-validation.js";
 
 export const FILE_ANALYZE_MAX_FILES = 5;
-export const FILE_ANALYZE_MAX_BYTES = 1_000_000;
 const FILE_ANALYZE_INLINE_LIMIT = 4_000;
 
 /** Caller-provided local file analysis request, validated before ACP receives file references. */
@@ -36,20 +42,18 @@ export interface FileAnalyzeOptions {
 	rootDir?: string;
 }
 
+/** Callback that may persist exact Gemini CLI folder trust after user consent. */
+export type FileAnalyzeTrustHandler = (
+	folderPath: string,
+	signal?: AbortSignal,
+) => Promise<boolean>;
+
 /** Dependencies for tests and controlled ACP probing. */
 export interface FileAnalyzeDeps {
 	acpSessionFactory?: GeminiAcpProcessSessionFactory;
 	commandExists?: StatusCommandChecker;
 	authProbe?: GeminiAcpAuthProbe;
-}
-
-/** File metadata that passed the conservative file-analysis safety checks. */
-export interface ValidatedAnalyzeFile {
-	path: string;
-	resolvedPath: string;
-	relativePath: string;
-	sizeBytes: number;
-	mimeType: string;
+	trustFolder?: FileAnalyzeTrustHandler;
 }
 
 /** Capability-gated file-analysis result. */
@@ -136,14 +140,91 @@ export async function runFileAnalyze(
 		validation.files,
 	);
 	const sessionFactory = deps.acpSessionFactory ?? AcpProcessSession.start;
+	const firstAttempt = await executeFileAnalyzeSession({
+		commandSettings,
+		files: validation.files,
+		instructions,
+		options,
+		sessionFactory,
+		sessionCwd: searchSessionCwd(undefined),
+		signal,
+	});
+	if (!firstAttempt.error || !isTrustRequiredError(firstAttempt.error)) {
+		return firstAttempt;
+	}
+	const trustedFolderPath = trustedFolderForFiles(
+		validation.files,
+		validation.rootDir,
+	);
+	const trusted = await requestFolderTrust(
+		deps.trustFolder,
+		trustedFolderPath,
+		signal,
+		firstAttempt,
+	);
+	if (trusted !== true) return trusted;
+	return executeFileAnalyzeSession({
+		commandSettings,
+		files: validation.files,
+		instructions,
+		options,
+		sessionFactory,
+		sessionCwd: trustedFolderPath,
+		signal,
+	});
+}
+
+async function requestFolderTrust(
+	trustFolder: FileAnalyzeTrustHandler | undefined,
+	folderPath: string,
+	signal: AbortSignal | undefined,
+	fallback: FileAnalyzeResult,
+): Promise<true | FileAnalyzeResult> {
+	if (!trustFolder) return fallback;
+	try {
+		return (await trustFolder(folderPath, signal)) ? true : fallback;
+	} catch (cause) {
+		if (isAbortError(cause)) return abortedProviderResult(fallback.files);
+		return {
+			...emptyFileAnalyzeResult(),
+			files: fallback.files,
+			error: providerError(
+				"GEMINI_ACP_TRUST_REQUIRED",
+				"provider_prompt",
+				trustRequiredMessage(
+					cause instanceof Error
+						? cause.message
+						: "Gemini CLI folder trust was not saved.",
+				),
+			),
+		};
+	}
+}
+
+interface FileAnalyzeSessionAttempt {
+	commandSettings: GeminiAcpCommandSettings;
+	files: ValidatedAnalyzeFile[];
+	instructions: string;
+	options: FileAnalyzeOptions;
+	sessionFactory: GeminiAcpProcessSessionFactory;
+	sessionCwd: string;
+	signal?: AbortSignal;
+}
+
+async function executeFileAnalyzeSession(
+	attempt: FileAnalyzeSessionAttempt,
+): Promise<FileAnalyzeResult> {
 	let session: Awaited<ReturnType<GeminiAcpProcessSessionFactory>> | undefined;
 	try {
-		session = await sessionFactory(commandSettings, signal);
+		session = await attempt.sessionFactory(
+			attempt.commandSettings,
+			attempt.signal,
+		);
 		const initializeResult = await session.initialize();
 		if (!initializeResult.promptCapabilities.embeddedContext) {
 			return {
 				...emptyFileAnalyzeResult(),
-				files: validation.files,
+				files: attempt.files,
 				error: providerError(
 					"GEMINI_ACP_FILE_ANALYSIS_UNAVAILABLE",
 					"capability_preflight",
@@ -151,24 +232,22 @@ export async function runFileAnalyze(
 				),
 			};
 		}
-		const sessionId = await session.newSession(validation.rootDir);
+		const sessionId = await session.newSession(attempt.sessionCwd);
 		const text = await session.prompt(
 			sessionId,
-			fileAnalyzePromptParts(instructions, validation.files),
+			fileAnalyzePromptParts(attempt.instructions, attempt.files),
+			undefined,
+			{ signal: attempt.signal },
 		);
-		return await compactFileAnalyzeResult(text, validation.files, options);
+		return await compactFileAnalyzeResult(text, attempt.files, attempt.options);
 	} catch (cause) {
 		return {
 			...emptyFileAnalyzeResult(),
-			files: validation.files,
+			files: attempt.files,
 			error: providerError(
-				isAbortError(cause) ? "GEMINI_ACP_ABORTED" : "GEMINI_ACP_FAILED",
+				providerErrorCode(cause),
 				"provider_prompt",
-				isAbortError(cause)
-					? "Gemini ACP file analysis was aborted."
-					: cause instanceof Error
-						? cause.message
-						: "Gemini ACP file analysis failed.",
+				providerErrorMessage(cause),
 			),
 		};
 	} finally {
@@ -176,130 +255,11 @@ export async function runFileAnalyze(
 	}
 }
 
-async function validateAnalyzeFiles(
-	paths: string[],
-	cwd = process.cwd(),
-): Promise<{
-	rootDir: string;
-	files: ValidatedAnalyzeFile[];
-	error?: StructuredError;
-}> {
-	const rootDir = path.resolve(cwd);
-	const seen = new Set<string>();
-	const files: ValidatedAnalyzeFile[] = [];
-	for (const inputPath of paths) {
-		const trimmed = inputPath.trim();
-		if (!trimmed) {
-			return {
-				rootDir,
-				files,
-				error: inputError(
-					"GEMINI_FILE_ANALYZE_EMPTY_PATH",
-					"File paths must be non-empty strings.",
-				),
-			};
-		}
-		const resolvedPath = path.resolve(rootDir, trimmed);
-		if (seen.has(resolvedPath)) continue;
-		seen.add(resolvedPath);
-
-		const unsafeReason = unsafePathReason(trimmed, resolvedPath, rootDir);
-		if (unsafeReason) return { rootDir, files, error: unsafeReason };
-
-		let stat;
-		try {
-			stat = await lstat(resolvedPath);
-		} catch {
-			return {
-				rootDir,
-				files,
-				error: inputError(
-					"GEMINI_FILE_ANALYZE_FILE_NOT_FOUND",
-					`File was not found: ${trimmed}`,
-				),
-			};
-		}
-		if (stat.isDirectory()) {
-			return {
-				rootDir,
-				files,
-				error: inputError(
-					"GEMINI_FILE_ANALYZE_DIRECTORY_REJECTED",
-					`Directories are not supported: ${trimmed}`,
-				),
-			};
-		}
-		if (stat.isSymbolicLink()) {
-			return {
-				rootDir,
-				files,
-				error: inputError(
-					"GEMINI_FILE_ANALYZE_SYMLINK_REJECTED",
-					`Symbolic links are rejected by default: ${trimmed}`,
-				),
-			};
-		}
-		if (!stat.isFile()) {
-			return {
-				rootDir,
-				files,
-				error: inputError(
-					"GEMINI_FILE_ANALYZE_NOT_A_FILE",
-					`Only regular files are supported: ${trimmed}`,
-				),
-			};
-		}
-		if (stat.size > FILE_ANALYZE_MAX_BYTES) {
-			return {
-				rootDir,
-				files,
-				error: inputError(
-					"GEMINI_FILE_ANALYZE_FILE_TOO_LARGE",
-					`Files must be ${FILE_ANALYZE_MAX_BYTES} bytes or smaller: ${trimmed}`,
-				),
-			};
-		}
-		const relativePath = toPosix(path.relative(rootDir, resolvedPath));
-		files.push({
-			path: trimmed,
-			resolvedPath,
-			relativePath,
-			sizeBytes: stat.size,
-			mimeType: mimeTypeForPath(resolvedPath),
-		});
-	}
-	return { rootDir, files };
-}
-
-function unsafePathReason(
-	inputPath: string,
-	resolvedPath: string,
+function trustedFolderForFiles(
+	files: ValidatedAnalyzeFile[],
 	rootDir: string,
-): StructuredError | undefined {
-	if (!isWithinRoot(resolvedPath, rootDir)) {
-		return inputError(
-			"GEMINI_FILE_ANALYZE_OUTSIDE_CWD_REJECTED",
-			`File analysis paths must resolve under cwd: ${inputPath}`,
-		);
-	}
-	const inputSegments = path
-		.normalize(inputPath)
-		.split(path.sep)
-		.filter(Boolean);
-	if (inputSegments.some((segment) => segment.startsWith("."))) {
-		return inputError(
-			"GEMINI_FILE_ANALYZE_HIDDEN_PATH_REJECTED",
-			`Hidden files or directories are rejected by default: ${inputPath}`,
-		);
-	}
-	const basename = path.basename(resolvedPath).toLowerCase();
-	if (secretLikePath(basename, resolvedPath.toLowerCase())) {
-		return inputError(
-			"GEMINI_FILE_ANALYZE_SECRET_PATH_REJECTED",
-			`Secret-like files are rejected by default: ${inputPath}`,
-		);
-	}
-	return undefined;
+): string {
+	return files.length === 1 ? path.dirname(files[0].resolvedPath) : rootDir;
 }
 
 function fileAnalyzePromptParts(
@@ -322,7 +282,7 @@ function fileAnalyzePromptParts(
 		},
 		...files.map((file) => ({
 			type: "resource_link" as const,
-			uri: `file://${file.relativePath}`,
+			uri: pathToFileURL(file.resolvedPath).href,
 			name: file.relativePath,
 			title: file.path,
 			mimeType: file.mimeType,
@@ -375,57 +335,6 @@ function withAllowedReadPaths(
 	};
 }
 
-function mimeTypeForPath(filePath: string): string {
-	const ext = path.extname(filePath).toLowerCase();
-	switch (ext) {
-		case ".md":
-		case ".markdown":
-			return "text/markdown";
-		case ".json":
-			return "application/json";
-		case ".html":
-		case ".htm":
-			return "text/html";
-		case ".ts":
-		case ".tsx":
-		case ".js":
-		case ".jsx":
-		case ".css":
-		case ".yaml":
-		case ".yml":
-		case ".txt":
-			return "text/plain";
-		default:
-			return "text/plain";
-	}
-}
-
-function isWithinRoot(filePath: string, rootDir: string): boolean {
-	const relative = path.relative(rootDir, filePath);
-	return (
-		relative === "" ||
-		(!relative.startsWith("..") && !path.isAbsolute(relative))
-	);
-}
-
-function toPosix(value: string): string {
-	return value.split(path.sep).join("/");
-}
-
-function secretLikePath(basename: string, lowerPath: string): boolean {
-	return (
-		/^(id_rsa|id_dsa|id_ecdsa|id_ed25519|known_hosts|authorized_keys)$/u.test(
-			basename,
-		) ||
-		/\.(pem|p12|pfx|key|keystore|jks)$/u.test(basename) ||
-		/(^|[-_.])(secret|token|password|passwd|credential|credentials|api[-_]?key)([-_.]|$)/u.test(
-			basename,
-		) ||
-		/(^|\/)\.?(aws|config)\/credentials$/u.test(lowerPath) ||
-		/(^|\/)kubeconfig$/u.test(lowerPath)
-	);
-}
-
 function fileAnalyzeError(
 	code: string,
 	phase: string,
@@ -437,16 +346,26 @@ function fileAnalyzeError(
 	};
 }
 
-function inputError(code: string, message: string): StructuredError {
-	return providerError(code, "input_validation", message);
-}
-
 function abortedResult(): FileAnalyzeResult {
 	return fileAnalyzeError(
 		"GEMINI_ACP_ABORTED",
 		"input_validation",
 		"Gemini ACP file analysis was aborted before ACP received file references.",
 	);
+}
+
+function abortedProviderResult(
+	files: ValidatedAnalyzeFile[],
+): FileAnalyzeResult {
+	return {
+		...emptyFileAnalyzeResult(),
+		files,
+		error: providerError(
+			"GEMINI_ACP_ABORTED",
+			"provider_prompt",
+			"Gemini ACP file analysis was aborted.",
+		),
+	};
 }
 
 function emptyFileAnalyzeResult(): FileAnalyzeResult {
@@ -464,9 +383,49 @@ function providerError(
 	phase: string,
 	message: string,
 ): StructuredError {
-	return { code, phase, message, retryable: false, provider: "gemini-acp" };
+	return {
+		code,
+		phase,
+		message,
+		retryable: code === "GEMINI_ACP_ABORTED",
+		provider: "gemini-acp",
+	};
+}
+
+function providerErrorCode(cause: unknown): string {
+	if (isAbortError(cause)) return "GEMINI_ACP_ABORTED";
+	if (isTrustRequiredCause(cause)) return "GEMINI_ACP_TRUST_REQUIRED";
+	return "GEMINI_ACP_FAILED";
+}
+
+function providerErrorMessage(cause: unknown): string {
+	if (isAbortError(cause)) return "Gemini ACP file analysis was aborted.";
+	const message = cause instanceof Error ? cause.message : undefined;
+	if (message && isTrustRequiredText(message))
+		return trustRequiredMessage(message);
+	return message ?? "Gemini ACP file analysis failed.";
+}
+
+function isTrustRequiredError(error: StructuredError): boolean {
+	return error.code === "GEMINI_ACP_TRUST_REQUIRED";
 }
 
 function isAbortError(cause: unknown): boolean {
-	return cause instanceof DOMException && cause.name === "AbortError";
+	return cause instanceof DOMException
+		? cause.name === "AbortError"
+		: cause instanceof Error && cause.name === "AbortError";
+}
+
+function isTrustRequiredCause(cause: unknown): boolean {
+	return cause instanceof Error && isTrustRequiredText(cause.message);
+}
+
+function isTrustRequiredText(message: string): boolean {
+	return /trust|trusted|untrusted|trusted directory|skip-trust|GEMINI_CLI_TRUST_WORKSPACE/iu.test(
+		message,
+	);
+}
+
+function trustRequiredMessage(message: string): string {
+	return `${message}\n\nGemini CLI appears to require folder trust for this ACP session. In interactive Pi, approve the trust prompt when offered; otherwise run /gemini-config trust or trust the exact folder in Gemini CLI, then retry.`;
 }

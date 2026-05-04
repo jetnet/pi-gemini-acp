@@ -209,15 +209,20 @@ export async function runSearch(
 		if (isAuthOrGroundingFailure(cause)) {
 			invalidateSearchPreflight(commandSettings, true);
 		}
+		const aborted = signal?.aborted === true || isAbortError(cause);
 		return {
 			provider: "gemini-acp",
 			model,
 			results: [],
 			error: {
 				...providerError(
-					"GEMINI_ACP_FAILED",
+					aborted ? "GEMINI_ACP_ABORTED" : "GEMINI_ACP_FAILED",
 					"provider_search",
-					cause instanceof Error ? cause.message : "Gemini ACP search failed",
+					aborted
+						? "Gemini ACP search was aborted."
+						: cause instanceof Error
+							? cause.message
+							: "Gemini ACP search failed",
 				),
 				cause,
 			},
@@ -420,5 +425,17 @@ function providerError(
 	phase: string,
 	message: string,
 ): StructuredError {
-	return { code, phase, message, retryable: false, provider: "gemini-acp" };
+	return {
+		code,
+		phase,
+		message,
+		retryable: code === "GEMINI_ACP_ABORTED",
+		provider: "gemini-acp",
+	};
+}
+
+function isAbortError(value: unknown): boolean {
+	return value instanceof DOMException
+		? value.name === "AbortError"
+		: value instanceof Error && value.name === "AbortError";
 }

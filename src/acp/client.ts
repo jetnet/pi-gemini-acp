@@ -119,6 +119,7 @@ export class StdioGeminiAcpClient implements GeminiAcpClient {
 				sessionId,
 				request.parts ?? [{ type: "text", text: request.prompt }],
 				onUpdate,
+				{ signal },
 			);
 		} finally {
 			await session.close();
