@@ -5,6 +5,7 @@ import type {
 	SearchResultItem,
 } from "../types.js";
 import { normalizeUrl } from "../url/normalize.js";
+import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.js";
 import { searchPrompt } from "./search-prompt.js";
 import { AcpProcessSession, permissionOptionId } from "./session.js";
 
@@ -86,13 +87,18 @@ export class StdioGeminiAcpClient implements GeminiAcpClient {
 		try {
 			await session.initialize();
 			const sessionId = await session.newSession(searchSessionCwd(request.cwd));
+			const earlyStop = createGeminiAcpSearchEarlyStop(onUpdate);
 			const text = await session.prompt(
 				sessionId,
 				searchPrompt(request),
-				onUpdate,
+				earlyStop.onUpdate,
+				{
+					signal: earlyStop.signal,
+					returnTextOnAbort: true,
+				},
 			);
 			return normalizeGeminiAcpSearchResults(
-				parseSearchPayload(text),
+				earlyStop.parsedPayload() ?? parseSearchPayload(text),
 				geminiMetadata(),
 			);
 		} finally {

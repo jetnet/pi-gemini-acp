@@ -30,6 +30,12 @@ interface PendingRequest {
 	reject: (error: Error) => void;
 }
 
+/** Controls cancellation behavior for one in-flight ACP prompt turn. */
+export interface GeminiAcpPromptOptions {
+	signal?: AbortSignal;
+	returnTextOnAbort?: boolean;
+}
+
 const MAX_CLIENT_READ_BYTES = 1_000_000;
 
 /** Normalized subset of ACP initialize capabilities used for feature preflight. */
@@ -49,6 +55,7 @@ export interface GeminiAcpProcessSession {
 		sessionId: string,
 		prompt: string | GeminiAcpPromptPart[],
 		onUpdate?: GeminiAcpPromptUpdateHandler,
+		options?: GeminiAcpPromptOptions,
 	): Promise<string>;
 	close(): Promise<void>;
 }
@@ -148,19 +155,40 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		sessionId: string,
 		prompt: string | GeminiAcpPromptPart[],
 		onUpdate?: GeminiAcpPromptUpdateHandler,
+		options: GeminiAcpPromptOptions = {},
 	): Promise<string> {
 		this.agentText.length = 0;
 		this.promptUpdateHandler = onUpdate;
+		const request = this.requestWithId("session/prompt", {
+			sessionId,
+			prompt:
+				typeof prompt === "string" ? [{ type: "text", text: prompt }] : prompt,
+		});
+		let abort: (() => void) | undefined;
 		try {
-			await this.request("session/prompt", {
-				sessionId,
-				prompt:
-					typeof prompt === "string"
-						? [{ type: "text", text: prompt }]
-						: prompt,
+			if (!options.signal) {
+				await request.promise;
+				return this.agentText.join("").trim();
+			}
+			const aborted = new Promise<string>((resolve, reject) => {
+				abort = () => {
+					this.pending.delete(request.id);
+					this.notify("session/cancel", { sessionId });
+					if (options.returnTextOnAbort) {
+						resolve(this.agentText.join("").trim());
+					} else {
+						reject(abortError());
+					}
+				};
+				if (options.signal?.aborted) abort();
+				else options.signal?.addEventListener("abort", abort, { once: true });
 			});
-			return this.agentText.join("").trim();
+			return await Promise.race([
+				request.promise.then(() => this.agentText.join("").trim()),
+				aborted,
+			]);
 		} finally {
+			if (abort) options.signal?.removeEventListener("abort", abort);
 			this.promptUpdateHandler = undefined;
 		}
 	}
@@ -177,6 +205,13 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	}
 
 	private request(method: string, params: unknown): Promise<unknown> {
+		return this.requestWithId(method, params).promise;
+	}
+
+	private requestWithId(
+		method: string,
+		params: unknown,
+	): { id: number; promise: Promise<unknown> } {
 		const id = this.nextId++;
 		const promise = new Promise<unknown>((resolve, reject) =>
 			this.pending.set(id, { resolve, reject }),
@@ -184,7 +219,13 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		this.child.stdin.write(
 			`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`,
 		);
-		return promise;
+		return { id, promise };
+	}
+
+	private notify(method: string, params: unknown): void {
+		this.child.stdin.write(
+			`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`,
+		);
 	}
 
 	private readStdout(chunk: string): void {

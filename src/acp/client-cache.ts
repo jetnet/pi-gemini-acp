@@ -11,6 +11,7 @@ import {
 	parseSearchPayload,
 	searchSessionCwd,
 } from "./client.js";
+import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.js";
 import { searchPrompt } from "./search-prompt.js";
 import {
 	AcpProcessSession,
@@ -172,18 +173,21 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<SearchResultItem[]> {
-		return this.enqueue(async () =>
-			normalizeGeminiAcpSearchResults(
-				parseSearchPayload(
-					await this.promptOnSearchSession(
-						searchSessionCwd(request.cwd),
-						searchPrompt(request),
-						signal,
-						onUpdate,
-					),
-				),
-			),
-		);
+		return this.enqueue(async () => {
+			const earlyStop = createGeminiAcpSearchEarlyStop(onUpdate);
+			const text = await this.promptOnSearchSession(
+				searchSessionCwd(request.cwd),
+				searchPrompt(request),
+				signal,
+				earlyStop.onUpdate,
+				earlyStop.signal,
+			);
+			const results = normalizeGeminiAcpSearchResults(
+				earlyStop.parsedPayload() ?? parseSearchPayload(text),
+			);
+			if (earlyStop.stopped()) await this.close();
+			return results;
+		});
 	}
 
 	async prompt(
@@ -224,6 +228,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		text: string,
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
+		promptSignal?: AbortSignal,
 	): Promise<string> {
 		return this.withWarmProcess(signal, async (active) => {
 			let sessionId = active.searchSessionIds.get(cwd);
@@ -231,7 +236,10 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 				sessionId = await active.session.newSession(cwd);
 				active.searchSessionIds.set(cwd, sessionId);
 			}
-			return active.session.prompt(sessionId, text, onUpdate);
+			return active.session.prompt(sessionId, text, onUpdate, {
+				signal: promptSignal,
+				returnTextOnAbort: true,
+			});
 		});
 	}
 
