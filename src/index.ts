@@ -1,6 +1,7 @@
 import type { PiCommandRegistrar } from "./commands/define.js";
 import { registerGeminiAcpCommands } from "./commands/register.js";
 import { detectPiScraper, type PiScraperPresence } from "./research/hydrate.js";
+import { scheduleGeminiSearchPrewarm } from "./search/prewarm.js";
 import type { PiToolRegistrar } from "./tools/define.js";
 import { registerGeminiAcpTools } from "./tools/register.js";
 
@@ -19,6 +20,7 @@ export default function registerPiGeminiAcpExtension(
 ): GeminiAcpExtensionState {
 	registerGeminiAcpTools(pi);
 	if (hasCommandRegistrar(pi)) registerGeminiAcpCommands(pi);
+	scheduleGeminiSearchPrewarm();
 	return { piScraper: detectPiScraper(pi) };
 }
 

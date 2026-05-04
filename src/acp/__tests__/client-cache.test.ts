@@ -101,6 +101,21 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
+	it("pre-warms the default search session without prompting", async () => {
+		const factory = new FakeSessionFactory();
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+
+		await cache.warmSearch(settings("gemini"));
+		await cache.get(settings("gemini")).search({ query: "one", maxResults: 5 });
+
+		expect(factory.sessions).toHaveLength(1);
+		expect(factory.sessions[0]?.initializeCalls).toBe(1);
+		expect(factory.sessions[0]?.newSessionCalls).toBe(1);
+		expect(factory.sessions[0]?.promptCalls).toBe(1);
+		expect(factory.sessions[0]?.cwds).toEqual([homedir() || originalCwd]);
+		await cache.close();
+	});
+
 	it("uses a fresh caller-cwd ACP session for each prompt while keeping the process warm", async () => {
 		const cwdRoot = await mkdtemp(path.join(tmpdir(), "pi-gemini-prompt-cwd-"));
 		const factory = new FakeSessionFactory();

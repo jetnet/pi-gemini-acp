@@ -225,6 +225,25 @@ export async function runSearch(
 	}
 }
 
+/** Primes the Gemini search preflight cache only after a successful preflight. */
+export async function primeSuccessfulGeminiSearchPreflight(
+	settings: GeminiAcpProviderSettings | undefined,
+	commandSettings: GeminiAcpCommandSettings,
+	options: Parameters<typeof preflightGeminiAcpProvider>[1],
+): Promise<StructuredError | undefined> {
+	const key = searchPreflightCacheKey(commandSettings, true);
+	const cached = searchPreflightCache.get(key);
+	if (cached) return cached.result;
+	const result = await preflightGeminiAcpProvider(settings, options);
+	if (!result) {
+		searchPreflightCache.set(key, {
+			clientCacheKey: geminiAcpClientCacheKey(commandSettings, "search"),
+			result,
+		});
+	}
+	return result;
+}
+
 async function preflightSearchProvider(
 	settings: GeminiAcpProviderSettings | undefined,
 	commandSettings: GeminiAcpCommandSettings,

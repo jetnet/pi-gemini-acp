@@ -36,6 +36,10 @@ interface CachedClientEntry {
 	client: CachedGeminiAcpClient;
 }
 
+export interface GeminiAcpClientWarmOptions {
+	signal?: AbortSignal;
+}
+
 export interface GeminiAcpClientCacheOptions {
 	idleTtlMs?: number;
 	sessionFactory?: GeminiAcpProcessSessionFactory;
@@ -76,11 +80,28 @@ export class GeminiAcpClientCache {
 		return client;
 	}
 
+	/** Warms the cached search subprocess and default neutral search session. */
+	async warmSearch(
+		settings: GeminiAcpCommandSettings,
+		options: GeminiAcpClientWarmOptions = {},
+	): Promise<void> {
+		await this.cachedClient(settings, "search").warmSearchSession(
+			options.signal,
+		);
+	}
+
 	/** Closes every warm ACP subprocess currently retained by this cache. */
 	async close(): Promise<void> {
 		const clients = [...this.entries.values()].map((entry) => entry.client);
 		this.entries.clear();
 		await Promise.all(clients.map((client) => client.close()));
+	}
+
+	private cachedClient(
+		settings: GeminiAcpCommandSettings,
+		purpose: GeminiAcpClientCachePurpose,
+	): CachedGeminiAcpClient {
+		return this.get(settings, purpose) as CachedGeminiAcpClient;
 	}
 }
 
@@ -118,6 +139,14 @@ export function getCachedGeminiAcpClient(
 	purpose: GeminiAcpClientCachePurpose = "search",
 ): GeminiAcpClient {
 	return defaultCache.get(settings, purpose);
+}
+
+/** Warms the production Gemini ACP search cache without sending user-visible work. */
+export async function warmCachedGeminiAcpSearchClient(
+	settings: GeminiAcpCommandSettings,
+	options: GeminiAcpClientWarmOptions = {},
+): Promise<void> {
+	await defaultCache.warmSearch(settings, options);
 }
 
 /** Closes production cached clients; primarily useful for tests and shutdown hooks. */
@@ -178,6 +207,16 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		this.clearIdleTimer();
 		this.removeFromCacheOnce();
 		await this.closeActive();
+	}
+
+	async warmSearchSession(signal?: AbortSignal): Promise<void> {
+		await this.enqueue(() =>
+			this.withWarmProcess(signal, async (active) => {
+				const cwd = searchSessionCwd(undefined);
+				if (active.searchSessionIds.has(cwd)) return;
+				active.searchSessionIds.set(cwd, await active.session.newSession(cwd));
+			}),
+		);
 	}
 
 	private async promptOnSearchSession(
