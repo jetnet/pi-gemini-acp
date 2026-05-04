@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
+import { load as loadSqliteVec } from "sqlite-vec";
 import {
 	ensureDir,
 	resolveStoragePaths,
@@ -43,12 +44,45 @@ export interface ResponseCacheSummary {
 	oldestCreatedAtIso?: string;
 }
 
+/** Pending embedding job persisted so crashes do not lose recall work. */
+export interface EmbeddingQueueRow {
+	responseId: string;
+	enqueuedAt: number;
+	attempts: number;
+	lastError?: string;
+	nextAttemptAt?: number;
+	deadAt?: number;
+}
+
+/** Embedding row and vector to persist for semantic recall. */
+export interface PutEmbeddingRow {
+	responseId: string;
+	tool: string;
+	recallText: string;
+	model: string;
+	embedding: readonly number[];
+	embeddedAt?: number;
+}
+
+/** Summary of local embedding metadata and queue state. */
+export interface EmbeddingSummary {
+	rowCount: number;
+	models: string[];
+	queueDepth: number;
+	deadQueueDepth: number;
+	sqliteVecAvailable: boolean;
+	currentModel?: string;
+	staleCount?: number;
+}
+
 /** Thin SQLite wrapper for the response cache database. */
 export class ResponseCacheDatabase {
 	readonly db: DatabaseSync;
+	readonly sqliteVecAvailable: boolean;
 
 	constructor(filePath: string) {
-		this.db = new DatabaseSync(filePath);
+		this.db = new DatabaseSync(filePath, { allowExtension: true });
+		this.sqliteVecAvailable = this.tryLoadSqliteVec();
 		this.migrate();
 	}
 
@@ -67,6 +101,13 @@ export class ResponseCacheDatabase {
 			)
 			.run(now, cacheKey);
 		return mapRow({ ...row, hit_count: row.hit_count + 1, last_hit_at: now });
+	}
+
+	responseById(responseId: string): ResponseCacheRow | undefined {
+		const row = this.db
+			.prepare("SELECT * FROM response_cache WHERE response_id = ?")
+			.get(responseId) as DbCacheRow | undefined;
+		return row ? mapRow(row) : undefined;
 	}
 
 	put(row: PutResponseCacheRow): void {
@@ -143,12 +184,137 @@ export class ResponseCacheDatabase {
 		};
 	}
 
+	enqueueEmbedding(responseId: string, now = Date.now()): void {
+		this.db
+			.prepare(
+				`INSERT OR IGNORE INTO embedding_queue
+				(response_id, enqueued_at, attempts, next_attempt_at)
+				VALUES (?, ?, 0, ?)`,
+			)
+			.run(responseId, now, now);
+	}
+
+	nextEmbeddingJobs(limit: number, now = Date.now()): EmbeddingQueueRow[] {
+		const rows = this.db
+			.prepare(
+				`SELECT * FROM embedding_queue
+				WHERE dead_at IS NULL AND COALESCE(next_attempt_at, enqueued_at) <= ?
+				ORDER BY enqueued_at ASC LIMIT ?`,
+			)
+			.all(now, limit) as unknown as DbEmbeddingQueueRow[];
+		return rows.map(mapEmbeddingQueueRow);
+	}
+
+	markEmbeddingFailure(
+		responseId: string,
+		message: string,
+		now = Date.now(),
+	): void {
+		const row = this.db
+			.prepare("SELECT attempts FROM embedding_queue WHERE response_id = ?")
+			.get(responseId) as { attempts: number } | undefined;
+		const attempts = (row?.attempts ?? 0) + 1;
+		const backoffMs = [1_000, 5_000, 30_000][attempts - 1] ?? 30_000;
+		this.db
+			.prepare(
+				`UPDATE embedding_queue
+				SET attempts = ?, last_error = ?, next_attempt_at = ?, dead_at = ?
+				WHERE response_id = ?`,
+			)
+			.run(
+				attempts,
+				message.slice(0, 1000),
+				attempts >= 3 ? null : now + backoffMs,
+				attempts >= 3 ? now : null,
+				responseId,
+			);
+	}
+
+	putEmbedding(row: PutEmbeddingRow): void {
+		const embeddedAt = row.embeddedAt ?? Date.now();
+		this.db
+			.prepare(
+				`INSERT OR REPLACE INTO embeddings
+				(response_id, tool, recall_text, model, dim, embedded_at)
+				VALUES (?, ?, ?, ?, ?, ?)`,
+			)
+			.run(
+				row.responseId,
+				row.tool,
+				row.recallText,
+				row.model,
+				row.embedding.length,
+				embeddedAt,
+			);
+		if (this.sqliteVecAvailable) {
+			this.db
+				.prepare(
+					"INSERT OR REPLACE INTO embeddings_vec(response_id, embedding) VALUES (?, ?)",
+				)
+				.run(row.responseId, JSON.stringify(row.embedding));
+		}
+	}
+
+	deleteEmbeddingJob(responseId: string): void {
+		this.db
+			.prepare("DELETE FROM embedding_queue WHERE response_id = ?")
+			.run(responseId);
+	}
+
+	embeddingSummary(currentModel?: string): EmbeddingSummary {
+		const base = this.db
+			.prepare(
+				"SELECT COUNT(*) AS row_count, GROUP_CONCAT(DISTINCT model) AS models FROM embeddings",
+			)
+			.get() as { row_count: number; models?: string };
+		const queue = this.db
+			.prepare(
+				"SELECT COUNT(*) AS depth, COALESCE(SUM(CASE WHEN dead_at IS NOT NULL THEN 1 ELSE 0 END), 0) AS dead FROM embedding_queue",
+			)
+			.get() as { depth: number; dead: number };
+		const stale = currentModel
+			? (
+					this.db
+						.prepare(
+							"SELECT COUNT(*) AS count FROM embeddings WHERE model != ?",
+						)
+						.get(currentModel) as { count: number }
+				).count
+			: undefined;
+		return {
+			rowCount: base.row_count,
+			models: base.models ? base.models.split(",").filter(Boolean).sort() : [],
+			queueDepth: queue.depth,
+			deadQueueDepth: queue.dead,
+			sqliteVecAvailable: this.sqliteVecAvailable,
+			currentModel,
+			staleCount: stale,
+		};
+	}
+
 	close(): void {
 		this.db.close();
 	}
 
+	private tryLoadSqliteVec(): boolean {
+		try {
+			this.db.enableLoadExtension(true);
+			loadSqliteVec(this.db);
+			return true;
+		} catch {
+			return false;
+		} finally {
+			try {
+				this.db.enableLoadExtension(false);
+			} catch {
+				/* extension loading may already be disabled by Node */
+			}
+		}
+	}
+
 	private migrate(): void {
 		this.db.exec("PRAGMA journal_mode = WAL");
+		this.db.exec("PRAGMA foreign_keys = ON");
 		this.db.exec(`CREATE TABLE IF NOT EXISTS response_cache (
 			cache_key TEXT PRIMARY KEY,
 			response_id TEXT NOT NULL,
@@ -171,7 +337,36 @@ export class ResponseCacheDatabase {
 		this.db.exec(
 			"CREATE INDEX IF NOT EXISTS idx_response_cache_response_id ON response_cache(response_id)",
 		);
-		this.db.exec("PRAGMA user_version = 1");
+		this.db.exec(
+			"CREATE UNIQUE INDEX IF NOT EXISTS idx_response_cache_response_id_unique ON response_cache(response_id)",
+		);
+		this.db.exec(`CREATE TABLE IF NOT EXISTS embeddings (
+			response_id TEXT PRIMARY KEY REFERENCES response_cache(response_id) ON DELETE CASCADE,
+			tool TEXT NOT NULL,
+			recall_text TEXT NOT NULL,
+			model TEXT NOT NULL,
+			dim INTEGER NOT NULL,
+			embedded_at INTEGER NOT NULL
+		)`);
+		if (this.sqliteVecAvailable) {
+			this.db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS embeddings_vec USING vec0(
+				response_id TEXT PRIMARY KEY,
+				embedding FLOAT[768]
+			)`);
+			this.db.exec(`CREATE TRIGGER IF NOT EXISTS trg_embeddings_delete_vec
+				AFTER DELETE ON embeddings BEGIN
+					DELETE FROM embeddings_vec WHERE response_id = old.response_id;
+				END`);
+		}
+		this.db.exec(`CREATE TABLE IF NOT EXISTS embedding_queue (
+			response_id TEXT PRIMARY KEY REFERENCES response_cache(response_id) ON DELETE CASCADE,
+			enqueued_at INTEGER NOT NULL,
+			attempts INTEGER NOT NULL DEFAULT 0,
+			last_error TEXT,
+			next_attempt_at INTEGER,
+			dead_at INTEGER
+		)`);
+		this.db.exec("PRAGMA user_version = 2");
 	}
 }
 
@@ -203,6 +398,15 @@ interface DbCacheRow {
 	bytes?: number;
 }
 
+interface DbEmbeddingQueueRow {
+	response_id: string;
+	enqueued_at: number;
+	attempts: number;
+	last_error?: string;
+	next_attempt_at?: number;
+	dead_at?: number;
+}
+
 function mapRow(row: DbCacheRow): ResponseCacheRow {
 	return {
 		cacheKey: row.cache_key,
@@ -216,5 +420,16 @@ function mapRow(row: DbCacheRow): ResponseCacheRow {
 		hitCount: row.hit_count,
 		lastHitAt: row.last_hit_at,
 		bytes: row.bytes,
+	};
+}
+
+function mapEmbeddingQueueRow(row: DbEmbeddingQueueRow): EmbeddingQueueRow {
+	return {
+		responseId: row.response_id,
+		enqueuedAt: row.enqueued_at,
+		attempts: row.attempts,
+		lastError: row.last_error,
+		nextAttemptAt: row.next_attempt_at,
+		deadAt: row.dead_at,
 	};
 }

@@ -52,4 +52,37 @@ describe("ResponseCacheDatabase", () => {
 			db.close();
 		}
 	});
+
+	it("stores embeddings and cascades them when cache rows are removed", async () => {
+		const db = await openResponseCacheDb({ rootDir });
+		try {
+			db.put({
+				cacheKey: "key-c",
+				responseId: "response-c",
+				tool: "gemini_extract",
+			});
+			db.putEmbedding({
+				responseId: "response-c",
+				tool: "gemini_extract",
+				recallText: "tool: gemini_extract",
+				model: "fake-embedding",
+				embedding: Array.from({ length: 768 }, (_, index) =>
+					index === 0 ? 1 : 0,
+				),
+			});
+			expect(db.embeddingSummary("fake-embedding").rowCount).toBe(1);
+
+			db.clear("gemini_extract");
+
+			expect(db.embeddingSummary("fake-embedding").rowCount).toBe(0);
+			if (db.sqliteVecAvailable) {
+				const vectorRows = db.db
+					.prepare("SELECT response_id FROM embeddings_vec WHERE response_id = ?")
+					.all("response-c");
+				expect(vectorRows).toHaveLength(0);
+			}
+		} finally {
+			db.close();
+		}
+	});
 });

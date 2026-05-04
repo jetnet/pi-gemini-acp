@@ -1,5 +1,13 @@
 import { readFile, stat } from "node:fs/promises";
-import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
+import {
+	configFromEnv,
+	loadConfig,
+	withDefaultGeminiAcpConfig,
+} from "../config/settings.js";
+import {
+	enqueueEmbeddingJob,
+	scheduleEmbeddingQueueDrain,
+} from "../recall/queue.js";
 import { deriveCacheKey, sha256Hex } from "../storage/cache-key.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
 import { getStoredResult, storeResult } from "../storage/results.js";
@@ -44,7 +52,13 @@ export async function writeFileAnalyzeCache(
 ): Promise<void> {
 	if (process.env.PI_GEMINI_ACP_CACHE === "0" || result.error) return;
 	const key = await fileAnalyzeCacheKey(options, instructions, files);
-	const stored = await storeResult({ result }, { rootDir: options.rootDir });
+	const stored = await storeResult(
+		{
+			result,
+			recallInputs: { paths: options.paths, instructions, cwd: options.cwd },
+		},
+		{ rootDir: options.rootDir },
+	);
 	const bytes = (await stat(stored.path)).size;
 	const db = await openResponseCacheDb({ rootDir: options.rootDir });
 	try {
@@ -59,6 +73,11 @@ export async function writeFileAnalyzeCache(
 	} finally {
 		db.close();
 	}
+	await enqueueEmbeddingJob({
+		responseId: stored.responseId,
+		rootDir: options.rootDir,
+	});
+	scheduleEmbeddingQueueDrain({ rootDir: options.rootDir });
 }
 
 async function fileAnalyzeCacheKey(

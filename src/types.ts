@@ -141,4 +141,5 @@ export interface GeminiAcpConfig {
 	providers?: {
 		"gemini-acp"?: GeminiAcpProviderSettings;
 	};
+	recallEnabled?: boolean;
 }

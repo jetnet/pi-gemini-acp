@@ -255,6 +255,13 @@ describe("Gemini ACP command registration", () => {
 		});
 	});
 
+	it("parses recall action from raw slash-command text", () => {
+		expect(parseGeminiConfigCommandArgs("recall disable")).toEqual({
+			action: "recall",
+			recallAction: "disable",
+		});
+	});
+
 	it("adds Gemini CLI trust arg in headless config mode", async () => {
 		const result = await runGeminiConfig(
 			{ action: "trust" },

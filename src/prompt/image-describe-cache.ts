@@ -1,9 +1,20 @@
 import { readFile, stat } from "node:fs/promises";
-import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
+import {
+	configFromEnv,
+	loadConfig,
+	withDefaultGeminiAcpConfig,
+} from "../config/settings.js";
+import {
+	enqueueEmbeddingJob,
+	scheduleEmbeddingQueueDrain,
+} from "../recall/queue.js";
 import { deriveCacheKey, sha256Hex } from "../storage/cache-key.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
 import { getStoredResult, storeResult } from "../storage/results.js";
-import type { ImageDescribeOptions, ImageDescribeResult } from "./image-describe.js";
+import type {
+	ImageDescribeOptions,
+	ImageDescribeResult,
+} from "./image-describe.js";
 import type { ValidatedImageInput } from "./image-describe-input.js";
 
 type ValidatedImagePathInput = Extract<ValidatedImageInput, { kind: "path" }>;
@@ -44,7 +55,18 @@ export async function writeImageDescribeCache(
 ): Promise<void> {
 	if (process.env.PI_GEMINI_ACP_CACHE === "0" || result.error) return;
 	const key = await imageDescribeCacheKey(options, image);
-	const stored = await storeResult({ result }, { rootDir: options.rootDir });
+	const stored = await storeResult(
+		{
+			result,
+			recallInputs: {
+				imagePath: options.imagePath,
+				mode: options.mode,
+				instructions: options.instructions,
+				cwd: options.cwd,
+			},
+		},
+		{ rootDir: options.rootDir },
+	);
 	const bytes = (await stat(stored.path)).size;
 	const db = await openResponseCacheDb({ rootDir: options.rootDir });
 	try {
@@ -59,6 +81,11 @@ export async function writeImageDescribeCache(
 	} finally {
 		db.close();
 	}
+	await enqueueEmbeddingJob({
+		responseId: stored.responseId,
+		rootDir: options.rootDir,
+	});
+	scheduleEmbeddingQueueDrain({ rootDir: options.rootDir });
 }
 
 async function imageDescribeCacheKey(

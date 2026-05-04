@@ -53,6 +53,31 @@ export async function saveGeminiAcpSettings(
 	return config;
 }
 
+/** Persists the local opt-in/out switch for background semantic recall embeddings. */
+export async function saveRecallEnabled(
+	recallEnabled: boolean,
+	options: StorageOptions = {},
+): Promise<GeminiAcpConfig> {
+	const paths = resolveStoragePaths(options);
+	await ensureDir(paths.config);
+	const config: GeminiAcpConfig = {
+		...(await loadConfig(options)),
+		recallEnabled,
+	};
+	await writeFile(
+		path.join(paths.config, CONFIG_FILE),
+		JSON.stringify(config, null, 2),
+		{ mode: 0o600 },
+	);
+	return config;
+}
+
+/** Returns whether local recall infrastructure should attempt queue/vector writes. */
+export function recallEnabledFromConfig(config: GeminiAcpConfig): boolean {
+	if (process.env.PI_GEMINI_ACP_RECALL === "0") return false;
+	return config.recallEnabled !== false;
+}
+
 export function configFromEnv(config: GeminiAcpConfig): GeminiAcpConfig {
 	const command = process.env.PI_GEMINI_ACP_COMMAND;
 	const args = process.env.PI_GEMINI_ACP_ARGS?.split(" ").filter(Boolean);

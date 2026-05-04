@@ -14,6 +14,10 @@ import {
 	runGeminiConfigCache,
 	type GeminiConfigCacheResult,
 } from "./gemini-config-cache.js";
+import {
+	runGeminiConfigRecall,
+	type GeminiConfigRecallResult,
+} from "./gemini-config-recall.js";
 import type {
 	GeminiConfigAcpCommandOptions,
 	GeminiConfigAcpCommandResult,
@@ -55,10 +59,13 @@ export const geminiConfigSchema = Type.Object({
 			Type.Literal("cache", {
 				description: "Show or clear the persistent Gemini response cache.",
 			}),
+			Type.Literal("recall", {
+				description: "Enable or disable background semantic recall embeddings.",
+			}),
 		],
 		{
 			description:
-				"Choose whether to inspect status, configure command settings, manage Gemini ACP permissions, trust the current folder, or inspect/clear the response cache.",
+				"Choose whether to inspect status, configure command settings, manage Gemini ACP permissions, trust the current folder, inspect/clear the response cache, or manage recall embeddings.",
 		},
 	),
 	executable: Type.Optional(
@@ -114,6 +121,9 @@ export const geminiConfigSchema = Type.Object({
 	cacheAction: Type.Optional(
 		Type.Union([Type.Literal("status"), Type.Literal("clear")]),
 	),
+	recallAction: Type.Optional(
+		Type.Union([Type.Literal("status"), Type.Literal("enable"), Type.Literal("disable")]),
+	),
 	tool: Type.Optional(
 		Type.String({ description: "Optional gemini_* tool name for cache clear." }),
 	),
@@ -140,6 +150,7 @@ export async function runGeminiConfig(
 			| GeminiConfigPermissionsResult
 			| GeminiConfigTrustResult
 			| GeminiConfigCacheResult
+			| GeminiConfigRecallResult
 			| { cancelled: true }
 			| null
 		>
@@ -151,6 +162,7 @@ export async function runGeminiConfig(
 		);
 	}
 	if (params.action === "cache") return runGeminiConfigCache(params, options);
+	if (params.action === "recall") return runGeminiConfigRecall(params, options);
 	if (params.action === "command") return runAcpCommandConfig(params, options);
 	if (params.action === "trust")
 		return runGeminiConfigTrust(undefined, options);
@@ -213,10 +225,11 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 		action !== "command" &&
 		action !== "permissions" &&
 		action !== "trust" &&
-		action !== "cache"
+		action !== "cache" &&
+		action !== "recall"
 	) {
 		throw new Error(
-			"Expected action 'status', 'command', 'permissions', 'trust', or 'cache'.",
+			"Expected action 'status', 'command', 'permissions', 'trust', 'cache', or 'recall'.",
 		);
 	}
 	if (action === "status" || action === "trust") {
@@ -226,6 +239,7 @@ export function parseGeminiConfigCommandArgs(raw: string): Params {
 		return { action };
 	}
 	if (action === "cache") return parseCacheArgs(rest);
+	if (action === "recall") return parseRecallArgs(rest);
 	if (action === "permissions") return parsePermissionsArgs(rest);
 
 	const [executable, ...args] = rest;
@@ -244,6 +258,14 @@ function parseCacheArgs(parts: string[]): Params {
 	}
 	const tool = rest[0] === "--tool" ? rest[1] : undefined;
 	return { action: "cache", cacheAction, tool };
+}
+
+function parseRecallArgs(parts: string[]): Params {
+	const action = parts[0] ?? "status";
+	if (action !== "status" && action !== "enable" && action !== "disable") {
+		throw new Error("Expected recall action 'status', 'enable', or 'disable'.");
+	}
+	return { action: "recall", recallAction: action };
 }
 
 function parsePermissionsArgs(parts: string[]): Params {
@@ -312,7 +334,7 @@ function parseBooleanToken(value: string): boolean | undefined {
 export const geminiConfigCommand = defineGeminiCommand({
 	name: "gemini-config",
 	description:
-		"Inspect Gemini ACP status, configure the local ACP command/args, manage ACP permissions, trust the current folder, or manage the response cache.",
+		"Inspect Gemini ACP status, configure the local ACP command/args, manage ACP permissions, trust the current folder, manage the response cache, or manage recall embeddings.",
 	parameters: geminiConfigSchema,
 	parseArgs: parseGeminiConfigCommandArgs,
 	execute: (params, ctx) => runGeminiConfigCommand(params, ctx),
@@ -324,7 +346,7 @@ async function showGeminiConfigActionPicker(
 ) {
 	const picked = await ctx.ui.select(
 		"Gemini config",
-		["Status", "ACP command", "Permissions", "Trust current folder", "Cache"],
+		["Status", "ACP command", "Permissions", "Trust current folder", "Cache", "Recall"],
 		{ signal: ctx.signal },
 	);
 	if (!picked) {
@@ -338,6 +360,7 @@ async function showGeminiConfigActionPicker(
 		return runGeminiConfigTrust(ctx, options);
 	}
 	if (picked === "Cache") return runGeminiConfigCache({}, options);
+	if (picked === "Recall") return runGeminiConfigRecall({}, options);
 	return runGeminiConfig({ action: "status" }, options);
 }
 async function showGeminiConfigStatus(

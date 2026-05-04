@@ -4,6 +4,10 @@ import {
 	loadConfig,
 	withDefaultGeminiAcpConfig,
 } from "../config/settings.js";
+import {
+	enqueueEmbeddingJob,
+	scheduleEmbeddingQueueDrain,
+} from "../recall/queue.js";
 import { deriveCacheKey } from "../storage/cache-key.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
 import { getStoredResult, storeResult } from "../storage/results.js";
@@ -32,6 +36,7 @@ export interface ToolCacheOptions<TData> {
 
 interface CachedShell<TData> {
 	shell: PiToolShell<ResultEnvelope<TData>>;
+	recallInputs?: unknown;
 }
 
 /** Runs a Gemini tool through the persistent response cache without making cache failures fatal. */
@@ -72,7 +77,10 @@ export async function withToolResponseCache<TData extends object | null>(
 	}
 	try {
 		const stored = await storeResult(
-			{ shell: fresh } satisfies CachedShell<TData>,
+			{
+				shell: fresh,
+				recallInputs: stripCacheControls(options.inputs),
+			} satisfies CachedShell<TData>,
 			{ rootDir: options.rootDir },
 		);
 		const bytes = (await stat(stored.path)).size;
@@ -91,6 +99,11 @@ export async function withToolResponseCache<TData extends object | null>(
 		} finally {
 			db.close();
 		}
+		await enqueueEmbeddingJob({
+			responseId: stored.responseId,
+			rootDir: options.rootDir,
+		});
+		scheduleEmbeddingQueueDrain({ rootDir: options.rootDir });
 	} catch {
 		return withCacheStatus(fresh, {
 			hit: false,

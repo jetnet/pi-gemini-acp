@@ -1,3 +1,4 @@
+import { defaultEmbedder } from "../recall/embedder.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
 import { sweepOrphanedResultBlobs } from "../storage/retention.js";
 import type { StorageOptions } from "../storage/paths.js";
@@ -15,6 +16,14 @@ export interface GeminiConfigCacheResult {
 	hitCount?: number;
 	totalBytes?: number;
 	oldestCreatedAt?: string;
+	embeddingCount?: number;
+	embeddingModels?: string[];
+	embeddingQueueDepth?: number;
+	embeddingDeadQueueDepth?: number;
+	embeddingStaleCount?: number;
+	embeddingStatus?: "available" | "unavailable";
+	embeddingReason?: string;
+	sqliteVecAvailable?: boolean;
 	deletedRows?: number;
 	orphanedBlobs?: number;
 	tool?: string;
@@ -44,12 +53,22 @@ export async function runGeminiConfigCache(
 			return toolResult({ text: cacheClearText(result), data: result });
 		}
 		const summary = db.summary();
+		const embedderStatus = await defaultEmbedder().status(options);
+		const embeddings = db.embeddingSummary(embedderStatus.model);
 		const result = {
 			action,
 			rowCount: summary.rowCount,
 			hitCount: summary.hitCount,
 			totalBytes: summary.totalBytes,
 			oldestCreatedAt: summary.oldestCreatedAtIso,
+			embeddingCount: embeddings.rowCount,
+			embeddingModels: embeddings.models,
+			embeddingQueueDepth: embeddings.queueDepth,
+			embeddingDeadQueueDepth: embeddings.deadQueueDepth,
+			embeddingStaleCount: embeddings.staleCount,
+			embeddingStatus: embedderStatus.available ? "available" : "unavailable",
+			embeddingReason: embedderStatus.reason,
+			sqliteVecAvailable: embeddings.sqliteVecAvailable,
 		} satisfies GeminiConfigCacheResult;
 		return toolResult({ text: cacheStatusText(result), data: result });
 	} finally {
@@ -64,6 +83,9 @@ function cacheStatusText(result: GeminiConfigCacheResult): string {
 		`- hits: ${result.hitCount ?? 0}`,
 		`- bytes: ${result.totalBytes ?? 0}`,
 		`- oldest: ${result.oldestCreatedAt ?? "none"}`,
+		`- embeddings: ${result.embeddingCount ?? 0} rows; models: ${result.embeddingModels?.join(", ") || "none"}; queue: ${result.embeddingQueueDepth ?? 0} (${result.embeddingDeadQueueDepth ?? 0} dead); stale: ${result.embeddingStaleCount ?? 0}`,
+		`- sqlite-vec: ${result.sqliteVecAvailable ? "loaded" : "unavailable"}`,
+		`- embedder: ${result.embeddingStatus ?? "unavailable"}${result.embeddingReason ? ` (${result.embeddingReason})` : ""}`,
 	].join("\n");
 }
 

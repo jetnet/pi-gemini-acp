@@ -20,7 +20,8 @@ Use this skill to combine `pi-gemini-acp` source discovery with optional `pi-scr
 - `gemini_translate` — translate/localize single text or ordered batches with glossary and preservation constraints; it requires configured/authenticated Gemini ACP and has no local/no-key fallback.
 - `gemini_image_describe` — analyze explicit local PNG/JPEG/WebP/GIF image paths through Gemini ACP resource links when image and embedded-context capabilities are advertised; base64 inputs are validated but not sent.
 - `gemini_get_result` — retrieve full stored Gemini ACP outputs by `responseId`.
-- `/gemini-config cache` — inspect or clear the persistent response cache; use `cache status` for counts and `cache clear --tool gemini_search` for targeted cleanup.
+- `/gemini-config cache` — inspect or clear the persistent response cache; use `cache status` for counts plus embedding queue/model status, and `cache clear --tool gemini_search` for targeted cleanup.
+- `/gemini-config recall` — enable, disable, or inspect background semantic recall embedding writes; current Gemini ACP embedding transport is unavailable, so this remains no-op infrastructure until a supported embedder is added.
 - `web_scrape` — if available, read one source page from `pi-scraper` for clean markdown/text.
 - `web_batch` — if available, read several independent source pages from `pi-scraper`.
 - `web_map` / `web_crawl` — if available, use only when the user asks for site structure or broader site coverage.
@@ -40,6 +41,7 @@ Use this skill to combine `pi-gemini-acp` source discovery with optional `pi-scr
 11. Use `/gemini-config command` only when the local Gemini ACP command or args need to differ from the default `gemini --acp`; interactive Pi opens a settings picker and saves only after explicit confirmation.
 12. Use `/gemini-config permissions` before advanced workflows that intentionally need ACP filesystem or terminal capabilities; enabling filesystem write or terminal execution requires explicit risk confirmation.
 13. Use `bypassCache: true` when the user explicitly asks for a fresh Gemini call. Use `useCache: true` to opt in for `gemini_prompt` or `gemini_research`; other cacheable provider-backed tools cache successful responses by default.
+14. Do not promise semantic recall answers yet; task-05 embeddings are background infrastructure only, and there is no public `gemini_recall` tool until a later release.
 
 ## When to Scrape After Gemini ACP
 

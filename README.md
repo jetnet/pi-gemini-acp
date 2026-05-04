@@ -36,7 +36,7 @@ pi install npm:pi-gemini-acp
 
 ## Commands
 
-- `/gemini-config` — inspect status, configure command args, manage permissions, confirm workspace trust, or manage the response cache.
+- `/gemini-config` — inspect status, configure command args, manage permissions, confirm workspace trust, manage the response cache, or toggle background recall embeddings.
 - `/gemini-model` — choose and persist a Gemini model or alias such as `pro` or `flash`.
 
 ## Configuration
@@ -64,6 +64,8 @@ With authenticated, search-capable `gemini --acp`, Gemini-backed tools work from
 /gemini-config trust
 /gemini-config cache status
 /gemini-config cache clear --tool gemini_search
+/gemini-config recall disable
+/gemini-config recall enable
 ```
 
 Use `/gemini-config` with no arguments for the interactive picker. Custom command settings are saved to `~/.pi/gemini-acp/config/settings.json`.
@@ -84,6 +86,7 @@ export PI_GEMINI_ACP_IDLE_TTL_MS=900000
 export PI_GEMINI_ACP_NO_PREWARM=1
 export PI_GEMINI_ACP_SEARCH_EARLY_STOP=0
 export PI_GEMINI_ACP_CACHE=0 # optional: disable persistent response cache
+export PI_GEMINI_ACP_RECALL=0 # optional: disable background recall embeddings
 ```
 
 ### Runtime behavior
@@ -95,6 +98,7 @@ export PI_GEMINI_ACP_CACHE=0 # optional: disable persistent response cache
 - Neutral cwd is used unless project context is required.
 - Local/no-key mode only works over supplied documents/sources.
 - Cacheable Gemini tools store successful responses in `~/.pi/gemini-acp/cache.db` + `results/`; pass `bypassCache: true` to force a live call. `gemini_prompt` and `gemini_research` only use cache when `useCache: true`.
+- Background semantic recall embeddings are local-only infrastructure for future recall. They can be toggled with `/gemini-config recall enable|disable`; current Gemini ACP embedding transport is unavailable, so status reports embeddings as disabled/no-op until supported.
 - `gemini_file_analyze` uses explicit validated files, filesystem-read permission, and a per-request allowlist.
 - `gemini_image_describe` uses explicit validated image paths, filesystem-read permission, and a per-request allowlist; base64 inputs are validation-only.
 

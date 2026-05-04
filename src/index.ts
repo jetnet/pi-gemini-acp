@@ -1,5 +1,6 @@
 import type { PiCommandRegistrar } from "./commands/define.js";
 import { registerGeminiAcpCommands } from "./commands/register.js";
+import { scheduleEmbeddingQueueDrain } from "./recall/queue.js";
 import { detectPiScraper, type PiScraperPresence } from "./research/hydrate.js";
 import { scheduleGeminiSearchPrewarm } from "./search/prewarm.js";
 import { sweepResponseCacheRetention } from "./storage/retention.js";
@@ -23,6 +24,7 @@ export default function registerPiGeminiAcpExtension(
 	if (hasCommandRegistrar(pi)) registerGeminiAcpCommands(pi);
 	scheduleGeminiSearchPrewarm();
 	scheduleCacheRetentionSweep();
+	scheduleEmbeddingQueueDrain();
 	return { piScraper: detectPiScraper(pi) };
 }
 
