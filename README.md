@@ -14,31 +14,28 @@ pi install npm:pi-gemini-acp
 
 - Node.js `>=22.18.0`
 - Pi `>=0.65.0`
-- Local authenticated Gemini ACP, defaulting to `gemini --acp`, for Gemini-backed tools.
-- `gemini_file_analyze` requires ACP filesystem-read permission and passes only validated explicit local files as resource links; `gemini_image_describe` still validates inputs only until ACP image transport is confirmed.
+- Local authenticated Gemini ACP (`gemini --acp` by default) for Gemini-backed tools.
 
 ## Tools
 
-| Tool                    | Description                                                                                                                                               |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `gemini_status`         | Report read-only Gemini ACP command/auth/capability status after applying the same default `gemini --acp` settings used by provider search.               |
-| `gemini_prompt`         | Send a general prompt to configured/authenticated Gemini ACP; does not require search grounding and has no local/no-key fallback.                         |
-| `gemini_extract`        | Extract structured JSON from supplied content using configured/authenticated Gemini ACP and a supported JSON-schema-like shape.                           |
-| `gemini_summarize`      | Summarize one supplied content item or one safe public HTTP(S) URL; does not perform research or multi-source synthesis.                                  |
-| `gemini_search`         | Run structured search through configured Gemini ACP, or local documents when supplied.                                                                    |
-| `gemini_research`       | Run Gemini ACP-backed research with source/citation tracking. Can optionally hydrate missing source text via safe direct fetch.                           |
-| `gemini_file_analyze`   | Analyze explicit local text/document files through Gemini ACP resource links after conservative path validation and filesystem-read permission preflight. |
-| `gemini_code_review`    | Analyze caller-provided code, diffs, or excerpts with Gemini ACP. Analysis-only; it does not read paths, edit files, or apply fixes.                      |
-| `gemini_translate`      | Translate/localize single text or ordered batches with glossary/preservation constraints through configured/authenticated Gemini ACP.                     |
-| `gemini_image_describe` | Validate explicit PNG/JPEG/WebP/GIF inputs and report unsupported Gemini ACP image capability until image transport is confirmed.                         |
-| `gemini_get_result`     | Retrieve stored full output by `responseId`.                                                                                                              |
+| Tool                    | Description                                                                  |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `gemini_status`         | Check Gemini ACP command, auth, and capability status.                       |
+| `gemini_prompt`         | Send a general prompt to authenticated Gemini ACP.                           |
+| `gemini_extract`        | Extract JSON from supplied content using a schema-like shape.                |
+| `gemini_summarize`      | Summarize one content item or safe public HTTP(S) URL.                       |
+| `gemini_search`         | Search with Gemini ACP, or search supplied local documents without ACP.      |
+| `gemini_research`       | Collect sources, findings, citations, and optional safe hydration.           |
+| `gemini_file_analyze`   | Analyze explicit local text/document files via validated ACP resource links. |
+| `gemini_code_review`    | Review caller-provided code/diffs; analysis-only, no path reads or edits.    |
+| `gemini_translate`      | Translate text/batches with glossary and preservation rules.                 |
+| `gemini_image_describe` | Validate image inputs only until ACP image transport is confirmed.           |
+| `gemini_get_result`     | Retrieve stored full output by `responseId`.                                 |
 
 ## Commands
 
-| Command          | Description                                                                                                                                                                                                                                                       |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/gemini-config` | Choose `status` for a read-only command/auth/search-grounding/model/permission report, `command` to configure the local ACP command/args, `permissions` to show/modify ACP capability toggles, or `trust` to confirm Gemini CLI workspace trust for ACP sessions. |
-| `/gemini-model`  | Show selectable Gemini model choices, accept aliases such as `pro` or `flash`, and persist a preferred model after confirming the configured ACP command advertises model selection.                                                                              |
+- `/gemini-config` — inspect status, configure command args, manage permissions, or confirm workspace trust.
+- `/gemini-model` — choose and persist a Gemini model or alias such as `pro` or `flash`.
 
 ## Configuration
 
@@ -54,33 +51,45 @@ The default Gemini ACP provider config is:
 }
 ```
 
-With authenticated, search-capable `gemini --acp`, Gemini-backed tools work from the default config. Use `/gemini-config` to inspect status, edit the ACP command/args, manage permissions, or confirm workspace trust. Interactive Pi opens picker UIs; `/gemini-config command` stages command/arg edits before saving custom settings to `~/.pi/gemini-acp/config/settings.json`.
+With authenticated, search-capable `gemini --acp`, Gemini-backed tools work from the default config.
+
+### Common commands
 
 ```bash
-/gemini-config
 /gemini-config status
-/gemini-config command
 /gemini-config command gemini --acp
-/gemini-config command /opt/homebrew/bin/gemini --acp --model gemini-2.5-flash
-/gemini-config permissions
 /gemini-config permissions filesystemRead
-/gemini-config permissions filesystemWrite true confirmRisk=true reason="modify generated docs"
 /gemini-config trust
 ```
 
-Do not pass API keys/tokens to `/gemini-config command`; use Gemini CLI local auth. `permissions` controls ACP filesystem/terminal access, and write/terminal access requires `confirmRisk=true`. `/gemini-config trust` explains why Gemini ACP needs a working folder for local sessions and, after confirmation, adds Gemini CLI `--skip-trust` to avoid untrusted-folder diagnostics corrupting ACP JSON-RPC stdout.
+Use `/gemini-config` with no arguments for the interactive picker. Custom command settings are saved to `~/.pi/gemini-acp/config/settings.json`.
 
-You can also override the command with environment variables:
+### Safety notes
+
+- Use Gemini CLI local auth; do not pass API keys to `/gemini-config command`.
+- `permissions` gates ACP filesystem/terminal access.
+- Filesystem write and terminal access require `confirmRisk=true`.
+- Use `/gemini-config trust` only when Gemini CLI requires workspace trust.
+
+### Environment overrides
 
 ```bash
 export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 export PI_GEMINI_ACP_IDLE_TTL_MS=900000
-export PI_GEMINI_ACP_NO_PREWARM=1 # optional: disable activation prewarm
-export PI_GEMINI_ACP_SEARCH_EARLY_STOP=0 # optional: disable search stream early-stop
+export PI_GEMINI_ACP_NO_PREWARM=1
+export PI_GEMINI_ACP_SEARCH_EARLY_STOP=0
 ```
 
-Search, prompt, and research source collection reuse warm ACP subprocesses for up to 15 minutes of idle time by default; set `PI_GEMINI_ACP_IDLE_TTL_MS` to a positive millisecond value to override it. Extension activation schedules a best-effort `gemini_search` prewarm so authenticated/search-capable local ACP installs can skip first-call subprocess startup and preflight; set `PI_GEMINI_ACP_NO_PREWARM=1` to disable it. `gemini_search` cancels a streamed Gemini ACP turn once a complete JSON result array is detected; set `PI_GEMINI_ACP_SEARCH_EARLY_STOP=0` to use the wait-for-turn-end fallback. The idle timer is `unref()`'d, so it does not keep Pi/Node running by itself. `gemini_prompt` still uses a fresh ACP session per prompt. Prompt/search sessions use a neutral working directory unless a workflow explicitly supplies a project cwd, so project trust is only triggered when project context is needed. Local/no-key mode is limited to supplied documents/sources for search/research. `gemini_file_analyze` validates explicit files under `cwd`, rejects hidden/secret-like/symlink/directory inputs, requires filesystem-read permission, and uses ACP resource links with a per-request read allowlist. `gemini_image_describe` only validates inputs until ACP image transport is confirmed.
+### Runtime behavior
+
+- Warm ACP subprocesses are reused for 15 minutes by default.
+- Search prewarms on activation unless `PI_GEMINI_ACP_NO_PREWARM=1`.
+- Search can cancel after complete streamed JSON unless `PI_GEMINI_ACP_SEARCH_EARLY_STOP=0`.
+- Prompt calls still use fresh ACP sessions.
+- Neutral cwd is used unless project context is required.
+- Local/no-key mode only works over supplied documents/sources.
+- `gemini_file_analyze` uses explicit validated files, filesystem-read permission, and a per-request allowlist.
 
 ### Selecting a model
 
