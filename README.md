@@ -16,7 +16,7 @@ pi install npm:pi-gemini-acp
 - Pi `>=0.65.0`
 - Local authenticated Gemini ACP (`gemini --acp` by default) for Gemini-backed tools.
 - `gemini_file_analyze` needs filesystem-read permission, only reads explicit validated files, and prompts before trusting a new folder when Pi is interactive.
-- `gemini_image_describe` validates inputs only until ACP image transport is confirmed.
+- `gemini_image_describe` needs filesystem-read permission and confirmed ACP image/resource-link support for local image paths; base64 inputs are validation-only.
 
 ## Tools
 
@@ -31,7 +31,7 @@ pi install npm:pi-gemini-acp
 | `gemini_file_analyze`   | Analyze explicit local text/document files via validated ACP resource links. |
 | `gemini_code_review`    | Review caller-provided code/diffs; analysis-only, no path reads or edits.    |
 | `gemini_translate`      | Translate text/batches with glossary and preservation rules.                 |
-| `gemini_image_describe` | Validate image inputs only until ACP image transport is confirmed.           |
+| `gemini_image_describe` | Analyze explicit local image paths via validated ACP resource links.         |
 | `gemini_get_result`     | Retrieve stored full output by `responseId`.                                 |
 
 ## Commands

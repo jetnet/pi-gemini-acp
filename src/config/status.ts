@@ -72,7 +72,7 @@ export interface GeminiAcpCommandStatus {
 
 export interface GeminiAcpImageInputStatus {
 	available: boolean | "unknown";
-	transport: "unconfirmed";
+	transport: "resource_link" | "unconfirmed";
 	supportedMimeTypes: string[];
 	message: string;
 }
@@ -424,12 +424,12 @@ function imageInputStatus(
 	const available = booleanOrUnknown(settings?.imageInputAvailable);
 	return {
 		available,
-		transport: "unconfirmed",
+		transport: available === true ? "resource_link" : "unconfirmed",
 		supportedMimeTypes: ["image/png", "image/jpeg", "image/webp", "image/gif"],
 		message:
 			available === true
-				? "Image input is marked available in settings, but this package has not confirmed the ACP image transport shape yet."
-				: "Gemini ACP image input support and transport shape are not confirmed by the current client.",
+				? "Image paths can be sent through ACP resource links after image and embedded-context capability preflight."
+				: "Gemini ACP image input support is not confirmed by the current client.",
 	};
 }
 

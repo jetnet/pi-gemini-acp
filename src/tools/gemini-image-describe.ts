@@ -34,7 +34,7 @@ export const geminiAcpImageDescribeSchema = Type.Object({
 	imageDataBase64: Type.Optional(
 		Type.String({
 			description:
-				"Standard base64 image bytes without a data URI prefix. Provide mimeType with this input.",
+				"Standard base64 image bytes without a data URI prefix. This input is validated but not sent; use imagePath for Gemini ACP image analysis.",
 		}),
 	),
 	mimeType: Type.Optional(
@@ -47,7 +47,13 @@ export const geminiAcpImageDescribeSchema = Type.Object({
 	instructions: Type.Optional(
 		Type.String({
 			description:
-				"Optional caller instructions for future caption/object/OCR behavior. Not sent while ACP image transport is unsupported.",
+				"Optional caller instructions for caption, object, OCR, or detailed image analysis.",
+		}),
+	),
+	cwd: Type.Optional(
+		Type.String({
+			description:
+				"Optional directory used only to resolve relative image paths for safety validation; no directory scanning is performed.",
 		}),
 	),
 });
@@ -58,7 +64,7 @@ export const geminiAcpImageDescribeTool = defineGeminiTool({
 	name: "gemini_image_describe",
 	label: "Gemini ACP Image Describe",
 	description:
-		"Validate explicit image inputs and report Gemini ACP image capability status. Actual image description is disabled until ACP image-input transport is confirmed.",
+		"Analyze explicit local image paths through Gemini ACP resource links after conservative path validation and filesystem-read permission preflight.",
 	parameters: geminiAcpImageDescribeSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		const result = await runImageDescribe(
@@ -123,7 +129,9 @@ function formatImageDescribeExpanded(
 				`image.kind: ${result.image.kind}`,
 				`image.mimeType: ${result.image.mimeType}`,
 				`image.sizeBytes: ${result.image.sizeBytes}`,
-				result.image.path ? `image.path: ${result.image.path}` : undefined,
+				result.image.kind === "path"
+					? `image.path: ${result.image.path}`
+					: undefined,
 			]
 		: ["image: none"];
 	return [
@@ -153,13 +161,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function resultText(result: ImageDescribeResult): string {
-	if (result.error?.code === "GEMINI_ACP_IMAGE_INPUT_UNSUPPORTED") {
-		return "Gemini ACP image input is not enabled: the current client has not confirmed a safe image transport shape. Input was validated and no image bytes were sent.";
-	}
 	if (result.error) return result.error.message;
+	const input = result.image
+		? `${result.image.kind === "path" ? result.image.path : result.image.kind} (${result.image.mimeType}, ${result.image.sizeBytes} bytes)`
+		: "image";
 	return result.caption
-		? `Gemini ACP image description:\n${result.caption}`
-		: "Gemini ACP image description completed.";
+		? `Gemini ACP image description for ${input}:\n${result.caption}`
+		: `Gemini ACP image description completed for ${input}.`;
 }
 
 function imageDescribeToolUpdate(

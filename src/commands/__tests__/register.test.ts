@@ -82,7 +82,7 @@ describe("Gemini ACP command registration", () => {
 		expect(result.content[0]?.text).toContain("- search grounding: available");
 		expect(result.content[0]?.text).toContain("- file analysis: unknown");
 		expect(result.content[0]?.text).toContain(
-			"- image input: unknown (transport: unconfirmed)",
+			"- image input: unknown (transport: unconfirmed; requires filesystem-read permission)",
 		);
 		expect(result.content[0]?.text).toContain(
 			"Gemini ACP command is not persisted; using default `gemini --acp`, but it was not found on PATH.",
@@ -148,7 +148,7 @@ describe("Gemini ACP command registration", () => {
 			"- file analysis: unknown (ACP resource-link transport",
 		);
 		expect(result.content[0]?.text).toContain(
-			"- image input: unknown (transport: unconfirmed)",
+			"- image input: unknown (transport: unconfirmed; requires filesystem-read permission)",
 		);
 		expect(result.content[0]?.text).toContain(
 			"Selected model: gemini-3-flash-preview",

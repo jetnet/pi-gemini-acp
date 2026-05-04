@@ -389,7 +389,7 @@ describe("gemini ACP tools smoke", () => {
 		expect(progress[0]?.content[0]?.text).toContain("Instructions length");
 	});
 
-	it("returns explicit unsupported-capability shell for image description", async () => {
+	it("returns explicit base64-unsupported shell for image description", async () => {
 		const tool = geminiAcpTools.find(
 			(candidate) => candidate.name === "gemini_image_describe",
 		);
@@ -406,7 +406,7 @@ describe("gemini ACP tools smoke", () => {
 		assertShell(result);
 		expect(result?.details).toMatchObject({
 			status: "error",
-			error: { code: "GEMINI_ACP_IMAGE_INPUT_UNSUPPORTED" },
+			error: { code: "GEMINI_ACP_IMAGE_BASE64_UNSUPPORTED" },
 		});
 	});
 

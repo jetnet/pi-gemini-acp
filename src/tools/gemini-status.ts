@@ -88,7 +88,7 @@ function statusText(status: GeminiStatusData): string {
 	return [
 		headline,
 		`File analysis capability: ${boolLabel(fileAnalysis, "available", "not confirmed")}; gemini_file_analyze uses ACP resource links when filesystem-read permission is enabled.`,
-		`Image input: ${boolLabel(status.capabilities.imageInput.available, "available", "not confirmed")} (${status.capabilities.imageInput.transport}).`,
+		`Image input: ${boolLabel(status.capabilities.imageInput.available, "available", "not confirmed")} (${status.capabilities.imageInput.transport}; gemini_image_describe uses validated resource links when available).`,
 		...status.remediation.map((item) => `- ${item}`),
 	].join("\n");
 }

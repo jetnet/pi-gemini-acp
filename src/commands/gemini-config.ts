@@ -338,7 +338,7 @@ function commandStatusText(status: GeminiAcpStatusReport): string {
 		`- auth: ${boolLabel(capabilities.authenticated, "confirmed", "not confirmed")}`,
 		`- search grounding: ${boolLabel(capabilities.searchGroundingAvailable, "available", "not confirmed")} (required: ${yesNo(capabilities.searchGroundingRequired)})`,
 		`- file analysis: ${boolLabel(capabilities.fileAnalysisAvailable, "available", "not confirmed")} (ACP resource-link transport; requires filesystem-read permission)`,
-		`- image input: ${boolLabel(capabilities.imageInput.available, "available", "not confirmed")} (transport: ${capabilities.imageInput.transport})`,
+		`- image input: ${boolLabel(capabilities.imageInput.available, "available", "not confirmed")} (transport: ${capabilities.imageInput.transport}; requires filesystem-read permission)`,
 		`- model: ${capabilities.model.message}`,
 		`- permission policy: ${capabilities.permissionPolicy.description}`,
 		"",

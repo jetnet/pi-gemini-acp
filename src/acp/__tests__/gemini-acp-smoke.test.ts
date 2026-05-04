@@ -1,8 +1,10 @@
+import { Buffer } from "node:buffer";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { runFileAnalyze } from "../../prompt/file-analyze.js";
+import { runImageDescribe } from "../../prompt/image-describe.js";
 import { runSearch } from "../../search/run.js";
 
 const enabled = process.env.PI_GEMINI_ACP === "1";
@@ -10,6 +12,10 @@ const command = process.env.PI_GEMINI_ACP_COMMAND ?? "gemini";
 const args = (process.env.PI_GEMINI_ACP_ARGS ?? "--acp")
 	.split(" ")
 	.filter(Boolean);
+const pngBytes = Buffer.from(
+	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+	"base64",
+);
 
 describe.skipIf(!enabled)("opt-in Gemini ACP smoke", () => {
 	it("runs configured Gemini ACP search", async () => {
@@ -40,21 +46,31 @@ describe.skipIf(!enabled)("opt-in Gemini ACP smoke", () => {
 				paths: ["notes.txt"],
 				instructions: "Reply with the exact three words in this file.",
 				cwd,
-				config: {
-					providers: {
-						"gemini-acp": {
-							enabled: true,
-							command,
-							args,
-							authenticated: true,
-							searchGroundingAvailable: true,
-							permissionPolicy: { filesystemRead: true },
-						},
-					},
-				},
+				config: fileReadConfig(),
 			});
 			expect(result.error).toBeUndefined();
 			expect(result.text.toLowerCase()).toContain("alpha beta gamma");
+		} finally {
+			await rm(cwd, { recursive: true, force: true });
+		}
+	}, 120_000);
+
+	it("preflights Gemini ACP image resource-link support", async () => {
+		const cwd = await mkdtemp(path.join(tmpdir(), "pi-gemini-smoke-image-"));
+		try {
+			await writeFile(path.join(cwd, "pixel.png"), pngBytes);
+			const result = await runImageDescribe({
+				imagePath: "pixel.png",
+				instructions: "Describe the image in one short sentence.",
+				cwd,
+				config: fileReadConfig(),
+			});
+			if (result.error?.code === "GEMINI_ACP_IMAGE_INPUT_UNSUPPORTED") {
+				expect(result.image?.kind).toBe("path");
+				return;
+			}
+			expect(result.error).toBeUndefined();
+			expect(result.caption?.length).toBeGreaterThan(0);
 		} finally {
 			await rm(cwd, { recursive: true, force: true });
 		}
@@ -66,3 +82,18 @@ describe.skipIf(enabled)("opt-in Gemini ACP smoke", () => {
 		expect(process.env.PI_GEMINI_ACP).not.toBe("1");
 	});
 });
+
+function fileReadConfig() {
+	return {
+		providers: {
+			"gemini-acp": {
+				enabled: true,
+				command,
+				args,
+				authenticated: true,
+				searchGroundingAvailable: true,
+				permissionPolicy: { filesystemRead: true },
+			},
+		},
+	};
+}
