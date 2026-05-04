@@ -65,6 +65,7 @@ describe("Gemini ACP command resolution", () => {
 			{
 				input: "gemini",
 				found: true,
+				// Space-in-path stress case: prevents regressions to unquoted shim paths.
 				command: "C:\\Users\\me\\AppData Roaming\\npm\\gemini.cmd",
 				source: "path",
 				platform: "win32",
@@ -86,6 +87,33 @@ describe("Gemini ACP command resolution", () => {
 			'"--model"',
 			'"gemini-3.1-pro-preview"',
 		]);
+		expect(spawnCommand.windowsVerbatimArguments).toBe(true);
+	});
+
+	it("keeps Scoop npm shim quoting compatible with cmd.exe", () => {
+		const spawnCommand = spawnCommandForGeminiAcpResolution(
+			{
+				input: "gemini",
+				found: true,
+				command:
+					"C:\\Users\\Administrator\\scoop\\apps\\nodejs\\current\\bin\\gemini.CMD",
+				source: "path",
+				platform: "win32",
+				searched: [],
+			},
+			["--acp", "--help"],
+		);
+
+		expect(spawnCommand.args).toEqual([
+			"/d",
+			"/s",
+			"/c",
+			"call",
+			'"C:\\Users\\Administrator\\scoop\\apps\\nodejs\\current\\bin\\gemini.CMD"',
+			'"--acp"',
+			'"--help"',
+		]);
+		expect(spawnCommand.args.join(" ")).not.toContain('\\"');
 		expect(spawnCommand.windowsVerbatimArguments).toBe(true);
 	});
 

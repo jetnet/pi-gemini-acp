@@ -41,28 +41,31 @@ describe("Gemini ACP model configuration", () => {
 		);
 	});
 
-	it("probes model support through a resolved PATH executable", async () => {
-		const binDir = await mkdtemp(path.join(rootDir, "bin-"));
-		const geminiPath = path.join(binDir, "gemini");
-		await writeFile(
-			geminiPath,
-			"#!/bin/sh\necho 'Usage: gemini --acp --model <model>'\n",
-		);
-		await chmod(geminiPath, 0o755);
-		process.env.PATH = `${binDir}${path.delimiter}${originalPath ?? ""}`;
-		await saveGeminiAcpSettings(
-			{ enabled: true, command: "gemini", args: ["--acp"] },
-			{ rootDir },
-		);
+	it.skipIf(process.platform === "win32")(
+		"probes model support through a resolved PATH executable",
+		async () => {
+			const binDir = await mkdtemp(path.join(rootDir, "bin-"));
+			const geminiPath = path.join(binDir, "gemini");
+			await writeFile(
+				geminiPath,
+				"#!/bin/sh\necho 'Usage: gemini --acp --model <model>'\n",
+			);
+			await chmod(geminiPath, 0o755);
+			process.env.PATH = `${binDir}${path.delimiter}${originalPath ?? ""}`;
+			await saveGeminiAcpSettings(
+				{ enabled: true, command: "gemini", args: ["--acp"] },
+				{ rootDir },
+			);
 
-		const result = await setGeminiAcpModel({
-			model: "gemini-2.5-flash",
-			rootDir,
-		});
+			const result = await setGeminiAcpModel({
+				model: "gemini-2.5-flash",
+				rootDir,
+			});
 
-		expect(result.error).toBeUndefined();
-		expect(result.status.selectedModel).toBe("gemini-2.5-flash");
-	});
+			expect(result.error).toBeUndefined();
+			expect(result.status.selectedModel).toBe("gemini-2.5-flash");
+		},
+	);
 
 	it("returns actionable command resolution errors for missing commands", async () => {
 		await saveGeminiAcpSettings(
