@@ -57,13 +57,12 @@ export function storedOutputLine(value: {
 	responseId?: string;
 	fullOutputPath?: string;
 }): string | undefined {
-	if (!value.responseId && !value.fullOutputPath) return undefined;
-	return [
-		value.responseId ? `responseId ${value.responseId}` : undefined,
-		value.fullOutputPath ? `stored at ${value.fullOutputPath}` : undefined,
-	]
-		.filter(Boolean)
-		.join("; ");
+	if (value.responseId && value.fullOutputPath) {
+		return `responseId ${value.responseId}; stored at ${value.fullOutputPath}`;
+	}
+	if (value.responseId) return `responseId ${value.responseId}`;
+	if (value.fullOutputPath) return `stored at ${value.fullOutputPath}`;
+	return undefined;
 }
 
 /** Appends the shared Ctrl+O expansion hint to collapsed display lines. */
