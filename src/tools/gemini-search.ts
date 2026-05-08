@@ -46,8 +46,7 @@ const SEARCH_TITLE_STATE_KEY = "geminiSearchTitle";
 export const geminiAcpSearchTool = defineGeminiTool({
 	name: "gemini_search",
 	label: "Gemini ACP Search",
-	description:
-		"web/localDocs(no ACP);bypassCache fresh/news/current;useRecall",
+	description: "web/localDocs(no ACP);bypassCache fresh/news/current;useRecall",
 	parameters: geminiAcpSearchSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		if (params.localDocuments?.length) {
