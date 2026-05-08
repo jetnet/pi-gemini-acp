@@ -43,9 +43,7 @@ export const geminiAskSchema = Type.Object({
 	task: askTaskSchema,
 	prompt: Type.Optional(Type.String({ minLength: 1 })),
 	content: Type.Optional(Type.String({ minLength: 1 })),
-	url: Type.Optional(
-		Type.String({ description: "Safe public URL for summarize." }),
-	),
+	url: Type.Optional(Type.String()),
 	schema: Type.Optional(Type.Any()),
 	text: Type.Optional(Type.String({ minLength: 1, maxLength: 80_000 })),
 	batch: Type.Optional(
@@ -74,9 +72,7 @@ export const geminiAskSchema = Type.Object({
 	preservationRules: Type.Optional(Type.Array(Type.String({ minLength: 1 }))),
 	diff: Type.Optional(Type.String()),
 	code: Type.Optional(Type.String()),
-	context: Type.Optional(
-		Type.String({ description: "Extra review context; avoid secrets." }),
-	),
+	context: Type.Optional(Type.String()),
 	language: Type.Optional(Type.String()),
 	filename: Type.Optional(Type.String()),
 	focus: Type.Optional(Type.Array(focusSchema)),
@@ -105,7 +101,7 @@ export const geminiAskTool = defineGeminiTool({
 	name: "gemini_ask",
 	label: "Gemini Ask",
 	description:
-		"Prompt, extract, summarize, translate, or code-review supplied text/code with Gemini ACP; no file reads or edits.",
+		"Prompt, extract, summarize text or safe public URL, translate, or code-review supplied text/code with Gemini ACP; no file reads, edits, or secrets.",
 	parameters: geminiAskSchema,
 	execute(toolCallId, params: Params, signal, onUpdate) {
 		switch (params.task) {
