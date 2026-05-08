@@ -11,17 +11,11 @@ describe("Gemini tool renderers", () => {
 	it("exposes custom collapsed/expanded renderers for every Gemini tool", () => {
 		for (const name of [
 			"gemini_status",
-			"gemini_prompt",
-			"gemini_extract",
-			"gemini_summarize",
+			"gemini_ask",
 			"gemini_search",
 			"gemini_research",
-			"gemini_file_analyze",
-			"gemini_code_review",
-			"gemini_translate",
-			"gemini_image_describe",
-			"gemini_recall",
-			"gemini_get_result",
+			"gemini_analyze",
+			"gemini_results",
 		] as const) {
 			const tool = geminiAcpTools.find((candidate) => candidate.name === name);
 			expect(tool?.renderCall).toBeTypeOf("function");
@@ -31,11 +25,15 @@ describe("Gemini tool renderers", () => {
 
 	it("renders file analysis validation errors with expansion details", async () => {
 		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_file_analyze",
+			(candidate) => candidate.name === "gemini_analyze",
 		);
 		const result = await tool?.execute(
 			"x",
-			{ paths: [".env"], instructions: "Summarize this file." } as never,
+			{
+				kind: "file",
+				paths: [".env"],
+				instructions: "Summarize this file.",
+			} as never,
 			new AbortController().signal,
 		);
 		expect(result).toBeDefined();
@@ -59,11 +57,12 @@ describe("Gemini tool renderers", () => {
 
 	it("renders image validation results with expansion details", async () => {
 		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_image_describe",
+			(candidate) => candidate.name === "gemini_analyze",
 		);
 		const result = await tool?.execute(
 			"x",
 			{
+				kind: "image",
 				imageDataBase64: Buffer.from([
 					0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
 				]).toString("base64"),
@@ -114,7 +113,7 @@ describe("Gemini tool renderers", () => {
 		expect(rendered(statusExpanded)).toContain("File analysis capability");
 
 		const getResultTool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_get_result",
+			(candidate) => candidate.name === "gemini_results",
 		);
 		const getResultShell: PiToolShell = toolResult({
 			text: "Retrieved result abc123.",

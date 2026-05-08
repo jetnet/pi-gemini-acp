@@ -2,7 +2,7 @@
 
 Gemini ACP prompt, search, and research provider for Pi.
 
-`pi-gemini-acp` adds Gemini ACP tools for prompt, search, research, recall, extraction, summarization, code review, translation, image analysis, and status while preserving local/no-key search over supplied documents.
+`pi-gemini-acp` adds a compact Gemini ACP tool surface for status, supplied-text tasks, search, research, local file/image analysis, stored results, and recall while preserving local/no-key search over supplied documents.
 
 ## Install
 
@@ -15,25 +15,19 @@ pi install npm:pi-gemini-acp
 - Node.js `>=22.18.0`
 - Pi `>=0.65.0`
 - Local authenticated Gemini ACP (`gemini --acp` by default) for Gemini-backed tools.
-- `gemini_file_analyze` needs filesystem-read permission, only reads explicit validated files, and prompts before trusting a new folder when Pi is interactive.
-- `gemini_image_describe` needs filesystem-read permission and confirmed ACP image/resource-link support for local image paths; base64 inputs are validation-only.
+- `gemini_analyze` needs filesystem-read permission for local files/images, only reads explicit validated paths, and prompts before trusting a new folder when Pi is interactive.
+- Image analysis requires confirmed ACP image/resource-link support for local image paths; base64 inputs are validation-only.
 
 ## Tools
 
-| Tool                    | Description                                                                  |
-| ----------------------- | ---------------------------------------------------------------------------- |
-| `gemini_status`         | Check Gemini ACP command, auth, and capability status.                       |
-| `gemini_prompt`         | Send a general prompt to authenticated Gemini ACP.                           |
-| `gemini_extract`        | Extract JSON from supplied content using a schema-like shape.                |
-| `gemini_summarize`      | Summarize one content item or safe public HTTP(S) URL.                       |
-| `gemini_search`         | Search with Gemini ACP, or search supplied local documents without ACP.      |
-| `gemini_research`       | Collect sources, findings, citations, and optional safe hydration.           |
-| `gemini_file_analyze`   | Analyze explicit local text/document files via validated ACP resource links. |
-| `gemini_code_review`    | Review caller-provided code/diffs; analysis-only, no path reads or edits.    |
-| `gemini_translate`      | Translate text/batches with glossary and preservation rules.                 |
-| `gemini_image_describe` | Analyze explicit local image paths via validated ACP resource links.         |
-| `gemini_recall`         | Search prior Gemini results with local SQLite FTS recall.                    |
-| `gemini_get_result`     | Retrieve stored full output by `responseId`.                                 |
+| Tool              | Description                                                             |
+| ----------------- | ----------------------------------------------------------------------- |
+| `gemini_status`   | Check Gemini ACP command, auth, and capability status.                  |
+| `gemini_ask`      | Prompt, extract, summarize, translate, or code-review supplied text.    |
+| `gemini_search`   | Search with Gemini ACP, or search supplied local documents without ACP. |
+| `gemini_research` | Collect sources, findings, citations, and optional safe hydration.      |
+| `gemini_analyze`  | Analyze explicit local files/images via validated ACP resource links.   |
+| `gemini_results`  | Retrieve stored outputs or search local SQLite FTS recall.              |
 
 ## Commands
 
@@ -98,12 +92,12 @@ export PI_GEMINI_ACP_RECALL=0 # optional: disable recall tool registration and F
 - Prompt calls still use fresh ACP sessions.
 - Neutral cwd is used unless project context is required.
 - Local/no-key mode only works over supplied documents/sources.
-- Cacheable Gemini tools store successful responses in `~/.pi/gemini-acp/cache.db` + `results/`; pass `bypassCache: true` to force a live call. `gemini_prompt` and `gemini_research` only use cache when `useCache: true`.
-- `gemini_recall` searches a local SQLite FTS5 query cache over prior Gemini results in `cache.db`; it does not require an embedding provider.
+- Cacheable Gemini tools store successful responses in `~/.pi/gemini-acp/cache.db` + `results/`; pass `bypassCache: true` to force a live call. `gemini_ask` prompt tasks and `gemini_research` only use cache when `useCache: true`.
+- `gemini_results` with `action: "recall"` searches a local SQLite FTS5 query cache over prior Gemini results in `cache.db`; it does not require an embedding provider.
 - Vector/semantic recall is disabled for now. No Gemini ACP embedding transport is used for recall queries.
 - `gemini_search` and `gemini_research` accept opt-in `useRecall: true` plus `bypassRecall: true`; exact cache hits win first, and any recall-sourced reuse is visibly marked with similarity, age, and `responseId`.
-- `gemini_file_analyze` uses explicit validated files, filesystem-read permission, and a per-request allowlist.
-- `gemini_image_describe` uses explicit validated image paths, filesystem-read permission, and a per-request allowlist; base64 inputs are validation-only.
+- `gemini_analyze` with `kind: "file"` uses explicit validated files, filesystem-read permission, and a per-request allowlist.
+- `gemini_analyze` with `kind: "image"` uses explicit validated image paths, filesystem-read permission, and a per-request allowlist; base64 inputs are validation-only.
 
 ### Image description example
 
@@ -115,7 +109,7 @@ export PI_GEMINI_ACP_RECALL=0 # optional: disable recall tool registration and F
 }
 ```
 
-`gemini_image_describe` performs runtime ACP image/resource-link capability checks even when status output reports image capability as unknown.
+`gemini_analyze` performs runtime ACP image/resource-link capability checks even when status output reports image capability as unknown.
 
 ### Selecting a model
 

@@ -15,17 +15,11 @@ describe("gemini ACP tools smoke", () => {
 	it("registers the standalone tool surface", () => {
 		expect(geminiAcpTools.map((tool) => tool.name)).toEqual([
 			"gemini_status",
-			"gemini_prompt",
-			"gemini_extract",
-			"gemini_summarize",
+			"gemini_ask",
 			"gemini_search",
 			"gemini_research",
-			"gemini_file_analyze",
-			"gemini_code_review",
-			"gemini_translate",
-			"gemini_image_describe",
-			"gemini_recall",
-			"gemini_get_result",
+			"gemini_analyze",
+			"gemini_results",
 		]);
 	});
 
@@ -175,7 +169,7 @@ describe("gemini ACP tools smoke", () => {
 
 	it("renders prompt-style output collapsed and expanded without changing content", () => {
 		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_prompt",
+			(candidate) => candidate.name === "gemini_ask",
 		);
 		const text = `${"alpha response ".repeat(30)}done`;
 		const result = toolResult({
@@ -211,7 +205,7 @@ describe("gemini ACP tools smoke", () => {
 
 	it("renders prompt-style streaming progress in collapsed and expanded modes", () => {
 		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_prompt",
+			(candidate) => candidate.name === "gemini_ask",
 		);
 		const update = toolResult({
 			text: "stream chunk",
@@ -243,7 +237,7 @@ describe("gemini ACP tools smoke", () => {
 
 	it("renders code review findings concisely until expanded", () => {
 		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_code_review",
+			(candidate) => candidate.name === "gemini_ask",
 		);
 		const reviewText = [
 			"## Blockers",
@@ -297,7 +291,7 @@ describe("gemini ACP tools smoke", () => {
 
 	it("renders translation previews and structured progress metadata", () => {
 		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_translate",
+			(candidate) => candidate.name === "gemini_ask",
 		);
 		const translation = `${"hola ".repeat(60)}fin`;
 		const result: PiToolShell = {
@@ -356,9 +350,7 @@ describe("gemini ACP tools smoke", () => {
 		expect(expanded?.render(120).join("\n")).toContain(
 			"targetLanguage: Spanish",
 		);
-		expect(progressCollapsed?.render(120).join("\n")).toContain(
-			"Translating: hola",
-		);
+		expect(progressCollapsed?.render(120).join("\n")).toContain("hola");
 		expect(
 			(progress.details as ResultEnvelope<{ progress: { type: string } }>).data
 				.progress.type,
@@ -367,12 +359,16 @@ describe("gemini ACP tools smoke", () => {
 
 	it("returns Pi shell for file analysis validation errors", async () => {
 		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_file_analyze",
+			(candidate) => candidate.name === "gemini_analyze",
 		);
 		const progress: PiToolShell[] = [];
 		const result = await tool?.execute(
 			"x",
-			{ paths: [".env"], instructions: "Summarize this file." } as never,
+			{
+				kind: "file",
+				paths: [".env"],
+				instructions: "Summarize this file.",
+			} as never,
 			new AbortController().signal,
 			(update) => {
 				progress.push(update);
@@ -392,7 +388,7 @@ describe("gemini ACP tools smoke", () => {
 
 	it("returns explicit base64-unsupported shell for image description", async () => {
 		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_image_describe",
+			(candidate) => candidate.name === "gemini_analyze",
 		);
 		const result = await tool?.execute(
 			"x",
