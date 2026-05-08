@@ -46,7 +46,7 @@ export const geminiAcpSearchTool = defineGeminiTool({
 	name: "gemini_search",
 	label: "Gemini ACP Search",
 	description:
-		"Search Gemini web/localDocs(no ACP); bypassCache fresh/current; useRecall prior.",
+		"Search Gemini web/localDocs(no ACP); bypassCache fresh/news/current; useRecall prior.",
 	parameters: geminiAcpSearchSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		if (params.localDocuments?.length) {
