@@ -15,29 +15,40 @@ import { renderGeminiToolCallTitle } from "./gemini-rendering.js";
 import { geminiAcpSummarizeTool } from "./gemini-summarize.js";
 import { geminiAcpTranslateTool } from "./gemini-translate.js";
 
-const askTaskSchema = Type.Union([
-	Type.Literal("prompt"),
-	Type.Literal("extract"),
-	Type.Literal("summarize"),
-	Type.Literal("translate"),
-	Type.Literal("code_review"),
-]);
+const ASK_TASK_VALUES = {
+	prompt: "prompt",
+	extract: "extract",
+	summarize: "summarize",
+	translate: "translate",
+	code_review: "code_review",
+} as const;
 
-const focusSchema = Type.Union([
-	Type.Literal("correctness"),
-	Type.Literal("security"),
-	Type.Literal("performance"),
-	Type.Literal("maintainability"),
-	Type.Literal("tests"),
-	Type.Literal("api"),
-	Type.Literal("documentation"),
-]);
+const FOCUS_VALUES = {
+	correctness: "correctness",
+	security: "security",
+	performance: "performance",
+	maintainability: "maintainability",
+	tests: "tests",
+	api: "api",
+	documentation: "documentation",
+} as const;
 
-const severitySchema = Type.Union([
-	Type.Literal("all"),
-	Type.Literal("important"),
-	Type.Literal("blockers"),
-]);
+const SEVERITY_VALUES = {
+	all: "all",
+	important: "important",
+	blockers: "blockers",
+} as const;
+
+const SUMMARY_STYLE_VALUES = {
+	paragraph: "paragraph",
+	bullets: "bullets",
+	executive: "executive",
+} as const;
+
+const askTaskSchema = Type.Enum(ASK_TASK_VALUES);
+const focusSchema = Type.Enum(FOCUS_VALUES);
+const severitySchema = Type.Enum(SEVERITY_VALUES);
+const summaryStyleSchema = Type.Enum(SUMMARY_STYLE_VALUES);
 
 export const geminiAskSchema = Type.Object({
 	task: askTaskSchema,
@@ -81,13 +92,7 @@ export const geminiAskSchema = Type.Object({
 	sentenceCount: Type.Optional(Type.Number({ minimum: 1, maximum: 20 })),
 	bulletCount: Type.Optional(Type.Number({ minimum: 1, maximum: 20 })),
 	audience: Type.Optional(Type.String()),
-	style: Type.Optional(
-		Type.Union([
-			Type.Literal("paragraph"),
-			Type.Literal("bullets"),
-			Type.Literal("executive"),
-		]),
-	),
+	style: Type.Optional(summaryStyleSchema),
 	maxSourceCharacters: Type.Optional(
 		Type.Number({ minimum: 1000, maximum: 50000 }),
 	),
