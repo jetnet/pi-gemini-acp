@@ -86,7 +86,7 @@ export async function upsertLexicalRecallEntry(
 			)
 			.run(
 				entry.responseId,
-				entry.tool,
+				publicRecallToolName(entry.tool),
 				normalized.originalQuery,
 				normalized.normalizedQuery,
 				normalized.expandedQuery,
@@ -239,12 +239,19 @@ function ftsQueryRows(
 function rowScore(row: LexicalRecallRow, queryTokens: string[]): number {
 	const rowTokens = new Set(
 		searchableTokens(
-			`${row.normalized_query} ${row.expanded_query} ${row.tags_json} ${row.entities_json}`,
+			`${row.normalized_query} ${row.expanded_query} ${row.tags_json} ${row.entities_json} ${row.recall_text}`,
 		),
 	);
 	const overlap = queryTokens.filter((token) => rowTokens.has(token)).length;
-	const comparableTokenCount = Math.min(queryTokens.length, rowTokens.size);
-	const tokenScore = comparableTokenCount ? overlap / comparableTokenCount : 0;
+	const queryCoverage = queryTokens.length ? overlap / queryTokens.length : 0;
+	const indexedQueryTokens = searchableTokens(
+		`${row.normalized_query} ${row.expanded_query}`,
+	);
+	const indexedCoverage = indexedQueryTokens.length
+		? indexedQueryTokens.filter((token) => queryTokens.includes(token)).length /
+			indexedQueryTokens.length
+		: 0;
+	const tokenScore = Math.max(queryCoverage, indexedCoverage);
 	const rankBoost = row.rank === undefined ? 0 : 1 / (1 + Math.abs(row.rank));
 	return Math.max(
 		0,
@@ -259,7 +266,7 @@ function rowToHit(
 ): LexicalRecallHit {
 	return {
 		responseId: row.response_id,
-		tool: row.tool,
+		tool: publicRecallToolName(row.tool),
 		summary: row.recall_text,
 		similarity,
 		createdAt: new Date(row.created_at).toISOString(),
@@ -294,7 +301,9 @@ function buildFilters(options: LexicalRecallOptions): {
 				: options.tool
 					? [options.tool]
 					: []
-			).filter(Boolean),
+			)
+				.filter(Boolean)
+				.map(publicRecallToolName),
 		),
 	};
 }
@@ -322,12 +331,40 @@ function clampScore(score: number | undefined): number {
 export function sourceTextForLexicalRecall(
 	result: unknown,
 ): string | undefined {
-	const record = result as { results?: SearchResultItem[] };
-	return Array.isArray(record?.results)
+	const record = result as {
+		data?: { results?: SearchResultItem[] };
+		results?: SearchResultItem[];
+		sourceText?: string;
+	};
+	if (typeof record?.sourceText === "string" && record.sourceText.trim())
+		return record.sourceText.trim();
+	const results = Array.isArray(record?.results)
 		? record.results
-				.map((item) =>
-					[item.title, item.url, item.snippet].filter(Boolean).join(" "),
-				)
-				.join("\n")
-		: undefined;
+		: Array.isArray(record?.data?.results)
+			? record.data.results
+			: undefined;
+	return results
+		?.map((item) =>
+			[item.title, item.url, item.snippet].filter(Boolean).join(" "),
+		)
+		.join("\n");
+}
+
+function publicRecallToolName(tool: string): string {
+	switch (tool) {
+		case "gemini_prompt":
+		case "gemini_extract":
+		case "gemini_summarize":
+		case "gemini_translate":
+		case "gemini_code_review":
+			return "gemini_ask";
+		case "gemini_file_analyze":
+		case "gemini_image_describe":
+			return "gemini_analyze";
+		case "gemini_recall":
+		case "gemini_get_result":
+			return "gemini_results";
+		default:
+			return tool;
+	}
 }

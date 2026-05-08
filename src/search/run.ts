@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import type {
 	GeminiAcpClient,
 	GeminiAcpCommandSettings,
@@ -20,6 +21,11 @@ import {
 	type StatusCommandChecker,
 } from "../config/status.js";
 import { isAbortError, providerError } from "../prompt/provider-result.js";
+import {
+	sourceTextForLexicalRecall,
+	upsertLexicalRecallEntry,
+} from "../recall/lexical-recall.js";
+import { openResponseCacheDb } from "../storage/cache-db.js";
 import { storeResult } from "../storage/results.js";
 import type {
 	GeminiAcpConfig,
@@ -129,6 +135,8 @@ export async function runSearch(
 			options.rootDir,
 			options.query,
 			deps.onProgress,
+			undefined,
+			true,
 		);
 	}
 
@@ -331,6 +339,7 @@ async function storeSearchResults(
 	query: string,
 	onProgress?: SearchProgressHandler,
 	model?: string,
+	indexRecall = false,
 ): Promise<SearchRunResult> {
 	await emitProgress(onProgress, {
 		phase: "store_results",
@@ -340,7 +349,17 @@ async function storeSearchResults(
 		model,
 		resultCount: results.length,
 	});
-	const stored = await storeResult({ provider, model, results }, { rootDir });
+	const payload = { provider, model, results };
+	const stored = await storeResult(payload, { rootDir });
+	if (indexRecall && results.length > 0) {
+		await indexStoredSearchResultForRecall({
+			...payload,
+			query,
+			rootDir,
+			responseId: stored.responseId,
+			path: stored.path,
+		});
+	}
 	await emitProgress(onProgress, {
 		phase: "complete",
 		message: `Search complete with ${results.length} result(s).`,
@@ -357,6 +376,47 @@ async function storeSearchResults(
 		responseId: stored.responseId,
 		fullOutputPath: stored.path,
 	};
+}
+
+async function indexStoredSearchResultForRecall(options: {
+	provider: SearchRunResult["provider"];
+	model?: string;
+	results: SearchResultItem[];
+	query: string;
+	rootDir?: string;
+	responseId: string;
+	path: string;
+}): Promise<void> {
+	try {
+		const bytes = (await stat(options.path)).size;
+		const db = await openResponseCacheDb({ rootDir: options.rootDir });
+		try {
+			db.put({
+				cacheKey: `recall:gemini_search:${options.responseId}`,
+				responseId: options.responseId,
+				tool: "gemini_search",
+				model: options.model,
+				sourceHash: options.provider,
+				bytes,
+			});
+		} finally {
+			db.close();
+		}
+		await upsertLexicalRecallEntry({
+			responseId: options.responseId,
+			tool: "gemini_search",
+			inputs: { query: options.query },
+			result: {
+				provider: options.provider,
+				model: options.model,
+				results: options.results,
+				sourceText: sourceTextForLexicalRecall({ results: options.results }),
+			},
+			rootDir: options.rootDir,
+		});
+	} catch {
+		/* Local recall indexing is best-effort; stored search results still work. */
+	}
 }
 
 async function emitProgress(

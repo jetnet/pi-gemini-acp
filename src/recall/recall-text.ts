@@ -9,11 +9,21 @@ export interface RecallTextInput {
 
 /** Builds compact deterministic text that captures what a Gemini tool call was about. */
 export function buildRecallText(input: RecallTextInput): string {
+	const sourceText = sourceTextValue(input.result);
 	return [
 		`tool: ${input.tool}`,
 		`inputs: ${summarizeValue(input.inputs)}`,
+		...(sourceText ? [`sources: ${truncate(sourceText, 1_000)}`] : []),
 		`result: ${summarizeValue(input.result)}`,
 	].join("\n");
+}
+
+function sourceTextValue(value: unknown): string | undefined {
+	if (!value || typeof value !== "object") return undefined;
+	const sourceText = (value as { sourceText?: unknown }).sourceText;
+	return typeof sourceText === "string" && sourceText.trim()
+		? sourceText.trim()
+		: undefined;
 }
 
 function summarizeValue(value: unknown): string {

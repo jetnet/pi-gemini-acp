@@ -4,7 +4,10 @@ import {
 	loadConfig,
 	withDefaultGeminiAcpConfig,
 } from "../config/settings.js";
-import { upsertLexicalRecallEntry } from "../recall/lexical-recall.js";
+import {
+	sourceTextForLexicalRecall,
+	upsertLexicalRecallEntry,
+} from "../recall/lexical-recall.js";
 import { runRecall, type RecallHit } from "../recall/recall.js";
 import { deriveCacheKey } from "../storage/cache-key.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
@@ -237,9 +240,12 @@ function isCacheEnabled(options: ToolCacheOptions<unknown>): boolean {
 function resultForLexicalRecall<TData extends object | null>(
 	shell: PiToolShell<ResultEnvelope<TData>>,
 ): unknown {
+	const data = shell.details.data;
+	const sourceText = sourceTextForLexicalRecall(data);
 	return {
 		text: shell.content[0]?.text,
-		data: shell.details.data,
+		...(sourceText ? { sourceText } : {}),
+		data,
 	};
 }
 

@@ -9,6 +9,7 @@ import type {
 	GeminiAcpSearchRequest,
 } from "../../acp/client.js";
 import { saveGeminiAcpSettings } from "../../config/settings.js";
+import { runRecall } from "../../recall/recall.js";
 import type { SearchResultItem } from "../../types.js";
 import { __resetGeminiSearchPreflightCache, runSearch } from "../run.js";
 
@@ -39,6 +40,33 @@ describe("runSearch", () => {
 		expect(result.provider).toBe("local");
 		expect(result.results[0]?.normalizedUrl).toBe("https://example.com/");
 		expect(result.responseId).toBeTruthy();
+	});
+
+	it("indexes local search results for FTS recall", async () => {
+		const result = await runSearch({
+			query: "zephyr quartz narwhal cache recall",
+			rootDir,
+			localDocuments: [
+				{
+					title: "Zephyr Quartz Narwhal cache note",
+					url: "https://example.com/zephyr-quartz-narwhal",
+					text: "Zephyr quartz narwhal cached Gemini search output should be discoverable through SQLite FTS5 recall.",
+				},
+			],
+		});
+		const recall = await runRecall({
+			rootDir,
+			query: "zephyr quartz narwhal cached Gemini search output SQLite FTS5",
+			tool: "gemini_search",
+		});
+
+		expect(recall).not.toHaveProperty("error");
+		if ("error" in recall) return;
+		expect(recall.hits[0]).toMatchObject({
+			responseId: result.responseId,
+			tool: "gemini_search",
+		});
+		expect(recall.hits[0]?.summary).toContain("Zephyr Quartz Narwhal");
 	});
 
 	it("runs default Gemini ACP config through an injected client", async () => {

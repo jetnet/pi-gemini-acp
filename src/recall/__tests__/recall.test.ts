@@ -47,6 +47,30 @@ describe("runRecall", () => {
 		});
 	});
 
+	it("normalizes legacy tool names to the aggregate public surface", async () => {
+		await seedLexicalRecall({
+			cacheKey: "cache-summary",
+			responseId: "response-summary",
+			tool: "gemini_summarize",
+			createdAt: 2_000,
+			inputs: { content: "local document search recall smoke" },
+			result: { text: "Summary of local document search recall smoke." },
+		});
+
+		const result = await runRecall({
+			rootDir,
+			query: "local document search recall smoke",
+			tool: "gemini_ask",
+		});
+
+		expect(result).not.toHaveProperty("error");
+		if ("error" in result) return;
+		expect(result.hits[0]).toMatchObject({
+			responseId: "response-summary",
+			tool: "gemini_ask",
+		});
+	});
+
 	it("returns an empty FTS result instead of falling back to vector recall", async () => {
 		const result = await runRecall({ rootDir, query: "dogs" });
 
