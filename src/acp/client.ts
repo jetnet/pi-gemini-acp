@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Narrow Gemini ACP client contracts, one-shot process helpers, and response normalization.
+ */
 import { homedir } from "node:os";
 import type {
 	GeminiAcpPermissionPolicy,
