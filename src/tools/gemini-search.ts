@@ -22,23 +22,11 @@ import { withToolResponseCache } from "./cache.js";
 import { errorResult, toolResult } from "./result.js";
 
 export const geminiAcpSearchSchema = Type.Object({
-	query: Type.String({ description: "Search query." }),
-	maxResults: Type.Optional(
-		Type.Number({
-			minimum: 1,
-			maximum: 20,
-			description: "Max Gemini ACP results.",
-		}),
-	),
-	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Fresh/latest/news: skip cache." }),
-	),
-	useRecall: Type.Optional(
-		Type.Boolean({ description: "Try local recall before live search." }),
-	),
-	bypassRecall: Type.Optional(
-		Type.Boolean({ description: "Skip local recall for this call." }),
-	),
+	query: Type.String(),
+	maxResults: Type.Optional(Type.Number({ minimum: 1, maximum: 20 })),
+	bypassCache: Type.Optional(Type.Boolean()),
+	useRecall: Type.Optional(Type.Boolean()),
+	bypassRecall: Type.Optional(Type.Boolean()),
 	localDocuments: Type.Optional(
 		Type.Array(
 			Type.Object({
@@ -47,7 +35,7 @@ export const geminiAcpSearchSchema = Type.Object({
 				text: Type.Optional(Type.String()),
 				snippet: Type.Optional(Type.String()),
 			}),
-			{ description: "Local/no-key search documents." },
+			{ description: "Supplied docs; no ACP." },
 		),
 	),
 });
@@ -62,7 +50,7 @@ export const geminiAcpSearchTool = defineGeminiTool({
 	name: "gemini_search",
 	label: "Gemini ACP Search",
 	description:
-		"Search web or supplied docs with Gemini; set bypassCache for latest/news/current queries.",
+		"Search Gemini web or supplied docs; bypassCache fresh/news/current; useRecall prior results.",
 	parameters: geminiAcpSearchSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		if (params.localDocuments?.length) {

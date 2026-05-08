@@ -24,29 +24,17 @@ import {
 import { withToolResponseCache } from "./cache.js";
 import { toolResult } from "./result.js";
 
+const hydrationModeSchema = Type.Enum({ none: "none", fetch: "fetch" });
+
 export const geminiAcpResearchSchema = Type.Object({
-	query: Type.String({ description: "Research query." }),
+	query: Type.String(),
 	maxResults: Type.Optional(Type.Number({ minimum: 1, maximum: 20 })),
-	hydrateSources: Type.Optional(
-		Type.Boolean({ description: "Fetch missing source text safely." }),
-	),
-	hydrationMode: Type.Optional(
-		Type.Union([Type.Literal("none"), Type.Literal("fetch")], {
-			description: "Source hydration mode: none or safe fetch.",
-		}),
-	),
-	useCache: Type.Optional(
-		Type.Boolean({ description: "Use persistent response cache." }),
-	),
-	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Fresh/latest/news: skip cache." }),
-	),
-	useRecall: Type.Optional(
-		Type.Boolean({ description: "Try local recall before live research." }),
-	),
-	bypassRecall: Type.Optional(
-		Type.Boolean({ description: "Skip local recall for this call." }),
-	),
+	hydrateSources: Type.Optional(Type.Boolean()),
+	hydrationMode: Type.Optional(hydrationModeSchema),
+	useCache: Type.Optional(Type.Boolean()),
+	bypassCache: Type.Optional(Type.Boolean()),
+	useRecall: Type.Optional(Type.Boolean()),
+	bypassRecall: Type.Optional(Type.Boolean()),
 	sources: Type.Optional(
 		Type.Array(
 			Type.Object({
@@ -69,7 +57,7 @@ export const geminiAcpResearchTool = defineGeminiTool({
 	name: "gemini_research",
 	label: "Gemini ACP Research",
 	description:
-		"Research with Gemini sources/citations; set bypassCache for latest/news/current topics.",
+		"Research sources/citations; safe hydration; useCache/useRecall; bypassCache fresh/news/current.",
 	parameters: geminiAcpResearchSchema,
 	async execute(_toolCallId, params: Params, signal, onUpdate) {
 		return withToolResponseCache({
@@ -87,6 +75,7 @@ export const geminiAcpResearchTool = defineGeminiTool({
 				const result = await runResearch(
 					{
 						...params,
+						hydrationMode: params.hydrationMode as "none" | "fetch" | undefined,
 						hydrateSources:
 							params.hydrationMode === "fetch" ? true : params.hydrateSources,
 					},

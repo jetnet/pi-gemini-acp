@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Internal prompt route used by the gemini_ask umbrella tool.
+ */
 import { type Static, Type } from "@mariozechner/pi-ai";
 import {
 	type PromptRunResult,
@@ -5,22 +8,19 @@ import {
 	runPrompt,
 } from "../prompt/run.js";
 import type { PiToolShell } from "../types.js";
-import { defineGeminiTool, type ToolUpdate } from "./define.js";
+import { type ToolRenderResultOptions, type ToolUpdate } from "../tools/define.js";
 import {
 	appendExpansionHint,
 	isRecord,
 	renderPromptToolResult,
 	resultMetadataLines,
 	storedOutputLine,
-} from "./gemini-prompt-rendering.js";
-import {
-	renderGeminiToolCallTitle,
-	truncateToolText,
-} from "./gemini-rendering.js";
-import { withToolResponseCache } from "./cache.js";
-import { errorResult, toolResult } from "./result.js";
+} from "../tools/gemini-prompt-rendering.js";
+import { truncateToolText } from "../tools/gemini-rendering.js";
+import { withToolResponseCache } from "../tools/cache.js";
+import { errorResult, toolResult } from "../tools/result.js";
 
-export const geminiAcpPromptSchema = Type.Object({
+const askPromptParamsSchema = Type.Object({
 	prompt: Type.String({
 		minLength: 1,
 		description: "Plain text prompt to send to the configured Gemini ACP.",
@@ -33,17 +33,15 @@ export const geminiAcpPromptSchema = Type.Object({
 	),
 });
 
-type Params = Static<typeof geminiAcpPromptSchema>;
+type Params = Static<typeof askPromptParamsSchema>;
 
-const PROMPT_TITLE_STATE_KEY = "geminiPromptTitle";
-
-export const geminiAcpPromptTool = defineGeminiTool({
-	name: "gemini_prompt",
-	label: "Gemini ACP Prompt",
-	description:
-		"Send a plain text prompt to a configured, authenticated local Gemini ACP command. Requires local ACP setup/auth; no local/no-key fallback is available for arbitrary prompts.",
-	parameters: geminiAcpPromptSchema,
-	async execute(_toolCallId, params: Params, signal, onUpdate) {
+export const askPromptRoute = {
+	async execute(
+		_toolCallId: string,
+		params: Params,
+		signal: AbortSignal,
+		onUpdate?: ToolUpdate,
+	) {
 		return withToolResponseCache({
 			toolName: "gemini_prompt",
 			inputs: params,
@@ -69,13 +67,11 @@ export const geminiAcpPromptTool = defineGeminiTool({
 			},
 		});
 	},
-	renderCall(_args, theme, context) {
-		return renderGeminiToolCallTitle(context, theme, {
-			toolName: "gemini_prompt",
-			stateKey: PROMPT_TITLE_STATE_KEY,
-		});
-	},
-	renderResult(result, options, theme) {
+	renderResult(
+		result: PiToolShell,
+		options: ToolRenderResultOptions,
+		theme: unknown,
+	) {
 		return renderPromptToolResult(result, options, theme, {
 			toolName: "gemini_prompt",
 			isData: isPromptRunResult,
@@ -83,7 +79,7 @@ export const geminiAcpPromptTool = defineGeminiTool({
 			expanded: formatPromptExpandedDisplay,
 		});
 	},
-});
+};
 
 function formatPromptCollapsedDisplay(result: PromptRunResult): string {
 	const lines = [

@@ -1,23 +1,23 @@
+/**
+ * @fileoverview Internal extraction route used by the gemini_ask umbrella tool.
+ */
 import { type Static, Type } from "@mariozechner/pi-ai";
 import { type ExtractRunResult, runExtract } from "../prompt/extract.js";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import type { PiToolShell } from "../types.js";
-import { defineGeminiTool, type ToolUpdate } from "./define.js";
+import { type ToolRenderResultOptions, type ToolUpdate } from "../tools/define.js";
 import {
 	appendExpansionHint,
 	isRecord,
 	renderPromptToolResult,
 	resultMetadataLines,
 	storedOutputLine,
-} from "./gemini-prompt-rendering.js";
-import {
-	renderGeminiToolCallTitle,
-	truncateToolText,
-} from "./gemini-rendering.js";
-import { withToolResponseCache } from "./cache.js";
-import { errorResult, toolResult } from "./result.js";
+} from "../tools/gemini-prompt-rendering.js";
+import { truncateToolText } from "../tools/gemini-rendering.js";
+import { withToolResponseCache } from "../tools/cache.js";
+import { errorResult, toolResult } from "../tools/result.js";
 
-export const geminiAcpExtractSchema = Type.Object({
+const askExtractParamsSchema = Type.Object({
 	content: Type.String({
 		minLength: 1,
 		description: "Text content to extract structured data from.",
@@ -35,17 +35,15 @@ export const geminiAcpExtractSchema = Type.Object({
 	),
 });
 
-type Params = Static<typeof geminiAcpExtractSchema>;
+type Params = Static<typeof askExtractParamsSchema>;
 
-const EXTRACT_TITLE_STATE_KEY = "geminiExtractTitle";
-
-export const geminiAcpExtractTool = defineGeminiTool({
-	name: "gemini_extract",
-	label: "Gemini ACP Extract",
-	description:
-		"Extract structured JSON from supplied content with configured/authenticated Gemini ACP. Requires local ACP setup/auth and validates the returned JSON.",
-	parameters: geminiAcpExtractSchema,
-	async execute(_toolCallId, params: Params, signal, onUpdate) {
+export const askExtractRoute = {
+	async execute(
+		_toolCallId: string,
+		params: Params,
+		signal: AbortSignal,
+		onUpdate?: ToolUpdate,
+	) {
 		return withToolResponseCache({
 			toolName: "gemini_extract",
 			inputs: params,
@@ -74,13 +72,11 @@ export const geminiAcpExtractTool = defineGeminiTool({
 			},
 		});
 	},
-	renderCall(_args, theme, context) {
-		return renderGeminiToolCallTitle(context, theme, {
-			toolName: "gemini_extract",
-			stateKey: EXTRACT_TITLE_STATE_KEY,
-		});
-	},
-	renderResult(result, options, theme) {
+	renderResult(
+		result: PiToolShell,
+		options: ToolRenderResultOptions,
+		theme: unknown,
+	) {
 		return renderPromptToolResult(result, options, theme, {
 			toolName: "gemini_extract",
 			isData: isExtractRunResult,
@@ -88,9 +84,9 @@ export const geminiAcpExtractTool = defineGeminiTool({
 			expanded: formatExtractExpandedDisplay,
 		});
 	},
-});
+};
 
-/** Formats the visible gemini_extract success text so assistants can answer from content[0].text even when details.data is hidden. */
+/** Formats the visible extract success text so assistants can answer from content[0].text even when details.data is hidden. */
 export function formatExtractToolText(result: ExtractRunResult): string {
 	const summary = summarizeExtractedValue(result.extracted);
 	const lines = [

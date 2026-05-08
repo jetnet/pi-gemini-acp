@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Internal file-analysis route used by the gemini_analyze umbrella tool.
+ */
 import { type Static, Type } from "@mariozechner/pi-ai";
 import { trustGeminiCliFolder } from "../config/gemini-cli-trust.js";
 import {
@@ -7,23 +10,21 @@ import {
 	runFileAnalyze,
 } from "../prompt/file-analyze.js";
 import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
-import {
-	defineGeminiTool,
-	type ToolExecutionContext,
-	type ToolRenderResultOptions,
-	type ToolUpdate,
-} from "./define.js";
+import type {
+	ToolExecutionContext,
+	ToolRenderResultOptions,
+	ToolUpdate,
+} from "../tools/define.js";
 import {
 	boxedToolText,
 	dimToolText,
 	expandedToolOutputHint,
 	formatCollapsedOrExpanded,
-	renderGeminiToolCallTitle,
 	truncateToolText,
-} from "./gemini-rendering.js";
-import { errorResult, toolResult } from "./result.js";
+} from "../tools/gemini-rendering.js";
+import { errorResult, toolResult } from "../tools/result.js";
 
-export const geminiAcpFileAnalyzeSchema = Type.Object({
+const analyzeFileParamsSchema = Type.Object({
 	paths: Type.Array(
 		Type.String({
 			minLength: 1,
@@ -48,15 +49,16 @@ export const geminiAcpFileAnalyzeSchema = Type.Object({
 	),
 });
 
-type Params = Static<typeof geminiAcpFileAnalyzeSchema>;
+type Params = Static<typeof analyzeFileParamsSchema>;
 
-export const geminiAcpFileAnalyzeTool = defineGeminiTool({
-	name: "gemini_file_analyze",
-	label: "Gemini ACP File Analyze",
-	description:
-		"Analyze explicit local text/document files via Gemini ACP resource links after path and filesystem-read preflight.",
-	parameters: geminiAcpFileAnalyzeSchema,
-	async execute(_toolCallId, params: Params, signal, onUpdate, ctx) {
+export const analyzeFileRoute = {
+	async execute(
+		_toolCallId: string,
+		params: Params,
+		signal: AbortSignal,
+		onUpdate?: ToolUpdate,
+		ctx?: ToolExecutionContext,
+	) {
 		await emitFileAnalyzeProgress(params, onUpdate);
 		const result = await runFileAnalyze(
 			params as FileAnalyzeOptions,
@@ -73,18 +75,17 @@ export const geminiAcpFileAnalyzeTool = defineGeminiTool({
 			fullOutputPath: result.fullOutputPath,
 		});
 	},
-	renderCall(_args, theme, context) {
-		return renderGeminiToolCallTitle(context, theme, {
-			toolName: "gemini_file_analyze",
-			stateKey: "geminiFileAnalyzeTitle",
-		});
-	},
-	renderResult(result, options, theme) {
+	renderResult(
+		result: PiToolShell,
+		options: ToolRenderResultOptions,
+		theme: unknown,
+		_context?: unknown,
+	) {
 		return boxedToolText(
 			dimToolText(formatFileAnalyzeToolDisplay(result, options), theme),
 		);
 	},
-});
+};
 
 function fileAnalyzeTrustHandler(ctx: ToolExecutionContext | undefined) {
 	if (!ctx?.hasUI || !ctx.ui) return undefined;

@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Internal recall route used by the gemini_results umbrella tool.
+ */
 import { type Static, Type } from "@mariozechner/pi-ai";
 import {
 	runRecall,
@@ -5,16 +8,15 @@ import {
 	type RecallResult,
 } from "../recall/recall.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
-import { defineGeminiTool } from "./define.js";
+
 import {
 	boxedToolText,
 	dimToolText,
-	renderGeminiToolCallTitle,
 	truncateToolText,
-} from "./gemini-rendering.js";
-import { errorResult, toolResult } from "./result.js";
+} from "../tools/gemini-rendering.js";
+import { errorResult, toolResult } from "../tools/result.js";
 
-export const geminiAcpRecallSchema = Type.Object({
+const resultsRecallParamsSchema = Type.Object({
 	query: Type.String({ description: "Natural-language recall query." }),
 	k: Type.Optional(
 		Type.Number({
@@ -50,30 +52,29 @@ export const geminiAcpRecallSchema = Type.Object({
 	),
 });
 
-type Params = Static<typeof geminiAcpRecallSchema>;
+type Params = Static<typeof resultsRecallParamsSchema>;
 
-const RECALL_TITLE_STATE_KEY = "geminiRecallTitle";
-
-export const geminiAcpRecallTool = defineGeminiTool({
-	name: "gemini_recall",
-	label: "Gemini Recall",
-	description: "Search local FTS recall over prior cached Gemini results.",
-	parameters: geminiAcpRecallSchema,
-	async execute(_toolCallId, params: Params, signal) {
+export const resultsRecallRoute = {
+	async execute(
+		_toolCallId: string,
+		params: Params,
+		signal: AbortSignal,
+		_onUpdate?: unknown,
+		_ctx?: unknown,
+	) {
 		const result = await runRecall({ ...params, signal });
 		if ("error" in result) return errorResult(result.error);
 		return toolResult({ text: formatRecallToolText(result), data: result });
 	},
-	renderCall(_args, theme, context) {
-		return renderGeminiToolCallTitle(context, theme, {
-			toolName: "gemini_recall",
-			stateKey: RECALL_TITLE_STATE_KEY,
-		});
-	},
-	renderResult(result, _options, theme) {
+	renderResult(
+		result: PiToolShell,
+		_options: unknown,
+		theme: unknown,
+		_context?: unknown,
+	) {
 		return boxedToolText(dimToolText(formatRecallToolDisplay(result), theme));
 	},
-});
+};
 
 /** Formats a local recall result for assistant-facing tool output. */
 export function formatRecallToolText(result: RecallResult): string {

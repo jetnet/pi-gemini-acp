@@ -3,17 +3,13 @@
  */
 import { type Static, Type } from "@mariozechner/pi-ai";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
-import {
-	defineGeminiTool,
-	type ToolRenderContext,
-	type ToolRenderResultOptions,
-} from "./define.js";
-import { geminiAcpCodeReviewTool } from "./gemini-code-review.js";
-import { geminiAcpExtractTool } from "./gemini-extract.js";
-import { geminiAcpPromptTool } from "./gemini-prompt.js";
+import { askCodeReviewRoute } from "../ask/code-review.js";
+import { askExtractRoute } from "../ask/extract.js";
+import { askPromptRoute } from "../ask/prompt.js";
+import { askSummarizeRoute } from "../ask/summarize.js";
+import { askTranslateRoute } from "../ask/translate.js";
+import { defineGeminiTool } from "./define.js";
 import { renderGeminiToolCallTitle } from "./gemini-rendering.js";
-import { geminiAcpSummarizeTool } from "./gemini-summarize.js";
-import { geminiAcpTranslateTool } from "./gemini-translate.js";
 import { errorResult } from "./result.js";
 
 const ASK_TASK_VALUES = {
@@ -87,7 +83,7 @@ export const geminiAskTool = defineGeminiTool({
 	name: "gemini_ask",
 	label: "Gemini Ask",
 	description:
-		"Prompt/extract/summarize/translate/review text or safe URL via Gemini ACP; no files/secrets.",
+		"Prompt/extract/summarize/translate/review text/URL; useCache/bypassCache; no files/secrets.",
 	parameters: geminiAskSchema,
 	execute(toolCallId, params: Params, signal, onUpdate) {
 		const validationError = validateAskTaskOptions(params);
@@ -95,7 +91,7 @@ export const geminiAskTool = defineGeminiTool({
 
 		switch (params.task) {
 			case "prompt":
-				return geminiAcpPromptTool.execute(
+				return askPromptRoute.execute(
 					toolCallId,
 					{
 						prompt: params.prompt ?? params.content ?? "",
@@ -106,7 +102,7 @@ export const geminiAskTool = defineGeminiTool({
 					onUpdate,
 				);
 			case "extract":
-				return geminiAcpExtractTool.execute(
+				return askExtractRoute.execute(
 					toolCallId,
 					{
 						content: params.content ?? "",
@@ -118,26 +114,26 @@ export const geminiAskTool = defineGeminiTool({
 					onUpdate,
 				);
 			case "summarize":
-				return geminiAcpSummarizeTool.execute(
+				return askSummarizeRoute.execute(
 					toolCallId,
-					params as Parameters<typeof geminiAcpSummarizeTool.execute>[1],
+					params as Parameters<typeof askSummarizeRoute.execute>[1],
 					signal,
 					onUpdate,
 				);
 			case "translate":
-				return geminiAcpTranslateTool.execute(
+				return askTranslateRoute.execute(
 					toolCallId,
 					{
 						...params,
 						targetLanguage: params.targetLanguage ?? "",
-					} as Parameters<typeof geminiAcpTranslateTool.execute>[1],
+					} as Parameters<typeof askTranslateRoute.execute>[1],
 					signal,
 					onUpdate,
 				);
 			case "code_review":
-				return geminiAcpCodeReviewTool.execute(
+				return askCodeReviewRoute.execute(
 					toolCallId,
-					params as Parameters<typeof geminiAcpCodeReviewTool.execute>[1],
+					params as Parameters<typeof askCodeReviewRoute.execute>[1],
 					signal,
 					onUpdate,
 				);
@@ -149,13 +145,8 @@ export const geminiAskTool = defineGeminiTool({
 			stateKey: "geminiAskTitle",
 		});
 	},
-	renderResult(result, options, theme, context) {
-		return askRenderTarget(result).renderResult!(
-			result,
-			options,
-			theme,
-			context,
-		);
+	renderResult(result, options, theme) {
+		return askRenderTarget(result).renderResult(result, options, theme);
 	},
 });
 
@@ -186,7 +177,8 @@ function validateAskTaskOptions(params: Params): PiToolShell | undefined {
 			params.maxSourceCharacters,
 		);
 		if (numberError) return numberError;
-		const countError = validateSummaryCount("sentenceCount", params.sentenceCount) ??
+		const countError =
+			validateSummaryCount("sentenceCount", params.sentenceCount) ??
 			validateSummaryCount("bulletCount", params.bulletCount);
 		if (countError) return countError;
 	}
@@ -226,10 +218,11 @@ function validateAskTaskOptions(params: Params): PiToolShell | undefined {
 		if (!Array.isArray(params.focus)) {
 			return invalidAskShape("focus must be an array.");
 		}
-		const invalidFocus = params.focus.find((value: unknown) =>
-			!isAllowedValue(value, FOCUS_VALUES),
+		const invalidFocus = params.focus.find(
+			(value: unknown) => !isAllowedValue(value, FOCUS_VALUES),
 		);
-		if (invalidFocus) return invalidAskValue("focus", invalidFocus, FOCUS_VALUES);
+		if (invalidFocus)
+			return invalidAskValue("focus", invalidFocus, FOCUS_VALUES);
 	}
 	return undefined;
 }
@@ -405,15 +398,14 @@ function invalidAskValue(
 function askRenderTarget(result: PiToolShell) {
 	const data = (result.details as Partial<ResultEnvelope<unknown>>).data;
 	const record = data && typeof data === "object" ? data : {};
-	if ("findings" in record || "sections" in record)
-		return geminiAcpCodeReviewTool;
+	if ("findings" in record || "sections" in record) return askCodeReviewRoute;
 	if (
 		"targetLanguage" in record ||
 		"translations" in record ||
 		"items" in record
 	)
-		return geminiAcpTranslateTool;
-	if ("source" in record && "summary" in record) return geminiAcpSummarizeTool;
-	if ("extracted" in record) return geminiAcpExtractTool;
-	return geminiAcpPromptTool;
+		return askTranslateRoute;
+	if ("source" in record && "summary" in record) return askSummarizeRoute;
+	if ("extracted" in record) return askExtractRoute;
+	return askPromptRoute;
 }

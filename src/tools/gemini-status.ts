@@ -19,7 +19,7 @@ export const geminiAcpStatusTool = defineGeminiTool({
 	name: "gemini_status",
 	label: "Gemini ACP Status",
 	description:
-		"Report read-only Gemini ACP command/auth/capability status after applying the same default `gemini --acp` settings used by provider-backed search. Local supplied-document workflows do not require Gemini ACP.",
+		"ACP status: command/auth/capabilities; local supplied docs do not need ACP.",
 	parameters: geminiAcpStatusSchema,
 	async execute(_toolCallId, _params: Params) {
 		const status = await getGeminiAcpStatus();
@@ -87,8 +87,8 @@ function statusText(status: GeminiStatusData): string {
 	const fileAnalysis = status.capabilities.fileAnalysisAvailable;
 	return [
 		headline,
-		`File analysis capability: ${boolLabel(fileAnalysis, "available", "not confirmed")}; gemini_file_analyze uses ACP resource links when filesystem-read permission is enabled.`,
-		`Image input: ${boolLabel(status.capabilities.imageInput.available, "available", "not confirmed")} (${status.capabilities.imageInput.transport}; gemini_image_describe uses validated resource links when available).`,
+		`File analysis capability: ${boolLabel(fileAnalysis, "available", "not confirmed")}; gemini_analyze uses ACP resource links for validated files when filesystem-read permission is enabled.`,
+		`Image input: ${boolLabel(status.capabilities.imageInput.available, "available", "not confirmed")} (${status.capabilities.imageInput.transport}; gemini_analyze uses validated image resource links when available).`,
 		...status.remediation.map((item) => `- ${item}`),
 	].join("\n");
 }

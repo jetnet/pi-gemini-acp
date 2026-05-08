@@ -3,21 +3,18 @@
  */
 import { type Static, Type } from "@mariozechner/pi-ai";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
+import { analyzeFileRoute } from "../analyze/file.js";
+import { analyzeImageRoute } from "../analyze/image.js";
 import { defineGeminiTool } from "./define.js";
-import { geminiAcpFileAnalyzeTool } from "./gemini-file-analyze.js";
-import { geminiAcpImageDescribeTool } from "./gemini-image-describe.js";
 import { renderGeminiToolCallTitle } from "./gemini-rendering.js";
 
-const analyzeKindSchema = Type.Union([
-	Type.Literal("file"),
-	Type.Literal("image"),
-]);
-const imageModeSchema = Type.Union([
-	Type.Literal("caption"),
-	Type.Literal("objects"),
-	Type.Literal("ocr"),
-	Type.Literal("detailed"),
-]);
+const analyzeKindSchema = Type.Enum({ file: "file", image: "image" });
+const imageModeSchema = Type.Enum({
+	caption: "caption",
+	objects: "objects",
+	ocr: "ocr",
+	detailed: "detailed",
+});
 
 export const geminiAnalyzeSchema = Type.Object({
 	kind: analyzeKindSchema,
@@ -25,13 +22,11 @@ export const geminiAnalyzeSchema = Type.Object({
 		Type.Array(Type.String({ minLength: 1 }), { minItems: 1, maxItems: 5 }),
 	),
 	imagePath: Type.Optional(Type.String()),
-	imageDataBase64: Type.Optional(
-		Type.String({ description: "Base64 validation only." }),
-	),
+	imageDataBase64: Type.Optional(Type.String()),
 	mimeType: Type.Optional(Type.String()),
 	instructions: Type.Optional(Type.String()),
 	mode: Type.Optional(imageModeSchema),
-	cwd: Type.Optional(Type.String({ description: "Base dir; no scanning." })),
+	cwd: Type.Optional(Type.String()),
 	bypassCache: Type.Optional(Type.Boolean()),
 });
 
@@ -41,11 +36,11 @@ export const geminiAnalyzeTool = defineGeminiTool({
 	name: "gemini_analyze",
 	label: "Gemini Analyze",
 	description:
-		"Local file/image paths via Gemini ACP resource links after path and filesystem-read preflight.",
+		"Analyze explicit file/image paths via ACP resource links after path/read preflight; base64 validate only.",
 	parameters: geminiAnalyzeSchema,
 	execute(toolCallId, params: Params, signal, onUpdate, ctx) {
 		if (params.kind === "file") {
-			return geminiAcpFileAnalyzeTool.execute(
+			return analyzeFileRoute.execute(
 				toolCallId,
 				{
 					paths: params.paths ?? [],
@@ -58,13 +53,18 @@ export const geminiAnalyzeTool = defineGeminiTool({
 				ctx,
 			);
 		}
-		return geminiAcpImageDescribeTool.execute(
+		return analyzeImageRoute.execute(
 			toolCallId,
 			{
 				imagePath: params.imagePath,
 				imageDataBase64: params.imageDataBase64,
 				mimeType: params.mimeType,
-				mode: params.mode,
+				mode: params.mode as
+					| "caption"
+					| "objects"
+					| "ocr"
+					| "detailed"
+					| undefined,
 				instructions: params.instructions,
 				cwd: params.cwd,
 				bypassCache: params.bypassCache,
@@ -82,8 +82,8 @@ export const geminiAnalyzeTool = defineGeminiTool({
 	},
 	renderResult(result, options, theme, context) {
 		const target = isImageDescribeResult(result)
-			? geminiAcpImageDescribeTool
-			: geminiAcpFileAnalyzeTool;
+			? analyzeImageRoute
+			: analyzeFileRoute;
 		return target.renderResult!(result, options, theme, context);
 	},
 });

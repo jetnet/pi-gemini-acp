@@ -1,25 +1,23 @@
+/**
+ * @fileoverview Internal translation route used by the gemini_ask umbrella tool.
+ */
 import { type Static, Type } from "@mariozechner/pi-ai";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import { runTranslate, type TranslateRunResult } from "../prompt/translate.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
-import {
-	defineGeminiTool,
-	type ToolRenderResultOptions,
-	type ToolUpdate,
-} from "./define.js";
-import { isPromptWorkflowUpdate, isRecord } from "./gemini-prompt-rendering.js";
+import { type ToolRenderResultOptions, type ToolUpdate } from "../tools/define.js";
+import { isPromptWorkflowUpdate, isRecord } from "../tools/gemini-prompt-rendering.js";
 import {
 	boxedToolText,
 	dimToolText,
 	expandedToolOutputHint,
 	formatCollapsedOrExpanded,
-	renderGeminiToolCallTitle,
 	truncateToolText,
-} from "./gemini-rendering.js";
-import { withToolResponseCache } from "./cache.js";
-import { errorResult, toolResult } from "./result.js";
+} from "../tools/gemini-rendering.js";
+import { withToolResponseCache } from "../tools/cache.js";
+import { errorResult, toolResult } from "../tools/result.js";
 
-export const geminiAcpTranslateSchema = Type.Object({
+const askTranslateParamsSchema = Type.Object({
 	text: Type.Optional(
 		Type.String({
 			minLength: 1,
@@ -76,18 +74,17 @@ export const geminiAcpTranslateSchema = Type.Object({
 	),
 });
 
-type Params = Static<typeof geminiAcpTranslateSchema>;
+type Params = Static<typeof askTranslateParamsSchema>;
 
 type TranslateProgressData = { progress: PromptWorkflowUpdate };
 
-const TRANSLATE_TITLE_STATE_KEY = "geminiTranslateTitle";
-
-export const geminiAcpTranslateTool = defineGeminiTool({
-	name: "gemini_translate",
-	label: "Gemini ACP Translate",
-	description: "Translate/localize text with Gemini ACP; no local fallback.",
-	parameters: geminiAcpTranslateSchema,
-	async execute(_toolCallId, params: Params, signal, onUpdate) {
+export const askTranslateRoute = {
+	async execute(
+		_toolCallId: string,
+		params: Params,
+		signal: AbortSignal,
+		onUpdate?: ToolUpdate,
+	) {
 		return withToolResponseCache({
 			toolName: "gemini_translate",
 			inputs: params,
@@ -109,18 +106,16 @@ export const geminiAcpTranslateTool = defineGeminiTool({
 			},
 		});
 	},
-	renderCall(_args, theme, context) {
-		return renderGeminiToolCallTitle(context, theme, {
-			toolName: "gemini_translate",
-			stateKey: TRANSLATE_TITLE_STATE_KEY,
-		});
-	},
-	renderResult(result, options, theme) {
+	renderResult(
+		result: PiToolShell,
+		options: ToolRenderResultOptions,
+		theme: unknown,
+	) {
 		return boxedToolText(
 			dimToolText(formatTranslateToolDisplay(result, options), theme),
 		);
 	},
-});
+};
 
 function translateToolUpdate(
 	onUpdate: ToolUpdate | undefined,

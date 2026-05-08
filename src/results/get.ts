@@ -1,30 +1,33 @@
+/**
+ * @fileoverview Internal stored-result route used by the gemini_results umbrella tool.
+ */
 import { type Static, Type } from "@mariozechner/pi-ai";
 import { getStoredResult } from "../storage/results.js";
 import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
-import { defineGeminiTool, type ToolRenderResultOptions } from "./define.js";
+import type { ToolRenderResultOptions } from "../tools/define.js";
 import {
 	boxedToolText,
 	dimToolText,
 	expandedToolOutputHint,
 	formatCollapsedOrExpanded,
-	renderGeminiToolCallTitle,
 	truncateToolText,
-} from "./gemini-rendering.js";
-import { errorResult, toolResult } from "./result.js";
+} from "../tools/gemini-rendering.js";
+import { errorResult, toolResult } from "../tools/result.js";
 
-export const geminiAcpGetResultSchema = Type.Object({
+const resultsGetParamsSchema = Type.Object({
 	responseId: Type.String({ description: "Stored result responseId." }),
 });
 
-type Params = Static<typeof geminiAcpGetResultSchema>;
+type Params = Static<typeof resultsGetParamsSchema>;
 
-export const geminiAcpGetResultTool = defineGeminiTool({
-	name: "gemini_get_result",
-	label: "Gemini ACP Get Result",
-	description:
-		"Retrieve full stored Gemini ACP search/research output by responseId.",
-	parameters: geminiAcpGetResultSchema,
-	async execute(_toolCallId, params: Params) {
+export const resultsGetRoute = {
+	async execute(
+		_toolCallId: string,
+		params: Params,
+		_signal?: AbortSignal,
+		_onUpdate?: unknown,
+		_ctx?: unknown,
+	) {
 		try {
 			const stored = await getStoredResult(params.responseId);
 			return toolResult({
@@ -42,18 +45,17 @@ export const geminiAcpGetResultTool = defineGeminiTool({
 			});
 		}
 	},
-	renderCall(_args, theme, context) {
-		return renderGeminiToolCallTitle(context, theme, {
-			toolName: "gemini_get_result",
-			stateKey: "geminiGetResultTitle",
-		});
-	},
-	renderResult(result, options, theme) {
+	renderResult(
+		result: PiToolShell,
+		options: ToolRenderResultOptions,
+		theme: unknown,
+		_context?: unknown,
+	) {
 		return boxedToolText(
 			dimToolText(formatGetResultToolDisplay(result, options), theme),
 		);
 	},
-});
+};
 
 function formatGetResultToolDisplay(
 	result: PiToolShell,

@@ -1,6 +1,22 @@
+/**
+ * @fileoverview Registration invariants for the Gemini tool adapter surface.
+ */
+import { readdir, readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import type { GeminiTool } from "../define.js";
 import { registerGeminiAcpTools } from "../register.js";
+
+const TOOLS_DIR = fileURLToPath(new URL("..", import.meta.url));
+
+const PUBLIC_TOOL_FILES = [
+	"gemini-analyze.ts",
+	"gemini-ask.ts",
+	"gemini-research.ts",
+	"gemini-results.ts",
+	"gemini-search.ts",
+	"gemini-status.ts",
+].sort();
 
 describe("Gemini tool registration", () => {
 	afterEach(() => {
@@ -19,5 +35,24 @@ describe("Gemini tool registration", () => {
 
 		expect(registered).not.toContain("gemini_recall");
 		expect(registered).toContain("gemini_search");
+	});
+
+	it("keeps public tool adapters limited to the registered umbrella files", async () => {
+		const files = (await readdir(TOOLS_DIR, { recursive: true })).filter(
+			(file) => file.endsWith(".ts"),
+		);
+		const publicToolFiles: string[] = [];
+
+		for (const file of files) {
+			const source = await readFile(
+				new URL(`../${file}`, import.meta.url),
+				"utf8",
+			);
+			if (/export const \w+ = defineGeminiTool\(/.test(source)) {
+				publicToolFiles.push(file);
+			}
+		}
+
+		expect(publicToolFiles.sort()).toEqual(PUBLIC_TOOL_FILES);
 	});
 });

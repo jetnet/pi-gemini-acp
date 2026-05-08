@@ -4,14 +4,11 @@
 import { type Static, Type } from "@mariozechner/pi-ai";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { defineGeminiTool } from "./define.js";
-import { geminiAcpGetResultTool } from "./gemini-get-result.js";
-import { geminiAcpRecallTool } from "./gemini-recall.js";
 import { renderGeminiToolCallTitle } from "./gemini-rendering.js";
+import { resultsGetRoute } from "../results/get.js";
+import { resultsRecallRoute } from "../results/recall.js";
 
-const resultsActionSchema = Type.Union([
-	Type.Literal("get"),
-	Type.Literal("recall"),
-]);
+const resultsActionSchema = Type.Enum({ get: "get", recall: "recall" });
 
 export const geminiResultsSchema = Type.Object({
 	action: resultsActionSchema,
@@ -29,12 +26,11 @@ type Params = Static<typeof geminiResultsSchema>;
 export const geminiResultsTool = defineGeminiTool({
 	name: "gemini_results",
 	label: "Gemini Results",
-	description:
-		"Get stored Gemini result by responseId or search local FTS recall.",
+	description: "Retrieve by responseId or local FTS recall.",
 	parameters: geminiResultsSchema,
 	execute(toolCallId, params: Params, signal, onUpdate, ctx) {
 		if (params.action === "get") {
-			return geminiAcpGetResultTool.execute(
+			return resultsGetRoute.execute(
 				toolCallId,
 				{ responseId: params.responseId ?? "" },
 				signal,
@@ -42,7 +38,7 @@ export const geminiResultsTool = defineGeminiTool({
 				ctx,
 			);
 		}
-		return geminiAcpRecallTool.execute(
+		return resultsRecallRoute.execute(
 			toolCallId,
 			{
 				query: params.query ?? "",
@@ -65,8 +61,8 @@ export const geminiResultsTool = defineGeminiTool({
 	},
 	renderResult(result, options, theme, context) {
 		const target = isRecallResult(result)
-			? geminiAcpRecallTool
-			: geminiAcpGetResultTool;
+			? resultsRecallRoute
+			: resultsGetRoute;
 		return target.renderResult!(result, options, theme, context);
 	},
 });

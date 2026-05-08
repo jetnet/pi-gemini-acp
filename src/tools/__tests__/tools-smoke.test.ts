@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Smoke coverage for the registered Gemini tool surface.
+ */
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import type { ExtractRunResult } from "../../prompt/extract.js";
@@ -6,7 +9,7 @@ import type {
 	ResearchResult,
 	ResultEnvelope,
 } from "../../types.js";
-import { formatExtractToolText } from "../gemini-extract.js";
+import { formatExtractToolText } from "../../ask/extract.js";
 import { formatResearchToolText } from "../gemini-research.js";
 import { geminiAcpTools } from "../register.js";
 import { toolResult } from "../result.js";

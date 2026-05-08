@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Internal image-analysis route used by the gemini_analyze umbrella tool.
+ */
 import { type Static, Type } from "@mariozechner/pi-ai";
 import {
 	type ImageDescribeResult,
@@ -5,17 +8,14 @@ import {
 } from "../prompt/image-describe.js";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import type { PiToolShell } from "../types.js";
-import { defineGeminiTool, type ToolUpdate } from "./define.js";
+import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
 import {
 	appendExpansionHint,
 	renderPromptToolResult,
 	resultMetadataLines,
-} from "./gemini-prompt-rendering.js";
-import {
-	renderGeminiToolCallTitle,
-	truncateToolText,
-} from "./gemini-rendering.js";
-import { errorResult, toolResult } from "./result.js";
+} from "../tools/gemini-prompt-rendering.js";
+import { truncateToolText } from "../tools/gemini-rendering.js";
+import { errorResult, toolResult } from "../tools/result.js";
 
 const imageModeSchema = Type.Union([
 	Type.Literal("caption"),
@@ -24,7 +24,7 @@ const imageModeSchema = Type.Union([
 	Type.Literal("detailed"),
 ]);
 
-export const geminiAcpImageDescribeSchema = Type.Object({
+const analyzeImageParamsSchema = Type.Object({
 	imagePath: Type.Optional(
 		Type.String({
 			description: "Local PNG/JPEG/WebP/GIF path; symlinks refused.",
@@ -54,15 +54,16 @@ export const geminiAcpImageDescribeSchema = Type.Object({
 	),
 });
 
-type Params = Static<typeof geminiAcpImageDescribeSchema>;
+type Params = Static<typeof analyzeImageParamsSchema>;
 
-export const geminiAcpImageDescribeTool = defineGeminiTool({
-	name: "gemini_image_describe",
-	label: "Gemini ACP Image Describe",
-	description:
-		"Analyze local image paths via Gemini ACP after path and filesystem-read preflight; base64 is validation-only.",
-	parameters: geminiAcpImageDescribeSchema,
-	async execute(_toolCallId, params: Params, signal, onUpdate) {
+export const analyzeImageRoute = {
+	async execute(
+		_toolCallId: string,
+		params: Params,
+		signal: AbortSignal,
+		onUpdate?: ToolUpdate,
+		_ctx?: unknown,
+	) {
 		const result = await runImageDescribe(
 			params,
 			signal,
@@ -78,13 +79,12 @@ export const geminiAcpImageDescribeTool = defineGeminiTool({
 			fullOutputPath: result.fullOutputPath,
 		});
 	},
-	renderCall(_args, theme, context) {
-		return renderGeminiToolCallTitle(context, theme, {
-			toolName: "gemini_image_describe",
-			stateKey: "geminiImageDescribeTitle",
-		});
-	},
-	renderResult(result, options, theme) {
+	renderResult(
+		result: PiToolShell,
+		options: ToolRenderResultOptions,
+		theme: unknown,
+		_context?: unknown,
+	) {
 		return renderPromptToolResult(result, options, theme, {
 			toolName: "gemini_image_describe",
 			isData: isImageDescribeResult,
@@ -92,7 +92,7 @@ export const geminiAcpImageDescribeTool = defineGeminiTool({
 			expanded: formatImageDescribeExpanded,
 		});
 	},
-});
+};
 
 function formatImageDescribeCollapsed(result: ImageDescribeResult): string {
 	const input = result.image

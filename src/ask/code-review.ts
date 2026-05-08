@@ -1,3 +1,6 @@
+/**
+ * @fileoverview Internal code-review route used by the gemini_ask umbrella tool.
+ */
 import { type Static, Type } from "@mariozechner/pi-ai";
 import {
 	type CodeReviewOptions,
@@ -6,22 +9,17 @@ import {
 } from "../prompt/code-review.js";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
-import {
-	defineGeminiTool,
-	type ToolRenderResultOptions,
-	type ToolUpdate,
-} from "./define.js";
-import { isPromptWorkflowUpdate, isRecord } from "./gemini-prompt-rendering.js";
+import { type ToolRenderResultOptions, type ToolUpdate } from "../tools/define.js";
+import { isPromptWorkflowUpdate, isRecord } from "../tools/gemini-prompt-rendering.js";
 import {
 	boxedToolText,
 	dimToolText,
 	expandedToolOutputHint,
 	formatCollapsedOrExpanded,
-	renderGeminiToolCallTitle,
 	truncateToolText,
-} from "./gemini-rendering.js";
-import { withToolResponseCache } from "./cache.js";
-import { errorResult, toolResult } from "./result.js";
+} from "../tools/gemini-rendering.js";
+import { withToolResponseCache } from "../tools/cache.js";
+import { errorResult, toolResult } from "../tools/result.js";
 
 const focusSchema = Type.Union([
 	Type.Literal("correctness"),
@@ -39,7 +37,7 @@ const severitySchema = Type.Union([
 	Type.Literal("blockers"),
 ]);
 
-export const geminiAcpCodeReviewSchema = Type.Object({
+const askCodeReviewParamsSchema = Type.Object({
 	diff: Type.Optional(
 		Type.String({
 			description: "Unified diff/patch text; paths are not read.",
@@ -73,19 +71,17 @@ export const geminiAcpCodeReviewSchema = Type.Object({
 	),
 });
 
-type Params = Static<typeof geminiAcpCodeReviewSchema>;
+type Params = Static<typeof askCodeReviewParamsSchema>;
 
 type CodeReviewProgressData = { progress: PromptWorkflowUpdate };
 
-const CODE_REVIEW_TITLE_STATE_KEY = "geminiCodeReviewTitle";
-
-export const geminiAcpCodeReviewTool = defineGeminiTool({
-	name: "gemini_code_review",
-	label: "Gemini ACP Code Review",
-	description:
-		"Review supplied code/diffs with Gemini ACP; analysis only, no file reads/edits/fixes.",
-	parameters: geminiAcpCodeReviewSchema,
-	async execute(_toolCallId, params: Params, signal, onUpdate) {
+export const askCodeReviewRoute = {
+	async execute(
+		_toolCallId: string,
+		params: Params,
+		signal: AbortSignal,
+		onUpdate?: ToolUpdate,
+	) {
 		return withToolResponseCache({
 			toolName: "gemini_code_review",
 			inputs: params,
@@ -107,18 +103,16 @@ export const geminiAcpCodeReviewTool = defineGeminiTool({
 			},
 		});
 	},
-	renderCall(_args, theme, context) {
-		return renderGeminiToolCallTitle(context, theme, {
-			toolName: "gemini_code_review",
-			stateKey: CODE_REVIEW_TITLE_STATE_KEY,
-		});
-	},
-	renderResult(result, options, theme) {
+	renderResult(
+		result: PiToolShell,
+		options: ToolRenderResultOptions,
+		theme: unknown,
+	) {
 		return boxedToolText(
 			dimToolText(formatCodeReviewToolDisplay(result, options), theme),
 		);
 	},
-});
+};
 
 function resultText(result: CodeReviewResult): string {
 	if (result.truncated) {
