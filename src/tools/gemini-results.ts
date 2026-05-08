@@ -15,22 +15,13 @@ const resultsActionSchema = Type.Union([
 
 export const geminiResultsSchema = Type.Object({
 	action: resultsActionSchema,
-	responseId: Type.Optional(Type.String({ description: "Stored responseId." })),
-	query: Type.Optional(Type.String({ description: "Recall query." })),
-	k: Type.Optional(
-		Type.Number({ minimum: 1, maximum: 20, description: "Max hits." }),
-	),
-	minScore: Type.Optional(
-		Type.Number({ minimum: 0, maximum: 1, description: "Min score." }),
-	),
-	since: Type.Optional(Type.String({ description: "After ISO time." })),
-	tool: Type.Optional(
-		Type.Union([
-			Type.String({ description: "One Gemini tool." }),
-			Type.Array(Type.String(), { description: "Gemini tools." }),
-		]),
-	),
-	bypassCache: Type.Optional(Type.Boolean({ description: "No FTS effect." })),
+	responseId: Type.Optional(Type.String()),
+	query: Type.Optional(Type.String()),
+	k: Type.Optional(Type.Number({ minimum: 1, maximum: 20 })),
+	minScore: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
+	since: Type.Optional(Type.String()),
+	tool: Type.Optional(Type.Union([Type.String(), Type.Array(Type.String())])),
+	bypassCache: Type.Optional(Type.Boolean()),
 });
 
 type Params = Static<typeof geminiResultsSchema>;

@@ -22,21 +22,17 @@ const imageModeSchema = Type.Union([
 export const geminiAnalyzeSchema = Type.Object({
 	kind: analyzeKindSchema,
 	paths: Type.Optional(
-		Type.Array(Type.String({ minLength: 1 }), {
-			minItems: 1,
-			maxItems: 5,
-			description: "File paths.",
-		}),
+		Type.Array(Type.String({ minLength: 1 }), { minItems: 1, maxItems: 5 }),
 	),
-	imagePath: Type.Optional(Type.String({ description: "Image path." })),
+	imagePath: Type.Optional(Type.String()),
 	imageDataBase64: Type.Optional(
 		Type.String({ description: "Base64 validation only." }),
 	),
-	mimeType: Type.Optional(Type.String({ description: "MIME type." })),
-	instructions: Type.Optional(Type.String({ description: "Instructions." })),
+	mimeType: Type.Optional(Type.String()),
+	instructions: Type.Optional(Type.String()),
 	mode: Type.Optional(imageModeSchema),
 	cwd: Type.Optional(Type.String({ description: "Base dir; no scanning." })),
-	bypassCache: Type.Optional(Type.Boolean({ description: "Skip cache." })),
+	bypassCache: Type.Optional(Type.Boolean()),
 });
 
 type Params = Static<typeof geminiAnalyzeSchema>;
