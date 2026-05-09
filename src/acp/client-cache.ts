@@ -263,17 +263,25 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 					"LLM token generation",
 					"Streaming first chunk back",
 				];
-				// Cycle through steps with full message (header + active step)
-				// Cycle through active steps (only show current active one)
-				for (let cycle = 0; cycle < 6; cycle++) {
-					for (const step of steps) {
-						onProgress?.("search", `${header}\n\n▶ ${step}...`);
-					}
-				}
-				return await active.session.prompt(sessionId, text, onUpdate, {
+				// Show first step immediately
+				onProgress?.("search", `${header}\n\n▶ ${steps[0]}...`);
+				// Start Gemini prompt in parallel
+				const promptPromise = active.session.prompt(sessionId, text, onUpdate, {
 					signal: promptSignal,
 					returnTextOnAbort: true,
 				});
+				// Cycle through steps while waiting for Gemini (with delays)
+				let stepIndex = 1;
+				const interval = setInterval(() => {
+					const step = steps[stepIndex % steps.length];
+					onProgress?.("search", `${header}\n\n▶ ${step}...`);
+					stepIndex++;
+				}, 600);
+				try {
+					return await promptPromise;
+				} finally {
+					clearInterval(interval);
+				}
 			} finally {
 				entry.busy = false;
 			}
