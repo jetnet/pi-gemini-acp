@@ -17,6 +17,7 @@ MODE="${MODE:-warm}"
 MAX_RESULTS="${MAX_RESULTS:-4}"
 RUNS="${RUNS:-5}"
 EARLY_STOP="${EARLY_STOP:-0}"
+VARIANT="${VARIANT:-current}"
 export PI_GEMINI_ACP_SEARCH_EARLY_STOP="$EARLY_STOP"
 
 # Run benchmark with settings
@@ -24,6 +25,7 @@ bench_json=$(node scripts/bench.mjs \
 	--mode "$MODE" \
 	--runs "$RUNS" \
 	--max-results "$MAX_RESULTS" \
+	--prompt-variant "$VARIANT" \
 	--json 2>/dev/null) || {
 	echo "METRIC totalMs_p50=999999"
 	echo "METRIC promptMs_p50=999999"
@@ -35,7 +37,7 @@ bench_json=$(node scripts/bench.mjs \
 echo "$bench_json" | node --input-type=module -e '
 import { readFileSync } from "node:fs";
 const json = JSON.parse(readFileSync(0, "utf8"));
-const section = json.sections.find(s => s.mode === "'"$MODE"'") || json.sections[0];
+const section = json.sections[0];
 if (!section || !section.summary) {
 	process.stdout.write("METRIC totalMs_p50=999999\n");
 	process.stdout.write("METRIC promptMs_p50=999999\n");
@@ -49,8 +51,6 @@ process.stdout.write("METRIC totalMs_p50=" + (summary?.totalMs?.p50 ?? 999999) +
 process.stdout.write("METRIC promptMs_p50=" + (summary?.promptMs?.p50 ?? 999999) + "\n");
 process.stdout.write("METRIC initMs=" + (summary?.initializeMs?.p50 ?? 0) + "\n");
 process.stdout.write("METRIC sessionMs=" + (summary?.sessionMs?.p50 ?? 0) + "\n");
-// Report variance as additional context
-process.stdout.write("METRIC totalMs_iqr=" + ((summary?.totalMs?.p75 ?? 0) - (summary?.totalMs?.p25 ?? 0)) + "\n");
 const results = section.runs?.map(r => r.results) || [];
 const avgResults = results.length > 0 ? results.reduce((s,v) => s+v, 0) / results.length : 0;
 process.stdout.write("METRIC results=" + Math.round(avgResults) + "\n");
