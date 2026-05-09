@@ -46,10 +46,10 @@ Every configuration with early-stop enabled was **2-3× slower** than disabled.
 
 ### 3. Warm Sequential Architecture (Experiment #13)
 
-| Run | Total   | Init   | Session | Prompt | Note          |
-| --- | ------- | ------ | ------- | ------ | ------------- |
-| 1   | 11,553ms | 1,936ms | 393ms   | 9,224ms | Cold start    |
-| 2-10| 1,767-5,550ms | 0 | 0     | prompt  | **Warm**      |
+| Run  | Total         | Init    | Session | Prompt  | Note       |
+| ---- | ------------- | ------- | ------- | ------- | ---------- |
+| 1    | 11,553ms      | 1,936ms | 393ms   | 9,224ms | Cold start |
+| 2-10 | 1,767-5,550ms | 0       | 0       | prompt  | **Warm**   |
 
 **Result: 4.5× speedup** after warm-up (11.5s → 2.6s)
 
@@ -68,6 +68,7 @@ Every configuration with early-stop enabled was **2-3× slower** than disabled.
 ## Architecture Insights
 
 **Warm Sequential Pattern:**
+
 ```
 Search 1: init (1.9s) + session (0.4s) + prompt (~9s) = ~11s
 Search 2+: prompt only (~2-5s) = ~2-5s
@@ -98,6 +99,6 @@ maxResults: 4
 ✅ Warm vs fresh — warm is critical  
 ✅ Parallel vs sequential — warm sequential wins  
 ✅ Batch sustainability — no degradation across 25+ runs  
-✅ Warm sequential architecture — 4.5× speedup confirmed  
+✅ Warm sequential architecture — 4.5× speedup confirmed
 
 **Production ready.** No further experiments needed.
