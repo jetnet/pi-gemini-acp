@@ -1,6 +1,6 @@
 # Autoresearch: Improve gemini_search Performance
 
-**Status:** ✅ Complete. 12 experiments run. **55-75% sustainable improvement** validated.
+**Status:** ✅ Complete. 14 experiments run. **55-75% sustainable improvement** validated.
 
 ## Objective
 
@@ -9,9 +9,9 @@ Optimize `gemini_search` latency through systematic experiments.
 ## Metrics
 
 - **Primary**: `totalMs_p50` (ms, lower is better)
-- **Secondary**: `promptMs_p50`, `results`, `initMs`, `sessionMs`
+- **Secondary**: `promptMs_p50`, `results`, `initMs`, `sessionMs`, `speedup`, `benefit`
 
-## Complete Experiment Results (12 runs)
+## Complete Experiment Results (14 runs)
 
 | #   | Config                       | Runs | Median   | Results | Decision              |
 | --- | ---------------------------- | ---- | -------- | ------- | --------------------- |
@@ -27,6 +27,8 @@ Optimize `gemini_search` latency through systematic experiments.
 | 10  | Batch warm                   | 10   | 8,652ms  | 4       | ✅ Sustainable        |
 | 11  | Extended validation          | 15   | 14,066ms | 4       | ✅ Variance confirmed |
 | 12  | maxResults=3 retest          | 10   | 16,251ms | 3       | ❌ Discard            |
+| 13  | Warm sequential              | 10   | 2,552ms  | 4       | ✅ **4.5× speedup**   |
+| 14  | Fresh vs Warm                | 3    | 9,745ms  | 4       | ✅ **1.5× benefit**   |
 
 ## Key Findings
 
@@ -42,16 +44,37 @@ Every configuration with early-stop enabled was **2-3× slower** than disabled.
 | **4**  | **8-14s** | **4**   | **Stable, recommended**      |
 | 5      | 20-33s    | 5       | Diminishing returns          |
 
-### 3. Warm Session = 6.6× Faster
+### 3. Warm Sequential Architecture (Experiment #13)
 
-- Cold: 18.4s (1.7s init + 0.4s session + 16s prompt)
-- Warm: 2.8-14s (prompt only)
+| Run | Total   | Init   | Session | Prompt | Note          |
+| --- | ------- | ------ | ------- | ------ | ------------- |
+| 1   | 11,553ms | 1,936ms | 393ms   | 9,224ms | Cold start    |
+| 2-10| 1,767-5,550ms | 0 | 0     | prompt  | **Warm**      |
 
-### 4. Network Variance Dominates
+**Result: 4.5× speedup** after warm-up (11.5s → 2.6s)
+
+### 4. Fresh vs Warm Mode (Experiment #14)
+
+- **Fresh**: 15,008ms (start new process each time)
+- **Warm**: 9,745ms (reuse process, pay init once)
+- **Benefit**: 1.5× faster with warm mode
+
+### 5. Network Variance Dominates
 
 - Best observed: 2.8s
 - Sustainable: 8-14s
 - Always faster than 33s baseline
+
+## Architecture Insights
+
+**Warm Sequential Pattern:**
+```
+Search 1: init (1.9s) + session (0.4s) + prompt (~9s) = ~11s
+Search 2+: prompt only (~2-5s) = ~2-5s
+Search 3+: prompt only (~2-5s) = ~2-5s
+```
+
+**The 15-minute idle TTL** maintains the warm process between user interactions.
 
 ## Final Recommended Configuration
 
@@ -65,6 +88,8 @@ maxResults: 4
 
 **Expected performance:** 8-14s median, 4 quality results (55-75% improvement vs 33s baseline).
 
+**For sequential searches:** First ~11s, subsequent ~2-5s each.
+
 ## Completed
 
 ✅ Early-stop behavior — disabled is 2-3× faster  
@@ -72,6 +97,7 @@ maxResults: 4
 ✅ Prompt variants — "Be concise" + full spec validated  
 ✅ Warm vs fresh — warm is critical  
 ✅ Parallel vs sequential — warm sequential wins  
-✅ Batch sustainability — no degradation across 25+ runs
+✅ Batch sustainability — no degradation across 25+ runs  
+✅ Warm sequential architecture — 4.5× speedup confirmed  
 
 **Production ready.** No further experiments needed.
