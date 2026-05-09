@@ -5,74 +5,58 @@ cd "$(dirname "$0")"
 
 # Quick syntax check: compile target files (fast fail)
 npx tsc -p tsconfig.json --noEmit 2>/dev/null || {
-	echo "METRIC simpleMs=999999"
-	echo "METRIC complexMs=999999"
-	echo "METRIC ratio=1"
+	echo "METRIC firstQueryMs=999999"
+	echo "METRIC repeatedQueryMs=999999"
+	echo "METRIC cacheBenefit=0"
 	echo "[autoresearch] ERROR: TypeScript compilation failed" >&2
 	exit 0
 }
 
-# Test query complexity impact
+# Test cache effectiveness: identical queries should be faster
 MAX_RESULTS="${MAX_RESULTS:-4}"
 EARLY_STOP="${EARLY_STOP:-0}"
 export PI_GEMINI_ACP_SEARCH_EARLY_STOP="$EARLY_STOP"
 
-QUERY_SIMPLE="weather"
-QUERY_COMPLEX="Amsterdam Netherlands current weather temperature conditions forecast humidity wind"
-
-# Run simple query
-simple_file=$(mktemp)
-trap "rm -f $simple_file" EXIT
+# Run with identical query 3 times to test for caching
+result_file=$(mktemp)
+trap "rm -f $result_file" EXIT
 
 node scripts/bench.mjs \
 	--mode warm \
-	--runs 3 \
+	--runs 5 \
 	--max-results "$MAX_RESULTS" \
-	--query "$QUERY_SIMPLE" \
-	--json > "$simple_file" 2>/dev/null || {
-	echo "METRIC simpleMs=999999"
-	echo "METRIC complexMs=999999"
-	echo "METRIC ratio=1"
+	--json > "$result_file" 2>/dev/null || {
+	echo "METRIC firstQueryMs=999999"
+	echo "METRIC repeatedQueryMs=999999"
+	echo "METRIC cacheBenefit=0"
 	exit 0
 }
 
-# Run complex query
-complex_file=$(mktemp)
-trap "rm -f $simple_file $complex_file" EXIT
-
-node scripts/bench.mjs \
-	--mode warm \
-	--runs 3 \
-	--max-results "$MAX_RESULTS" \
-	--query "$QUERY_COMPLEX" \
-	--json > "$complex_file" 2>/dev/null || {
-	echo "METRIC simpleMs=999999"
-	echo "METRIC complexMs=999999"
-	echo "METRIC ratio=1"
-	exit 0
-}
-
-# Parse and compare
+# Parse: compare run 1 (first) vs median of runs 2-5 (repeated)
 node --input-type=module -e '
 import { readFileSync } from "node:fs";
-const simple = JSON.parse(readFileSync(process.argv[1], "utf8"));
-const complex = JSON.parse(readFileSync(process.argv[2], "utf8"));
+const json = JSON.parse(readFileSync(process.argv[1], "utf8"));
+const section = json.sections.find(s => s.mode === "warm");
 
-const simpleSection = simple.sections.find(s => s.mode === "warm");
-const complexSection = complex.sections.find(s => s.mode === "warm");
-
-if (!simpleSection?.summary || !complexSection?.summary) {
-	process.stdout.write("METRIC simpleMs=999999\n");
-	process.stdout.write("METRIC complexMs=999999\n");
-	process.stdout.write("METRIC ratio=1\n");
+if (!section?.runs || section.runs.length < 3) {
+	process.stdout.write("METRIC firstQueryMs=999999\n");
+	process.stdout.write("METRIC repeatedQueryMs=999999\n");
+	process.stdout.write("METRIC cacheBenefit=0\n");
 	process.exit(0);
 }
 
-const simpleMs = simpleSection.summary.totalMs?.p50 || 999999;
-const complexMs = complexSection.summary.totalMs?.p50 || 999999;
-const ratio = complexMs / simpleMs;
+// First run vs repeated runs (same query, warm process)
+const first = section.runs[0].totalMs;
+const subsequent = section.runs.slice(1).map(r => r.totalMs);
+subsequent.sort((a, b) => a - b);
+const repeated = subsequent[Math.floor(subsequent.length / 2)];
 
-process.stdout.write("METRIC simpleMs=" + Math.round(simpleMs) + "\n");
-process.stdout.write("METRIC complexMs=" + Math.round(complexMs) + "\n");
-process.stdout.write("METRIC ratio=" + ratio.toFixed(2) + "\n");
-' "$simple_file" "$complex_file"
+const benefit = first / repeated;
+
+process.stdout.write("METRIC firstQueryMs=" + Math.round(first) + "\n");
+process.stdout.write("METRIC repeatedQueryMs=" + Math.round(repeated) + "\n");
+process.stdout.write("METRIC cacheBenefit=" + benefit.toFixed(2) + "\n");
+
+// Also output all times for variance analysis
+process.stdout.write("METRIC allTimes=" + section.runs.map(r => Math.round(r.totalMs)).join(",") + "\n");
+' "$result_file"
