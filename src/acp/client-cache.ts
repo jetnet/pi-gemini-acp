@@ -257,14 +257,22 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 			const entry = this.claimSearchSession(active, cwd);
 			try {
 				const sessionId = await entry.sessionId;
-				onProgress?.(
-					"search",
-					`Executing web search: "${query}" with ${maxResults} max results via ${model}.`,
-				);
-				// Emit processing steps sequentially (Pi UI will animate them)
-				onProgress?.("search", `• Web search grounding...`);
-				onProgress?.("search", `• LLM token generation...`);
-				onProgress?.("search", `• Streaming first chunk back...`);
+				const header = `Executing web search: "${query}" with ${maxResults} max results via ${model}.`;
+				const steps = [
+					"Web search grounding",
+					"LLM token generation",
+					"Streaming first chunk back",
+				];
+				// Cycle through steps 3 times to create animation effect
+				for (let cycle = 0; cycle < 3; cycle++) {
+					for (let i = 0; i < steps.length; i++) {
+						const display = steps.map((step, idx) => {
+							if (idx === i) return `▶ ${step}...`;
+							return `  ${step}`;
+						}).join("\n");
+						onProgress?.("search", `${header}\n\n${display}`);
+					}
+				}
 				return await active.session.prompt(sessionId, text, onUpdate, {
 					signal: promptSignal,
 					returnTextOnAbort: true,
