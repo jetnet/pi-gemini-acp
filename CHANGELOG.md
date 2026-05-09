@@ -6,6 +6,8 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-05-09
+
 ### Added
 
 - Added Gemini API key fallback: when `GEMINI_API_KEY` is set, `gemini_search`, `gemini_research`, and `gemini_ask` automatically fall back to the Gemini REST API if local ACP is unavailable. `gemini_status` reports whether the fallback is configured.
@@ -185,7 +187,9 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 - Added CI/publish workflows, lint/audit tooling, and packaged Gemini skill setup (`5bb606b`).
 - Added early Gemini model/login/permission commands (`e181cf3`).
 
-[Unreleased]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.9.1...v0.10.0
+[0.9.1]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.7.0...v0.7.1
