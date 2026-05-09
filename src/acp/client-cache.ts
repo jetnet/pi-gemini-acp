@@ -2,6 +2,7 @@ import type { SearchResultItem } from "../types.js";
 import type {
 	GeminiAcpClient,
 	GeminiAcpCommandSettings,
+	GeminiAcpPromptChunk,
 	GeminiAcpPromptRequest,
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
@@ -258,36 +259,32 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 			try {
 				const sessionId = await entry.sessionId;
 				const header = `Executing web search: "${query}" with ${maxResults} max results via ${model}.`;
-				const steps = [
-					"Web search grounding",
-					"LLM token generation",
-					"Streaming first chunk back",
-				];
-				// Show first step immediately
-				onProgress?.("search", `${header}\n\n● ${steps[0]}...`);
-				// Start Gemini prompt in parallel
-				const promptPromise = active.session.prompt(sessionId, text, onUpdate, {
+				
+				// Show initial state
+				onProgress?.("search", `${header}\n\n● Executing web search...`);
+				
+				// Track actual Gemini progress
+				let receivedFirstToken = false;
+				const wrappedOnUpdate = onUpdate ? async (chunk: GeminiAcpPromptChunk) => {
+					// First token received - Gemini is generating
+					if (!receivedFirstToken) {
+						receivedFirstToken = true;
+						onProgress?.("search", `${header}\n\n● LLM generating tokens...`);
+					}
+					// Forward to original handler
+					await onUpdate(chunk);
+				} : undefined;
+				
+				// Start Gemini prompt
+				const promptPromise = active.session.prompt(sessionId, text, wrappedOnUpdate, {
 					signal: promptSignal,
 					returnTextOnAbort: true,
 				});
-				// Cycle through steps while waiting for Gemini (max 15 cycles = ~9s)
-				let stepIndex = 1;
-				let cycleCount = 0;
-				const maxCycles = 15;
-				const interval = setInterval(() => {
-					if (cycleCount >= maxCycles) {
-						clearInterval(interval);
-						return;
-					}
-					const step = steps[stepIndex % steps.length];
-					onProgress?.("search", `${header}\n\n● ${step}...`);
-					stepIndex++;
-					cycleCount++;
-				}, 600);
+				
 				try {
 					return await promptPromise;
 				} finally {
-					clearInterval(interval);
+					// No interval to clear - using real events
 				}
 			} finally {
 				entry.busy = false;
