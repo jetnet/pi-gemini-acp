@@ -270,12 +270,19 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 					signal: promptSignal,
 					returnTextOnAbort: true,
 				});
-				// Cycle through steps while waiting for Gemini (with delays)
+				// Cycle through steps while waiting for Gemini (max 15 cycles = ~9s)
 				let stepIndex = 1;
+				let cycleCount = 0;
+				const maxCycles = 15;
 				const interval = setInterval(() => {
+					if (cycleCount >= maxCycles) {
+						clearInterval(interval);
+						return;
+					}
 					const step = steps[stepIndex % steps.length];
 					onProgress?.("search", `${header}\n\n● ${step}...`);
 					stepIndex++;
+					cycleCount++;
 				}, 600);
 				try {
 					return await promptPromise;
