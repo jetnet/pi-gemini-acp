@@ -33,25 +33,46 @@ bench_json=$(node scripts/bench.mjs \
 	exit 0
 }
 
-# Parse metrics
+# Parse metrics based on mode
 echo "$bench_json" | node --input-type=module -e '
 import { readFileSync } from "node:fs";
+const MODE = "'"$MODE"'";
 const json = JSON.parse(readFileSync(0, "utf8"));
 const section = json.sections[0];
 if (!section || !section.summary) {
 	process.stdout.write("METRIC totalMs_p50=999999\n");
 	process.stdout.write("METRIC promptMs_p50=999999\n");
-	process.stdout.write("METRIC initMs=999999\n");
-	process.stdout.write("METRIC sessionMs=999999\n");
 	process.stdout.write("METRIC results=0\n");
 	process.exit(0);
 }
+
 const summary = section.summary;
-process.stdout.write("METRIC totalMs_p50=" + (summary?.totalMs?.p50 ?? 999999) + "\n");
-process.stdout.write("METRIC promptMs_p50=" + (summary?.promptMs?.p50 ?? 999999) + "\n");
-process.stdout.write("METRIC initMs=" + (summary?.initializeMs?.p50 ?? 0) + "\n");
-process.stdout.write("METRIC sessionMs=" + (summary?.sessionMs?.p50 ?? 0) + "\n");
-const results = section.runs?.map(r => r.results) || [];
-const avgResults = results.length > 0 ? results.reduce((s,v) => s+v, 0) / results.length : 0;
-process.stdout.write("METRIC results=" + Math.round(avgResults) + "\n");
+
+// For parallel mode, use wallClockMs; otherwise use totalMs
+if (MODE === "parallel") {
+	const wallClockTimes = section.runs?.map(r => r.wallClockMs) || [];
+	wallClockTimes.sort((a, b) => a - b);
+	const p50 = wallClockTimes.length > 0 ? wallClockTimes[Math.floor(wallClockTimes.length / 2)] : 999999;
+	process.stdout.write("METRIC totalMs_p50=" + p50 + "\n");
+	process.stdout.write("METRIC promptMs_p50=" + (summary?.promptMs?.p50 ?? 999999) + "\n");
+	// Average results across all queries in all runs
+	let totalResults = 0;
+	let queryCount = 0;
+	for (const run of section.runs || []) {
+		for (const q of run.queries || []) {
+			totalResults += q.results || 0;
+			queryCount++;
+		}
+	}
+	const avgResults = queryCount > 0 ? totalResults / queryCount : 0;
+	process.stdout.write("METRIC results=" + Math.round(avgResults) + "\n");
+} else {
+	process.stdout.write("METRIC totalMs_p50=" + (summary?.totalMs?.p50 ?? 999999) + "\n");
+	process.stdout.write("METRIC promptMs_p50=" + (summary?.promptMs?.p50 ?? 999999) + "\n");
+	process.stdout.write("METRIC initMs=" + (summary?.initializeMs?.p50 ?? 0) + "\n");
+	process.stdout.write("METRIC sessionMs=" + (summary?.sessionMs?.p50 ?? 0) + "\n");
+	const results = section.runs?.map(r => r.results) || [];
+	const avgResults = results.length > 0 ? results.reduce((s,v) => s+v, 0) / results.length : 0;
+	process.stdout.write("METRIC results=" + Math.round(avgResults) + "\n");
+}
 '

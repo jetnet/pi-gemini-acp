@@ -3,7 +3,9 @@
 **Status:** Complete. 8 experiments run, **91% improvement** achieved from baseline.
 
 ## Objective
+
 Optimize `gemini_search` latency through systematic experiments. The search involves network calls to Gemini ACP, so we focus on:
+
 1. **Prompt efficiency** - already optimized with "Be concise" prefix
 2. **maxResults tuning** - balance between result count and latency
 3. **Early-stop optimization** - JSON streaming, abort after complete array
@@ -11,13 +13,16 @@ Optimize `gemini_search` latency through systematic experiments. The search invo
 5. **Idle TTL tuning** - balance memory vs process restart cost
 
 ## Metrics
+
 - **Primary**: `totalMs_p50` (ms, lower is better) — median total search latency
 - **Secondary**: `promptMs_p50`, `results`, `initMs`, `sessionMs`
 
 ## How to Run
+
 `./autoresearch.sh` — outputs `METRIC name=value` lines.
 
 Configure via environment variables:
+
 - `MODE` - warm (default) or fresh
 - `MAX_RESULTS` - 3, 4, or 5 (default: 4)
 - `EARLY_STOP` - 0 or 1 (default: 0)
@@ -25,6 +30,7 @@ Configure via environment variables:
 - `RUNS` - number of benchmark runs (default: 5)
 
 ## Files in Scope
+
 - `src/acp/search-prompt.ts` — search prompt builder (already optimized)
 - `src/acp/search-early-stop.ts` — JSON streaming/abort logic
 - `src/acp/client-cache.ts` — warm session cache, idle TTL
@@ -32,12 +38,14 @@ Configure via environment variables:
 - `scripts/bench.mjs` — existing benchmark harness
 
 ## Off Limits
+
 - Do NOT change core search orchestration (run.ts)
 - Do NOT change tool schemas or public APIs
 - Do NOT add dependencies
 - Do NOT break existing tests
 
 ## Constraints
+
 - Tests must pass (`npm test`)
 - TypeScript must compile (`npm run typecheck`)
 - Changes must work in warm mode (most common)
@@ -45,16 +53,16 @@ Configure via environment variables:
 
 ## Complete Experiment Results (8 runs, 2026-05-09)
 
-| Config | Latency | Results | vs Baseline | Decision |
-|--------|---------|---------|-------------|----------|
-| **Baseline** (5, early-stop) | 33,156ms | 5 | — | — |
-| Disable early-stop (5) | 20,192ms | 4 | **-39%** | ✅ Keep |
-| **maxResults=4, early-stop=0** | **11,560ms** | 4 | **-65%** | ✅ **Recommended** |
-| maxResults=3, early-stop=0 | 7,015ms | 3 | -79% | Option |
-| maxResults=4, early-stop=1 | 26,108ms | 4 | -21% | ❌ Discard |
-| **Validation** (4, early-stop=0, 5 runs) | **2,812ms** | 4 | **-92%** | ✅ **Best** |
-| **Cold-start** (fresh, 4, early-stop=0) | 18,441ms | 4 | -44% | Baseline |
-| short-json variant (no "Be concise") | 2,657ms | 2 | -92% | ❌ Discard |
+| Config                                   | Latency      | Results | vs Baseline | Decision           |
+| ---------------------------------------- | ------------ | ------- | ----------- | ------------------ |
+| **Baseline** (5, early-stop)             | 33,156ms     | 5       | —           | —                  |
+| Disable early-stop (5)                   | 20,192ms     | 4       | **-39%**    | ✅ Keep            |
+| **maxResults=4, early-stop=0**           | **11,560ms** | 4       | **-65%**    | ✅ **Recommended** |
+| maxResults=3, early-stop=0               | 7,015ms      | 3       | -79%        | Option             |
+| maxResults=4, early-stop=1               | 26,108ms     | 4       | -21%        | ❌ Discard         |
+| **Validation** (4, early-stop=0, 5 runs) | **2,812ms**  | 4       | **-92%**    | ✅ **Best**        |
+| **Cold-start** (fresh, 4, early-stop=0)  | 18,441ms     | 4       | -44%        | Baseline           |
+| short-json variant (no "Be concise")     | 2,657ms      | 2       | -92%        | ❌ Discard         |
 
 ### Key Findings
 
@@ -98,8 +106,9 @@ export PI_GEMINI_ACP_SEARCH_EARLY_STOP=0
 ## Completed
 
 All major hypotheses tested. The optimization path is clear:
+
 - ✅ Early-stop disabled
-- ✅ maxResults=4  
+- ✅ maxResults=4
 - ✅ "Be concise" prompt (already in baseline)
 - ✅ Warm session established (already implemented)
 
