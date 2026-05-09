@@ -12,12 +12,17 @@ npx tsc -p tsconfig.json --noEmit 2>/dev/null || {
 	exit 0
 }
 
-# Run benchmark with warm mode, default settings
+# Configuration via env vars
+MODE="${MODE:-warm}"
+MAX_RESULTS="${MAX_RESULTS:-5}"
+RUNS="${RUNS:-3}"
+
+# Run benchmark with settings
 # Use --json for machine-parseable output
 bench_json=$(node scripts/bench.mjs \
-	--mode warm \
-	--runs 3 \
-	--max-results 5 \
+	--mode "$MODE" \
+	--runs "$RUNS" \
+	--max-results "$MAX_RESULTS" \
 	--json 2>/dev/null) || {
 	echo "METRIC totalMs_p50=999999"
 	echo "METRIC promptMs_p50=999999"
@@ -29,8 +34,8 @@ bench_json=$(node scripts/bench.mjs \
 echo "$bench_json" | node --input-type=module -e '
 import { readFileSync } from "node:fs";
 const json = JSON.parse(readFileSync(0, "utf8"));
-const warmSection = json.sections.find(s => s.mode === "warm");
-if (!warmSection || !warmSection.summary) {
+const section = json.sections.find(s => s.mode === "'"$MODE"'") || json.sections[0];
+if (!section || !section.summary) {
 	process.stdout.write("METRIC totalMs_p50=999999\n");
 	process.stdout.write("METRIC promptMs_p50=999999\n");
 	process.stdout.write("METRIC initMs=999999\n");
@@ -38,13 +43,13 @@ if (!warmSection || !warmSection.summary) {
 	process.stdout.write("METRIC results=0\n");
 	process.exit(0);
 }
-const summary = warmSection.summary;
+const summary = section.summary;
 process.stdout.write("METRIC totalMs_p50=" + (summary?.totalMs?.p50 ?? 999999) + "\n");
 process.stdout.write("METRIC promptMs_p50=" + (summary?.promptMs?.p50 ?? 999999) + "\n");
 process.stdout.write("METRIC initMs=" + (summary?.initializeMs?.p50 ?? 0) + "\n");
 process.stdout.write("METRIC sessionMs=" + (summary?.sessionMs?.p50 ?? 0) + "\n");
 // Calculate average results from runs
-const results = warmSection.runs?.map(r => r.results) || [];
+const results = section.runs?.map(r => r.results) || [];
 const avgResults = results.length > 0 ? results.reduce((s,v) => s+v, 0) / results.length : 0;
 process.stdout.write("METRIC results=" + Math.round(avgResults) + "\n");
 '
