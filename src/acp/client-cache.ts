@@ -263,14 +263,12 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 					"LLM token generation",
 					"Streaming first chunk back",
 				];
-				// Cycle through steps 3 times to create animation effect
-				for (let cycle = 0; cycle < 3; cycle++) {
-					for (let i = 0; i < steps.length; i++) {
-						const display = steps.map((step, idx) => {
-							if (idx === i) return `▶ ${step}...`;
-							return `  ${step}`;
-						}).join("\n");
-						onProgress?.("search", `${header}\n\n${display}`);
+				// Emit header once
+				onProgress?.("search", header);
+				// Cycle through active steps (only show current active one)
+				for (let cycle = 0; cycle < 4; cycle++) {
+					for (const step of steps) {
+						onProgress?.("search", `▶ ${step}...`);
 					}
 				}
 				return await active.session.prompt(sessionId, text, onUpdate, {
