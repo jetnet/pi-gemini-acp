@@ -31,14 +31,21 @@ export function createGeminiAcpSearchEarlyStop(
 	}
 	const controller = new AbortController();
 	let parsedPayload: unknown;
+	let scanStart = 0;
 	let stopped = false;
 	return {
 		signal: controller.signal,
 		onUpdate: async (chunk) => {
 			await onUpdate?.(chunk);
 			if (stopped) return;
-			const detected = completeJsonArrayPayload(chunk.accumulatedText);
-			if (!detected.found) return;
+			const detected = completeJsonArrayPayload(
+				chunk.accumulatedText,
+				scanStart,
+			);
+			if (!detected.found) {
+				scanStart = detected.retryFrom;
+				return;
+			}
 			parsedPayload = detected.payload;
 			stopped = true;
 			controller.abort();
@@ -48,24 +55,34 @@ export function createGeminiAcpSearchEarlyStop(
 	};
 }
 
+export type GeminiAcpSearchJsonScanResult =
+	| { found: true; payload: unknown; retryFrom: number }
+	| { found: false; retryFrom: number };
+
 /** Finds and parses the first complete JSON array in streamed assistant text. */
 export function completeJsonArrayPayload(
 	text: string,
-): { found: true; payload: unknown } | { found: false } {
+	startAt = 0,
+): GeminiAcpSearchJsonScanResult {
+	const initialStart = Math.max(0, Math.min(startAt, text.length));
 	for (
-		let start = text.indexOf("[");
+		let start = text.indexOf("[", initialStart);
 		start >= 0;
 		start = text.indexOf("[", start + 1)
 	) {
 		const end = completeJsonArrayEnd(text, start);
-		if (end === undefined) return { found: false };
+		if (end === undefined) return { found: false, retryFrom: start };
 		try {
-			return { found: true, payload: JSON.parse(text.slice(start, end + 1)) };
+			return {
+				found: true,
+				payload: JSON.parse(text.slice(start, end + 1)),
+				retryFrom: end + 1,
+			};
 		} catch {
 			/* A markdown/link-style bracket can precede the real JSON array. */
 		}
 	}
-	return { found: false };
+	return { found: false, retryFrom: text.length };
 }
 
 function completeJsonArrayEnd(text: string, start: number): number | undefined {

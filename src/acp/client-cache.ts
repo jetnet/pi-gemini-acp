@@ -30,7 +30,12 @@ export type GeminiAcpClientCachePurpose = "search" | "prompt";
 
 interface ActiveProcess {
 	session: GeminiAcpProcessSession;
-	searchSessionIds: Map<string, string>;
+	searchSessions: Map<string, SearchSessionEntry[]>;
+}
+
+interface SearchSessionEntry {
+	sessionId: Promise<string>;
+	busy: boolean;
 }
 
 interface CachedClientEntry {
@@ -159,6 +164,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 	private active?: Promise<ActiveProcess>;
 	private queue: Promise<unknown> = Promise.resolve();
 	private idleTimer?: ReturnType<typeof setTimeout>;
+	private activeOperations = 0;
 	private removedFromCache = false;
 
 	constructor(
@@ -173,21 +179,17 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<SearchResultItem[]> {
-		return this.enqueue(async () => {
-			const earlyStop = createGeminiAcpSearchEarlyStop(onUpdate);
-			const text = await this.promptOnSearchSession(
-				searchSessionCwd(request.cwd),
-				searchPrompt(request),
-				signal,
-				earlyStop.onUpdate,
-				earlyStop.signal,
-			);
-			const results = normalizeGeminiAcpSearchResults(
-				earlyStop.parsedPayload() ?? parseSearchPayload(text),
-			);
-			if (earlyStop.stopped()) await this.close();
-			return results;
-		});
+		const earlyStop = createGeminiAcpSearchEarlyStop(onUpdate);
+		const text = await this.promptOnSearchSession(
+			searchSessionCwd(request.cwd),
+			searchPrompt(request),
+			signal,
+			earlyStop.onUpdate,
+			earlyStop.signal,
+		);
+		return normalizeGeminiAcpSearchResults(
+			earlyStop.parsedPayload() ?? parseSearchPayload(text),
+		);
 	}
 
 	async prompt(
@@ -216,9 +218,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 	async warmSearchSession(signal?: AbortSignal): Promise<void> {
 		await this.enqueue(() =>
 			this.withWarmProcess(signal, async (active) => {
-				const cwd = searchSessionCwd(undefined);
-				if (active.searchSessionIds.has(cwd)) return;
-				active.searchSessionIds.set(cwd, await active.session.newSession(cwd));
+				await this.ensureIdleSearchSession(active, searchSessionCwd(undefined));
 			}),
 		);
 	}
@@ -231,16 +231,64 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		promptSignal?: AbortSignal,
 	): Promise<string> {
 		return this.withWarmProcess(signal, async (active) => {
-			let sessionId = active.searchSessionIds.get(cwd);
-			if (!sessionId) {
-				sessionId = await active.session.newSession(cwd);
-				active.searchSessionIds.set(cwd, sessionId);
+			const entry = this.claimSearchSession(active, cwd);
+			try {
+				const sessionId = await entry.sessionId;
+				return await active.session.prompt(sessionId, text, onUpdate, {
+					signal: promptSignal,
+					returnTextOnAbort: true,
+				});
+			} finally {
+				entry.busy = false;
 			}
-			return active.session.prompt(sessionId, text, onUpdate, {
-				signal: promptSignal,
-				returnTextOnAbort: true,
-			});
 		});
+	}
+
+	private async ensureIdleSearchSession(
+		active: ActiveProcess,
+		cwd: string,
+	): Promise<void> {
+		const entries = active.searchSessions.get(cwd) ?? [];
+		if (entries.length > 0) return;
+		const entry = this.createSearchSession(active, cwd, false);
+		await entry.sessionId;
+	}
+
+	private claimSearchSession(
+		active: ActiveProcess,
+		cwd: string,
+	): SearchSessionEntry {
+		const entries = active.searchSessions.get(cwd) ?? [];
+		const idle = entries.find((entry) => !entry.busy);
+		if (idle) {
+			idle.busy = true;
+			return idle;
+		}
+		return this.createSearchSession(active, cwd, true);
+	}
+
+	private createSearchSession(
+		active: ActiveProcess,
+		cwd: string,
+		busy: boolean,
+	): SearchSessionEntry {
+		const entries = active.searchSessions.get(cwd) ?? [];
+		const entry: SearchSessionEntry = {
+			busy,
+			sessionId: active.session.newSession(cwd).catch((error) => {
+				const current = active.searchSessions.get(cwd);
+				if (current?.includes(entry)) {
+					active.searchSessions.set(
+						cwd,
+						current.filter((candidate) => candidate !== entry),
+					);
+				}
+				throw error;
+			}),
+		};
+		entries.push(entry);
+		active.searchSessions.set(cwd, entries);
+		return entry;
 	}
 
 	private async promptOnFreshSession(
@@ -264,6 +312,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 			throw abortError();
 		}
 		this.clearIdleTimer();
+		this.activeOperations += 1;
 		const abort = () => {
 			void this.close();
 		};
@@ -280,7 +329,10 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 			throw error;
 		} finally {
 			signal?.removeEventListener("abort", abort);
-			if (keepWarm && !signal?.aborted) this.scheduleIdleCleanup();
+			this.activeOperations = Math.max(0, this.activeOperations - 1);
+			if (keepWarm && !signal?.aborted && this.activeOperations === 0) {
+				this.scheduleIdleCleanup();
+			}
 		}
 	}
 
@@ -296,7 +348,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		const session = await this.sessionFactory(this.settings, signal);
 		try {
 			await session.initialize();
-			return { session, searchSessionIds: new Map() };
+			return { session, searchSessions: new Map() };
 		} catch (error) {
 			await session.close();
 			throw error;

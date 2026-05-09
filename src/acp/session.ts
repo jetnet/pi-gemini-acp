@@ -30,6 +30,11 @@ export interface GeminiAcpPromptOptions {
 
 const MAX_CLIENT_READ_BYTES = 1_000_000;
 
+interface PromptState {
+	accumulatedText: string;
+	onUpdate?: GeminiAcpPromptUpdateHandler;
+}
+
 /** Normalized subset of ACP initialize capabilities used for feature preflight. */
 export interface GeminiAcpInitializeResult {
 	promptCapabilities: {
@@ -61,8 +66,7 @@ export type GeminiAcpProcessSessionFactory = (
 /** JSON-RPC-over-stdio session for one Gemini ACP subprocess. */
 export class AcpProcessSession implements GeminiAcpProcessSession {
 	private readonly rpc: JsonRpcStdioClient;
-	private readonly agentText: string[] = [];
-	private promptUpdateHandler?: GeminiAcpPromptUpdateHandler;
+	private readonly promptStates = new Map<string, PromptState>();
 	private sessionCwd = process.cwd();
 	private readonly allowedReadPaths: Set<string>;
 
@@ -143,8 +147,8 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 		options: GeminiAcpPromptOptions = {},
 	): Promise<string> {
-		this.agentText.length = 0;
-		this.promptUpdateHandler = onUpdate;
+		const state: PromptState = { accumulatedText: "", onUpdate };
+		this.promptStates.set(sessionId, state);
 		try {
 			await this.rpc.request(
 				"session/prompt",
@@ -161,9 +165,9 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 					abortMode: options.returnTextOnAbort ? "resolve" : "reject",
 				},
 			);
-			return this.agentText.join("").trim();
+			return state.accumulatedText.trim();
 		} finally {
-			this.promptUpdateHandler = undefined;
+			this.promptStates.delete(sessionId);
 		}
 	}
 
@@ -247,23 +251,36 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	}
 
 	private collectUpdate(params: unknown): void {
-		const update = asRecord(asRecord(params)?.update);
+		const record = asRecord(params);
+		const update = asRecord(record?.update);
 		if (update?.sessionUpdate !== "agent_message_chunk") return;
 		const content = asRecord(update.content);
-		if (content?.type === "text" && typeof content.text === "string") {
-			this.agentText.push(content.text);
-			this.emitPromptUpdate(content.text);
-		}
+		if (content?.type !== "text" || typeof content.text !== "string") return;
+		const state = this.promptStateForUpdate(record, update);
+		if (!state) return;
+		state.accumulatedText += content.text;
+		this.emitPromptUpdate(state, content.text);
 	}
 
-	private emitPromptUpdate(text: string): void {
-		const onUpdate = this.promptUpdateHandler;
+	private promptStateForUpdate(
+		record: Record<string, unknown> | undefined,
+		update: Record<string, unknown>,
+	): PromptState | undefined {
+		const sessionId =
+			stringValue(record?.sessionId) ?? stringValue(update.sessionId);
+		if (sessionId) return this.promptStates.get(sessionId);
+		if (this.promptStates.size !== 1) return undefined;
+		return this.promptStates.values().next().value;
+	}
+
+	private emitPromptUpdate(state: PromptState, text: string): void {
+		const onUpdate = state.onUpdate;
 		if (!onUpdate) return;
 		void Promise.resolve(
 			onUpdate({
 				type: "chunk",
 				text,
-				accumulatedText: this.agentText.join(""),
+				accumulatedText: state.accumulatedText,
 			}),
 		).catch(() => {
 			/* Streaming callbacks must not destabilize the ACP session. */

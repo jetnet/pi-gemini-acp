@@ -136,6 +136,7 @@ export function normalizeGeminiAcpSearchResults(
 	metadata: SearchProviderMetadata = geminiMetadata(),
 ): SearchResultItem[] {
 	const candidates = Array.isArray(raw) ? raw : recordsFromObject(raw);
+	const normalizedUrls = new Map<string, string>();
 	return candidates.flatMap((entry, index) => {
 		const record = asRecord(entry);
 		const url = record
@@ -145,7 +146,7 @@ export function normalizeGeminiAcpSearchResults(
 			: undefined;
 		if (!record || !url) return [];
 		try {
-			const normalizedUrl = normalizeUrl(url);
+			const normalizedUrl = normalizedSearchUrl(url, normalizedUrls);
 			return [
 				{
 					title: stringValue(record.title) ?? normalizedUrl,
@@ -163,6 +164,14 @@ export function normalizeGeminiAcpSearchResults(
 			return [];
 		}
 	});
+}
+
+function normalizedSearchUrl(url: string, cache: Map<string, string>): string {
+	const cached = cache.get(url);
+	if (cached) return cached;
+	const normalized = normalizeUrl(url);
+	cache.set(url, normalized);
+	return normalized;
 }
 
 /** Extracts JSON search payloads from raw assistant text. */

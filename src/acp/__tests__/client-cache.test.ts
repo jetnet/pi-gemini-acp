@@ -290,7 +290,7 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
-	it("serializes prompt turns on a warm session", async () => {
+	it("allows parallel search turns on one warm process", async () => {
 		const factory = new FakeSessionFactory({ delayedPrompt: true });
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const client = cache.get(settings("gemini"));
@@ -299,7 +299,9 @@ describe("GeminiAcpClientCache", () => {
 		const second = client.search({ query: "two", maxResults: 5 });
 		await Promise.all([first, second]);
 
-		expect(factory.sessions[0]?.maxConcurrentPrompts).toBe(1);
+		expect(factory.sessions).toHaveLength(1);
+		expect(factory.sessions[0]?.newSessionCalls).toBe(2);
+		expect(factory.sessions[0]?.maxConcurrentPrompts).toBe(2);
 		await cache.close();
 	});
 });

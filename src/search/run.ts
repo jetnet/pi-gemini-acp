@@ -4,27 +4,26 @@ import type {
 	GeminiAcpCommandSettings,
 	GeminiAcpPromptChunk,
 } from "../acp/client.js";
-import {
-	geminiAcpClientCacheKey,
-	getCachedGeminiAcpClient,
-	onGeminiAcpClientCacheEntryRemoved,
-} from "../acp/client-cache.js";
+import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
 import {
 	configFromEnv,
 	loadConfig,
 	withDefaultGeminiAcpConfig,
 } from "../config/settings.js";
-import {
-	type GeminiAcpAuthProbe,
-	preflightGeminiAcpProvider,
-	type StatusCommandChecker,
+import type {
+	GeminiAcpAuthProbe,
+	StatusCommandChecker,
 } from "../config/status.js";
 import { isAbortError, providerError } from "../prompt/provider-result.js";
 import {
 	sourceTextForLexicalRecall,
 	upsertLexicalRecallEntry,
 } from "../recall/lexical-recall.js";
+import {
+	invalidateSearchPreflight,
+	preflightSearchProvider,
+} from "./preflight-cache.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
 import { storeResult } from "../storage/results.js";
 import type {
@@ -34,6 +33,11 @@ import type {
 	StructuredError,
 } from "../types.js";
 import { normalizeUrl } from "../url/normalize.js";
+
+export {
+	__resetGeminiSearchPreflightCache,
+	primeSuccessfulGeminiSearchPreflight,
+} from "./preflight-cache.js";
 
 /** Checks whether an ACP command is available before provider search. */
 export type CommandChecker = StatusCommandChecker;
@@ -97,24 +101,8 @@ export interface SearchRunResult {
 	error?: StructuredError;
 }
 
-interface PreflightCacheEntry {
-	clientCacheKey: string;
-	result: StructuredError | undefined;
-}
-
 const SEARCH_TERM_SPLIT_RE = /\s+/u;
 const SEARCH_HAS_WHITESPACE_RE = /\s/u;
-
-const searchPreflightCache = new Map<string, PreflightCacheEntry>();
-
-onGeminiAcpClientCacheEntryRemoved((clientCacheKey) => {
-	invalidateSearchPreflightForClientCacheKey(clientCacheKey);
-});
-
-/** Resets process-local Gemini search preflight state for deterministic tests. */
-export function __resetGeminiSearchPreflightCache(): void {
-	searchPreflightCache.clear();
-}
 
 /** Runs local document search or preflighted Gemini ACP grounded search. */
 export async function runSearch(
@@ -237,71 +225,6 @@ export async function runSearch(
 				{ cause },
 			),
 		};
-	}
-}
-
-/** Primes the Gemini search preflight cache only after a successful preflight. */
-export async function primeSuccessfulGeminiSearchPreflight(
-	settings: GeminiAcpProviderSettings | undefined,
-	commandSettings: GeminiAcpCommandSettings,
-	options: Parameters<typeof preflightGeminiAcpProvider>[1],
-): Promise<StructuredError | undefined> {
-	const key = searchPreflightCacheKey(commandSettings, true);
-	const cached = searchPreflightCache.get(key);
-	if (cached) return cached.result;
-	const result = await preflightGeminiAcpProvider(settings, options);
-	if (!result) {
-		searchPreflightCache.set(key, {
-			clientCacheKey: geminiAcpClientCacheKey(commandSettings, "search"),
-			result,
-		});
-	}
-	return result;
-}
-
-async function preflightSearchProvider(
-	settings: GeminiAcpProviderSettings | undefined,
-	commandSettings: GeminiAcpCommandSettings,
-	options: Parameters<typeof preflightGeminiAcpProvider>[1],
-	useCache: boolean,
-): Promise<StructuredError | undefined> {
-	if (!useCache) return await preflightGeminiAcpProvider(settings, options);
-	const key = searchPreflightCacheKey(commandSettings, true);
-	const cached = searchPreflightCache.get(key);
-	if (cached) return cached.result;
-	const result = await preflightGeminiAcpProvider(settings, options);
-	searchPreflightCache.set(key, {
-		clientCacheKey: geminiAcpClientCacheKey(commandSettings, "search"),
-		result,
-	});
-	return result;
-}
-
-function searchPreflightCacheKey(
-	settings: GeminiAcpCommandSettings,
-	requireSearchGrounding: boolean,
-): string {
-	return JSON.stringify({
-		clientCacheKey: geminiAcpClientCacheKey(settings, "search"),
-		requireSearchGrounding,
-	});
-}
-
-function invalidateSearchPreflight(
-	settings: GeminiAcpCommandSettings,
-	requireSearchGrounding: boolean,
-): void {
-	searchPreflightCache.delete(
-		searchPreflightCacheKey(settings, requireSearchGrounding),
-	);
-}
-
-function invalidateSearchPreflightForClientCacheKey(
-	clientCacheKey: string,
-): void {
-	for (const [key, entry] of searchPreflightCache) {
-		if (entry.clientCacheKey === clientCacheKey)
-			searchPreflightCache.delete(key);
 	}
 }
 

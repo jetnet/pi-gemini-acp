@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
 	GeminiAcpClient,
 	GeminiAcpPromptRequest,
@@ -21,6 +21,8 @@ beforeEach(async () => {
 
 afterEach(async () => {
 	__resetGeminiSearchPreflightCache();
+	vi.useRealTimers();
+	vi.unstubAllEnvs();
 	await rm(rootDir, { recursive: true, force: true });
 });
 
@@ -171,6 +173,67 @@ describe("runSearch", () => {
 
 		expect(commandChecks).toBe(1);
 		expect(authProbes).toBe(1);
+	});
+
+	it("does not cache failed provider preflight results", async () => {
+		await saveGeminiAcpSettings(
+			{
+				enabled: true,
+				command: "gemini",
+				args: ["--acp"],
+				authenticated: true,
+				searchGroundingAvailable: true,
+			},
+			{ rootDir },
+		);
+		let commandChecks = 0;
+		const deps = {
+			commandExists: async () => {
+				commandChecks += 1;
+				return false;
+			},
+			geminiAcpClient: new FakeGeminiClient(),
+		};
+
+		expect((await runSearch({ query: "one", rootDir }, deps)).error?.code).toBe(
+			"GEMINI_ACP_COMMAND_NOT_FOUND",
+		);
+		expect((await runSearch({ query: "two", rootDir }, deps)).error?.code).toBe(
+			"GEMINI_ACP_COMMAND_NOT_FOUND",
+		);
+
+		expect(commandChecks).toBe(2);
+	});
+
+	it("expires cached successful provider preflight results", async () => {
+		vi.useFakeTimers();
+		vi.stubEnv("PI_GEMINI_ACP_SEARCH_PREFLIGHT_TTL_MS", "10");
+		await saveGeminiAcpSettings(
+			{
+				enabled: true,
+				command: "gemini",
+				args: ["--acp"],
+				authenticated: true,
+				searchGroundingAvailable: true,
+			},
+			{ rootDir },
+		);
+		let commandChecks = 0;
+		const deps = {
+			commandExists: async () => {
+				commandChecks += 1;
+				return true;
+			},
+			geminiAcpClient: new FakeGeminiClient(),
+		};
+
+		await runSearch({ query: "one", rootDir }, deps);
+		await vi.advanceTimersByTimeAsync(9);
+		await runSearch({ query: "two", rootDir }, deps);
+		await vi.advanceTimersByTimeAsync(1);
+		await runSearch({ query: "three", rootDir }, deps);
+
+		expect(commandChecks).toBe(2);
 	});
 
 	it("invalidates cached preflight after auth-shaped search failures", async () => {

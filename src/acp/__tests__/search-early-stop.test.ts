@@ -31,7 +31,8 @@ describe("Gemini ACP search early stop", () => {
 		expect(results[0]?.title).toBe("Early");
 		expect(factory.session?.emittedChunks).toBe(1);
 		expect(factory.session?.earlyAbortSignals).toBe(1);
-		expect(factory.session?.closeCalls).toBe(1);
+		expect(factory.session?.closeCalls).toBe(0);
+		await cache.close();
 	});
 
 	it("waits for turn end when streamed search JSON is incomplete", async () => {
@@ -49,6 +50,26 @@ describe("Gemini ACP search early stop", () => {
 		expect(results[0]?.title).toBe("Late");
 		expect(factory.session?.emittedChunks).toBe(1);
 		expect(factory.session?.earlyAbortSignals).toBe(0);
+		expect(factory.session?.closeCalls).toBe(0);
+		await cache.close();
+	});
+
+	it("keeps the warm process reusable after streamed early-stop", async () => {
+		const factory = new FakeSessionFactory({
+			chunks: [
+				'[{"title":"Reusable","url":"https://example.com/reuse","snippet":"done"}]',
+				" trailing text",
+			],
+		});
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const client = cache.get(settings());
+
+		await client.search({ query: "first", maxResults: 5 });
+		await client.search({ query: "second", maxResults: 5 });
+
+		expect(factory.session?.initializeCalls).toBe(1);
+		expect(factory.session?.newSessionCalls).toBe(1);
+		expect(factory.session?.promptCalls).toBe(2);
 		expect(factory.session?.closeCalls).toBe(0);
 		await cache.close();
 	});
