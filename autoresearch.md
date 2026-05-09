@@ -68,14 +68,15 @@ Reduce Gemini ACP search prompt response time by optimizing the prompt shape sen
 
 ### maxResults impact on latency (v0.9.0 follow-up)
 
-| maxResults  | p50 promptMs | p50 totalMs | Speedup  | Notes                                    |
-| ----------- | ------------ | ----------- | -------- | ---------------------------------------- |
-| 5 (default) | ~24,177ms    | ~24,177ms   | baseline | v0.9.0 default                           |
-| 4           | ~6,377ms     | ~6,377ms    | **~3.8x** | Sweet spot: 4 results with ~74% speedup |
-| 4 + "Be concise" | ~4,124ms | ~4,124ms | **~5.9x** | ~35% faster than maxResults=4 alone (7.2× confidence) |
-| 3           | ~3,500ms     | ~3,500ms    | **~7x**  | Fewest results, fastest response         |
+| maxResults       | p50 promptMs | p50 totalMs | Speedup   | Notes                                                 |
+| ---------------- | ------------ | ----------- | --------- | ----------------------------------------------------- |
+| 5 (default)      | ~24,177ms    | ~24,177ms   | baseline  | v0.9.0 default                                        |
+| 4                | ~6,377ms     | ~6,377ms    | **~3.8x** | Sweet spot: 4 results with ~74% speedup               |
+| 4 + "Be concise" | ~4,124ms     | ~4,124ms    | **~5.9x** | ~35% faster than maxResults=4 alone (7.2× confidence) |
+| 3                | ~3,500ms     | ~3,500ms    | **~7x**   | Fewest results, fastest response                      |
 
 **Key findings:**
+
 1. maxResults shows non-linear latency. The jump from 4→5 results is disproportionately expensive (~18s penalty).
 2. Adding "Be concise" prefix to maxResults=4 yields additional ~35% speedup (4,124ms vs 6,377ms) with high confidence (7.2× noise floor).
 3. The "Be concise" behavioral hint appears to reduce LLM output generation time beyond just the result count limit.
