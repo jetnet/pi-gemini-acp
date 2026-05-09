@@ -68,11 +68,11 @@ Reduce Gemini ACP search prompt response time by optimizing the prompt shape sen
 
 ### maxResults impact on latency (v0.9.0 follow-up)
 
-| maxResults  | p50 promptMs | p50 totalMs | Speedup  | Notes                                    |
-| ----------- | ------------ | ----------- | -------- | ---------------------------------------- |
-| 5 (default) | ~24,177ms    | ~24,177ms   | baseline | v0.9.0 default                           |
+| maxResults  | p50 promptMs | p50 totalMs | Speedup   | Notes                                   |
+| ----------- | ------------ | ----------- | --------- | --------------------------------------- |
+| 5 (default) | ~24,177ms    | ~24,177ms   | baseline  | v0.9.0 default                          |
 | 4           | ~6,377ms     | ~6,377ms    | **~3.8x** | Sweet spot: 4 results with ~74% speedup |
-| 3           | ~3,500ms     | ~3,500ms    | **~7x**  | Fewest results, fastest response         |
+| 3           | ~3,500ms     | ~3,500ms    | **~7x**   | Fewest results, fastest response        |
 
 **Key finding:** maxResults shows non-linear latency. The jump from 4→5 results is disproportionately expensive (~18s penalty). maxResults=4 provides a strong quality/speed trade-off: 4 results with ~74% latency reduction vs default.
 
