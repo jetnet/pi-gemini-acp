@@ -259,28 +259,38 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 			try {
 				const sessionId = await entry.sessionId;
 				const header = `Executing web search: "${query}" with ${maxResults} max results via ${model}.`;
-				
+
 				// Show initial state
-				onProgress?.("search", `${header}\n\n● Executing web search...`);
-				
+				onProgress?.("search", `${header}\n\n● Waiting for Gemini...`);
+
 				// Track actual Gemini progress
 				let receivedFirstToken = false;
-				const wrappedOnUpdate = onUpdate ? async (chunk: GeminiAcpPromptChunk) => {
-					// First token received - Gemini is generating
-					if (!receivedFirstToken) {
-						receivedFirstToken = true;
-						onProgress?.("search", `${header}\n\n● LLM generating tokens...`);
-					}
-					// Forward to original handler
-					await onUpdate(chunk);
-				} : undefined;
-				
+				const wrappedOnUpdate = onUpdate
+					? async (chunk: GeminiAcpPromptChunk) => {
+							// First token received - Gemini is generating
+							if (!receivedFirstToken) {
+								receivedFirstToken = true;
+								onProgress?.(
+									"search",
+									`${header}\n\n● LLM generating tokens...`,
+								);
+							}
+							// Forward to original handler
+							await onUpdate(chunk);
+						}
+					: undefined;
+
 				// Start Gemini prompt
-				const promptPromise = active.session.prompt(sessionId, text, wrappedOnUpdate, {
-					signal: promptSignal,
-					returnTextOnAbort: true,
-				});
-				
+				const promptPromise = active.session.prompt(
+					sessionId,
+					text,
+					wrappedOnUpdate,
+					{
+						signal: promptSignal,
+						returnTextOnAbort: true,
+					},
+				);
+
 				try {
 					return await promptPromise;
 				} finally {
