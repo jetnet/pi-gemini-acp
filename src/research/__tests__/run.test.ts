@@ -118,6 +118,7 @@ describe("runResearch", () => {
 			"hydrate",
 			"hydrate",
 			"assemble",
+			"assemble",
 			"store",
 			"done",
 		]);

@@ -148,7 +148,7 @@ export async function runResearch(
 
 	await emitProgress(deps.onProgress, {
 		phase: "assemble",
-		message: "Assembling findings and citations.",
+		message: "● Analyzing findings...",
 		query: options.query,
 		mode: request.mode,
 		provider,
@@ -157,6 +157,18 @@ export async function runResearch(
 		totalSources: hydrated.length,
 	});
 	const assembled = assembleFindingsAndCitations(hydrated);
+	
+	// Show final assembly step
+	await emitProgress(deps.onProgress, {
+		phase: "assemble",
+		message: "● Building citations...",
+		query: options.query,
+		mode: request.mode,
+		provider,
+		model,
+		completedSources: hydrated.length,
+		totalSources: hydrated.length,
+	});
 	const result: ResearchResult = {
 		query: options.query,
 		summary:
@@ -345,15 +357,25 @@ async function hydrateMissingSources(
 	onProgress?: ResearchProgressReporter,
 ): Promise<ResearchSource[]> {
 	const hydrated: ResearchSource[] = [];
+	const steps = ["● Fetching source content", "● Parsing text", "● Extracting data"];
+	
 	for (const source of sources) {
 		if (source.text?.trim()) {
 			hydrated.push(source);
-			await emitProgress(
-				onProgress,
-				hydrationProgress(hydrated.length, sources),
-			);
+			await emitProgress(onProgress, hydrationProgress(hydrated.length, sources));
 			continue;
 		}
+		
+		// Show animated steps while hydrating this source
+		const stepIndex = hydrated.length % steps.length;
+		const step = steps[stepIndex];
+		await emitProgress(onProgress, {
+			phase: "hydrate",
+			message: `${step} (${hydrated.length + 1}/${sources.length})...`,
+			completedSources: hydrated.length,
+			totalSources: sources.length,
+		});
+		
 		try {
 			hydrated.push(await hydrator.hydrate(source, signal));
 		} catch (error) {
