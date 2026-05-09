@@ -71,11 +71,14 @@ Reduce Gemini ACP search prompt response time by optimizing the prompt shape sen
 | maxResults  | p50 promptMs | p50 totalMs | Speedup  | Notes                                    |
 | ----------- | ------------ | ----------- | -------- | ---------------------------------------- |
 | 5 (default) | ~24,177ms    | ~24,177ms   | baseline | v0.9.0 default                           |
-| 3           | ~3,500ms     | ~3,500ms    | **~7x**  | Fewer results = less LLM generation time |
+| 4           | ~6,377ms     | ~6,377ms    | **~3.8x** | Sweet spot: 4 results with ~74% speedup |
+| 3           | ~3,500ms     | ~3,500ms    | **~7x**  | Fewest results, fastest response         |
 
-**Key finding:** maxResults is a major latency driver. Reducing from 5 to 3 results yields ~7x speedup because the LLM generates less JSON. Network variance remains high (2s-30s), but the median improves dramatically.
+**Key finding:** maxResults shows non-linear latency. The jump from 4→5 results is disproportionately expensive (~18s penalty). maxResults=4 provides a strong quality/speed trade-off: 4 results with ~74% latency reduction vs default.
 
-**Recommendation:** Users should be able to tune maxResults based on their latency/quality trade-off. The default of 5 prioritizes result coverage; 3 prioritizes speed.
+**Confidence:** 2.3× noise floor on the maxResults=4 measurement — improvement is statistically significant.
+
+**Recommendation:** Users should be able to tune maxResults based on their latency/quality trade-off. The default of 5 prioritizes result coverage; 4 prioritizes balanced speed; 3 prioritizes minimal latency.
 
 ## Why the autoresearch stopped here
 
