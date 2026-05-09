@@ -14,11 +14,12 @@ npx tsc -p tsconfig.json --noEmit 2>/dev/null || {
 
 # Configuration via env vars
 MODE="${MODE:-warm}"
-MAX_RESULTS="${MAX_RESULTS:-5}"
-RUNS="${RUNS:-3}"
+MAX_RESULTS="${MAX_RESULTS:-4}"
+RUNS="${RUNS:-5}"
+EARLY_STOP="${EARLY_STOP:-0}"
+export PI_GEMINI_ACP_SEARCH_EARLY_STOP="$EARLY_STOP"
 
 # Run benchmark with settings
-# Use --json for machine-parseable output
 bench_json=$(node scripts/bench.mjs \
 	--mode "$MODE" \
 	--runs "$RUNS" \
@@ -30,7 +31,7 @@ bench_json=$(node scripts/bench.mjs \
 	exit 0
 }
 
-# Parse metrics from warm section
+# Parse metrics
 echo "$bench_json" | node --input-type=module -e '
 import { readFileSync } from "node:fs";
 const json = JSON.parse(readFileSync(0, "utf8"));
@@ -48,7 +49,8 @@ process.stdout.write("METRIC totalMs_p50=" + (summary?.totalMs?.p50 ?? 999999) +
 process.stdout.write("METRIC promptMs_p50=" + (summary?.promptMs?.p50 ?? 999999) + "\n");
 process.stdout.write("METRIC initMs=" + (summary?.initializeMs?.p50 ?? 0) + "\n");
 process.stdout.write("METRIC sessionMs=" + (summary?.sessionMs?.p50 ?? 0) + "\n");
-// Calculate average results from runs
+// Report variance as additional context
+process.stdout.write("METRIC totalMs_iqr=" + ((summary?.totalMs?.p75 ?? 0) - (summary?.totalMs?.p25 ?? 0)) + "\n");
 const results = section.runs?.map(r => r.results) || [];
 const avgResults = results.length > 0 ? results.reduce((s,v) => s+v, 0) / results.length : 0;
 process.stdout.write("METRIC results=" + Math.round(avgResults) + "\n");
