@@ -6,19 +6,32 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-09
+
 ### Added
 
 - Added persistent Gemini tool response caching backed by SQLite, with cache markers, retention, atomic result writes, and `/gemini-config cache` controls (`81db6da`).
 - Added semantic-recall infrastructure: `sqlite-vec`, embedding queue/schema, recall text generation, recall enable/disable status, and an honest unavailable production embedder seam (`e6f96a2`).
 - Added the public `gemini_recall` tool plus opt-in `useRecall` / `bypassRecall` support for `gemini_search` and `gemini_research` (`3d19496`).
+- Added lexical recall and local search fast paths (`6e76308`).
+- Added a tool token-surface evaluator under `eval/` (`9252890`).
 
 ### Changed
 
+- Collapsed twelve individual public Gemini tools into six aggregate `gemini_*` tools (`24c7cf8`); follow-up commits compacted descriptions and schemas while preserving cache, recall, freshness, and analyze safety guidance.
+- Optimized `gemini_search` warm-process reuse and parallel sessions, and improved search bench/prompt reliability (`82c972f`, `0d54bc2`).
+- Optimized the `gemini_ask` token surface, including compact enum schemas for routing fields and consolidated description guidance (`a416dad`, `517f603`, `7df6e3c`, `4161170`, `a810b8f`).
 - Shared provider-result handling across prompt/search/tool/config paths (`c6d7c9d`, `d332f9d`).
 - Shared JSON-RPC-over-stdio transport between ACP sessions and benchmark tooling (`adc0d98`).
 
+### Fixed
+
+- Indexed local search results into recall (`2a7921d`).
+- Disabled the vector recall fallback when no embedder is available (`9369914`).
+
 ### Notes
 
+- The aggregate-tool collapse is a breaking change to the public tool surface; consumers calling the previous twelve tool names must migrate to the six `gemini_*` aggregates.
 - `gemini_recall` is capability-gated: it returns an unavailable provider/capability error until a real embedding provider is configured and preflighted.
 
 ## [0.8.0] - 2026-05-04
@@ -153,7 +166,8 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 - Added CI/publish workflows, lint/audit tooling, and packaged Gemini skill setup (`5bb606b`).
 - Added early Gemini model/login/permission commands (`e181cf3`).
 
-[Unreleased]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/brandonkramer/pi-gemini-acp/compare/v0.6.0...v0.7.0
