@@ -1,7 +1,7 @@
 /**
  * @fileoverview Wires pi-gemini-acp into pi-scraper's pi:model-adapter protocol.
  */
-import { createGeminiSummarizeAdapter } from "./summarize.js";
+import { createGeminiSummarizeAdapter } from "./gemini-summarize.js";
 import type { ModelCapability, RegisteredAdapter } from "./types.js";
 
 const ADAPTER_ID = "gemini-acp";

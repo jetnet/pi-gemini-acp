@@ -3,26 +3,11 @@
  */
 import { describe, expect, it, vi, type Mock } from "vitest";
 import type { SummarizeRunResult } from "../../prompt/summarize.js";
-import type { GeminiAcpConfig } from "../../types.js";
-import { createGeminiSummarizeAdapter } from "../summarize.js";
+import { createGeminiSummarizeAdapter } from "../gemini-summarize.js";
 import type { ModelRequest } from "../types.js";
 
-function mockDeps(overrides?: {
-	config?: GeminiAcpConfig;
-	result?: SummarizeRunResult;
-}) {
-	const config: GeminiAcpConfig = {
-		providers: {
-			"gemini-acp": {
-				enabled: true,
-				command: "gemini",
-				args: ["--acp"],
-				authenticated: true,
-			},
-		},
-		...overrides?.config,
-	};
-	const runSummarizeMock = vi.fn().mockResolvedValue(
+function mockRun(overrides?: { result?: SummarizeRunResult }) {
+	return vi.fn().mockResolvedValue(
 		overrides?.result ?? {
 			provider: "gemini-acp",
 			summary: "mock summary",
@@ -37,16 +22,12 @@ function mockDeps(overrides?: {
 			},
 		},
 	) as Mock;
-	return {
-		loadConfig: vi.fn().mockResolvedValue(config),
-		runSummarize: runSummarizeMock,
-	};
 }
 
 describe("createGeminiSummarizeAdapter", () => {
 	it("returns a ModelResponse for summarize task", async () => {
-		const deps = mockDeps();
-		const adapter = createGeminiSummarizeAdapter(deps);
+		const run = mockRun();
+		const adapter = createGeminiSummarizeAdapter(run);
 		const request: ModelRequest = {
 			task: "summarize",
 			input: "Some content to summarize.",
@@ -58,8 +39,8 @@ describe("createGeminiSummarizeAdapter", () => {
 			provider: "gemini-acp",
 			summary: "mock summary",
 		});
-		expect(deps.runSummarize).toHaveBeenCalledOnce();
-		const optionsArg = deps.runSummarize.mock.calls[0][0] as {
+		expect(run).toHaveBeenCalledOnce();
+		const optionsArg = run.mock.calls[0][0] as {
 			content: string;
 			prompt?: string;
 		};
@@ -67,8 +48,8 @@ describe("createGeminiSummarizeAdapter", () => {
 	});
 
 	it("includes custom guidance and maps options to SummarizeOptions", async () => {
-		const deps = mockDeps();
-		const adapter = createGeminiSummarizeAdapter(deps);
+		const run = mockRun();
+		const adapter = createGeminiSummarizeAdapter(run);
 		const request: ModelRequest = {
 			task: "summarize",
 			input: "Some content.",
@@ -83,7 +64,7 @@ describe("createGeminiSummarizeAdapter", () => {
 			},
 		};
 		await adapter.run(request);
-		const optionsArg = deps.runSummarize.mock.calls[0][0] as {
+		const optionsArg = run.mock.calls[0][0] as {
 			content: string;
 			prompt: string;
 			style: string;
@@ -104,8 +85,8 @@ describe("createGeminiSummarizeAdapter", () => {
 	});
 
 	it("throws for unsupported extract task", async () => {
-		const deps = mockDeps();
-		const adapter = createGeminiSummarizeAdapter(deps);
+		const run = mockRun();
+		const adapter = createGeminiSummarizeAdapter(run);
 		const request: ModelRequest = {
 			task: "extract",
 			input: "Some content.",
@@ -113,26 +94,26 @@ describe("createGeminiSummarizeAdapter", () => {
 		await expect(adapter.run(request)).rejects.toThrow(
 			'gemini-acp adapter does not support task "extract" (only summarize)',
 		);
-		expect(deps.runSummarize).not.toHaveBeenCalled();
+		expect(run).not.toHaveBeenCalled();
 	});
 
 	it("propagates abort signal to runSummarize", async () => {
-		const deps = mockDeps();
-		const adapter = createGeminiSummarizeAdapter(deps);
+		const run = mockRun();
+		const adapter = createGeminiSummarizeAdapter(run);
 		const controller = new AbortController();
 		const request: ModelRequest = {
 			task: "summarize",
 			input: "Some content.",
 		};
 		await adapter.run(request, controller.signal);
-		expect(deps.runSummarize).toHaveBeenCalledOnce();
-		const signalArg = deps.runSummarize.mock.calls[0][2] as AbortSignal;
+		expect(run).toHaveBeenCalledOnce();
+		const signalArg = run.mock.calls[0][2] as AbortSignal;
 		expect(signalArg).toBe(controller.signal);
 	});
 
 	it("filters out invalid option values before calling runSummarize", async () => {
-		const deps = mockDeps();
-		const adapter = createGeminiSummarizeAdapter(deps);
+		const run = mockRun();
+		const adapter = createGeminiSummarizeAdapter(run);
 		const request: ModelRequest = {
 			task: "summarize",
 			input: "Some content.",
@@ -146,10 +127,7 @@ describe("createGeminiSummarizeAdapter", () => {
 			},
 		};
 		await adapter.run(request);
-		const optionsArg = deps.runSummarize.mock.calls[0][0] as Record<
-			string,
-			unknown
-		>;
+		const optionsArg = run.mock.calls[0][0] as Record<string, unknown>;
 		expect(optionsArg.style).toBeUndefined();
 		expect(optionsArg.sentenceCount).toBeUndefined();
 		expect(optionsArg.bulletCount).toBeUndefined();
@@ -159,7 +137,7 @@ describe("createGeminiSummarizeAdapter", () => {
 	});
 
 	it("throws when runSummarize returns an error", async () => {
-		const deps = mockDeps({
+		const run = mockRun({
 			result: {
 				provider: "gemini-acp",
 				summary: "",
@@ -179,7 +157,7 @@ describe("createGeminiSummarizeAdapter", () => {
 				},
 			},
 		});
-		const adapter = createGeminiSummarizeAdapter(deps);
+		const adapter = createGeminiSummarizeAdapter(run);
 		const request: ModelRequest = {
 			task: "summarize",
 			input: "Some content.",

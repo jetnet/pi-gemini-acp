@@ -13,28 +13,16 @@ import {
 	type SummarizeRunResult,
 	type SummaryStyle,
 } from "../prompt/summarize.js";
-import {
-	configFromEnv,
-	loadConfig,
-	withDefaultGeminiAcpConfig,
-} from "../config/settings.js";
-import type { GeminiAcpConfig } from "../types.js";
 import type { ModelAdapter, ModelRequest, ModelResponse } from "./types.js";
 
-export interface SummarizeAdapterDeps {
-	loadConfig?(): Promise<GeminiAcpConfig>;
-	runSummarize?(
+export function createGeminiSummarizeAdapter(
+	run?: (
 		options: SummarizeOptions,
 		deps?: SummarizeDeps,
 		signal?: AbortSignal,
-	): Promise<SummarizeRunResult>;
-}
-
-export function createGeminiSummarizeAdapter(
-	deps?: SummarizeAdapterDeps,
+	) => Promise<SummarizeRunResult>,
 ): ModelAdapter {
-	const load = deps?.loadConfig ?? defaultLoadConfig;
-	const run = deps?.runSummarize ?? runSummarize;
+	const executor = run ?? runSummarize;
 
 	return {
 		async run<T>(
@@ -46,9 +34,8 @@ export function createGeminiSummarizeAdapter(
 					`gemini-acp adapter does not support task "${request.task}" (only summarize)`,
 				);
 			}
-			const config = withDefaultGeminiAcpConfig(configFromEnv(await load()));
-			const options = mapRequestToSummarizeOptions(request, config);
-			const result = await run(options, {}, signal);
+			const options = mapRequestToSummarizeOptions(request);
+			const result = await executor(options, {}, signal);
 			if (result.error) {
 				throw new Error(result.error.message);
 			}
@@ -63,10 +50,7 @@ export function createGeminiSummarizeAdapter(
 	};
 }
 
-function mapRequestToSummarizeOptions(
-	request: ModelRequest,
-	config: GeminiAcpConfig,
-): SummarizeOptions {
+function mapRequestToSummarizeOptions(request: ModelRequest): SummarizeOptions {
 	const opts = request.options ?? {};
 	// request.schema is ignored — structured summary extraction is not
 	// supported by this adapter. request.options.url is ignored because
@@ -80,7 +64,6 @@ function mapRequestToSummarizeOptions(
 		audience: validString(opts.audience),
 		title: validString(opts.title),
 		maxSourceCharacters: validFiniteNumber(opts.maxSourceCharacters),
-		config,
 	};
 }
 
@@ -100,10 +83,7 @@ function validFiniteNumber(value: unknown): number | undefined {
 }
 
 function validString(value: unknown): string | undefined {
-	if (typeof value === "string" && value.trim().length > 0) return value.trim();
+	if (typeof value === "string" && value.trim().length > 0)
+		return value.trim();
 	return undefined;
-}
-
-async function defaultLoadConfig(): Promise<GeminiAcpConfig> {
-	return configFromEnv(await loadConfig());
 }
