@@ -139,7 +139,7 @@ export async function runSummarize(
 		summaryLength: promptResult.responseLength,
 		summaryTruncated: promptResult.truncated,
 		source: prepared.source,
-		model: options.config?.providers?.["gemini-acp"]?.model?.trim(),
+		model: promptResult.model,
 		responseId,
 		fullOutputPath,
 	};
@@ -198,9 +198,12 @@ async function loadSourceText(
 			phase: "source_fetch",
 			text: `Fetching ${url.toString()} via safe direct fetch.`,
 		});
-		const fetched = await (deps.fetcher ?? directFetcher).fetch(url.toString(), {
-			signal,
-		});
+		const fetched = await (deps.fetcher ?? directFetcher).fetch(
+			url.toString(),
+			{
+				signal,
+			},
+		);
 		return { text: fetched.text, url: fetched.url };
 	} catch (cause) {
 		return {

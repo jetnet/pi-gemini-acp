@@ -90,6 +90,7 @@ export interface PromptRunResult {
 	text: string;
 	responseLength: number;
 	truncated: boolean;
+	model?: string;
 	responseId?: string;
 	fullOutputPath?: string;
 	error?: StructuredError;
@@ -102,6 +103,7 @@ export type PromptUpdateHandler = (
 /** Result returned by the shared provider prompt turn before per-tool shaping. */
 export interface ProviderPromptRunResult {
 	text: string;
+	model?: string;
 	error?: StructuredError;
 }
 
@@ -216,7 +218,9 @@ export async function runProviderPrompt(
 		const executed = options.promptExecutor
 			? await options.promptExecutor(context, signal, onUpdate)
 			: await defaultPromptExecutor(context, deps, signal, onUpdate);
-		return typeof executed === "string" ? { text: executed } : executed;
+		return typeof executed === "string"
+			? { text: executed, model }
+			: { ...executed, model };
 	} catch (cause) {
 		if (isQuotaExhaustedError(cause)) {
 			recordQuotaExhausted(
@@ -268,7 +272,10 @@ export async function runPrompt(
 	const promptResult = await runProviderPrompt(options, deps, signal, onUpdate);
 	return promptResult.error
 		? { ...emptyPromptResult(), error: promptResult.error }
-		: await compactPromptResult(promptResult.text, options);
+		: {
+				...(await compactPromptResult(promptResult.text, options)),
+				model: promptResult.model,
+			};
 }
 
 async function defaultPromptExecutor(
@@ -332,7 +339,7 @@ async function runApiKeyPrompt(
 		const text = await client.prompt(request, signal, async (chunk) => {
 			await onUpdate?.(chunk);
 		});
-		return { text };
+		return { text, model };
 	} catch (cause) {
 		return {
 			text: "",

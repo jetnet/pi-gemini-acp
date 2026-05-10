@@ -47,9 +47,24 @@ describe("adapter usage", () => {
 	});
 
 	it("token counts match estimateCost output", async () => {
-		const input = "Some input text to summarize.";
-		const summary = "A short summary.";
-		const run = mockRun();
+		const input =
+			"This is a deliberately long input text so that swapping input and summary arguments would produce a different token count.";
+		const summary = "Short.";
+		const run = mockRun({
+			result: {
+				provider: "gemini-acp",
+				summary,
+				summaryLength: summary.length,
+				summaryTruncated: false,
+				source: {
+					kind: "content",
+					contentLength: input.length,
+					preparedLength: input.length,
+					truncated: false,
+					maxSourceCharacters: 20000,
+				},
+			},
+		});
 		const adapter = createGeminiSummarizeAdapter(run);
 		const request: ModelRequest = { task: "summarize", input };
 		const result = await adapter.run<{ summary: string }>(request);

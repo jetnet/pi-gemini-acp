@@ -146,6 +146,29 @@ describe("runSummarize", () => {
 		expect(client.promptText).not.toContain("bad()");
 	});
 
+	it("propagates resolved model name through to SummarizeRunResult", async () => {
+		const client = new FakeGeminiClient(["Pro summary"]);
+		const result = await runSummarize(
+			{
+				content: "Alpha beta gamma.",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							model: "gemini-1.5-pro",
+							modelSelectionAvailable: true,
+						},
+					},
+				},
+			},
+			{ commandExists: async () => true, geminiAcpClient: client },
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.summary).toBe("Pro summary");
+		expect(result.model).toBe("gemini-1.5-pro");
+	});
+
 	it("rejects private URL summarization before fetch", async () => {
 		let fetchCalls = 0;
 		const result = await runSummarize(
