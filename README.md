@@ -195,10 +195,6 @@ When set, pi-gemini-acp skips registration. Use this to keep your Gemini quota f
 
 `offered: true` means the `pi:model-adapter/register` event was actually emitted — not just that the env var allowed it. `/gemini-config status` shows the same info as a one-line "Model adapter offered" entry.
 
-### Adding other providers
-
-The `pi:model-adapter/*` protocol is open. Any extension can implement it — see pi-scraper's README "Model adapters" section for the contract. Adapters registered with `priority > 50` preempt `gemini-acp` when both are present and the user hasn't pinned a specific provider.
-
 ## Validation
 
 ```bash
