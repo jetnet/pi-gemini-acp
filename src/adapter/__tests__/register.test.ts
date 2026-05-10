@@ -3,11 +3,13 @@
  */
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import {
-	getModelAdapterStatus,
 	registerModelAdapter,
-	resetModelAdapterEmitted,
 	type ModelAdapterRegistrar,
 } from "../register.js";
+import {
+	getModelAdapterStatus,
+	resetModelAdapterEmitted,
+} from "../status.js";
 
 interface MockRegistrar {
 	events: {

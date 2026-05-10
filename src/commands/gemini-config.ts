@@ -7,7 +7,7 @@ import {
 	type GeminiAcpStatusReport,
 	getGeminiAcpStatus,
 } from "../config/status.js";
-import { getModelAdapterStatus } from "../adapter/register.js";
+import { getModelAdapterStatus } from "../adapter/status.js";
 import { toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { defineGeminiCommand, type PiCommandContext } from "./define.js";

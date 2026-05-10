@@ -4,7 +4,7 @@
 import { type Static, Type } from "@earendil-works/pi-ai";
 import { getGeminiAcpStatus } from "../config/status.js";
 import { configFromEnv, loadConfig } from "../config/settings.js";
-import { getModelAdapterStatus } from "../adapter/register.js";
+import { getModelAdapterStatus } from "../adapter/status.js";
 import {
 	getGeminiSearchPrewarmStatus,
 	type GeminiSearchPrewarmStatus,
