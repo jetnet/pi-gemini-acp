@@ -6,6 +6,7 @@
  * inherits source truncation, API-key fallback, response caching, and
  * cost-estimate plumbing.
  */
+import { coerceEnum, coerceFiniteNumber, coerceString } from "../coerce.js";
 import {
 	runSummarize,
 	type SummarizeDeps,
@@ -14,6 +15,8 @@ import {
 	type SummaryStyle,
 } from "../prompt/summarize.js";
 import type { ModelAdapter, ModelRequest, ModelResponse } from "./types.js";
+
+const SUMMARY_STYLES: readonly SummaryStyle[] = ["paragraph", "bullets", "executive"];
 
 export function createGeminiSummarizeAdapter(
 	run?: (
@@ -58,31 +61,11 @@ function mapRequestToSummarizeOptions(request: ModelRequest): SummarizeOptions {
 	return {
 		content: request.input,
 		prompt: request.prompt,
-		style: validSummaryStyle(opts.style),
-		sentenceCount: validFiniteNumber(opts.sentenceCount),
-		bulletCount: validFiniteNumber(opts.bulletCount),
-		audience: validString(opts.audience),
-		title: validString(opts.title),
-		maxSourceCharacters: validFiniteNumber(opts.maxSourceCharacters),
+		style: coerceEnum<SummaryStyle>(opts.style, SUMMARY_STYLES),
+		sentenceCount: coerceFiniteNumber(opts.sentenceCount),
+		bulletCount: coerceFiniteNumber(opts.bulletCount),
+		audience: coerceString(opts.audience),
+		title: coerceString(opts.title),
+		maxSourceCharacters: coerceFiniteNumber(opts.maxSourceCharacters),
 	};
-}
-
-function validSummaryStyle(value: unknown): SummaryStyle | undefined {
-	if (
-		typeof value === "string" &&
-		(value === "paragraph" || value === "bullets" || value === "executive")
-	) {
-		return value;
-	}
-	return undefined;
-}
-
-function validFiniteNumber(value: unknown): number | undefined {
-	if (typeof value === "number" && Number.isFinite(value)) return value;
-	return undefined;
-}
-
-function validString(value: unknown): string | undefined {
-	if (typeof value === "string" && value.trim().length > 0) return value.trim();
-	return undefined;
 }

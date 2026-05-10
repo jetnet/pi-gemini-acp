@@ -3,7 +3,11 @@
  */
 import { createGeminiSummarizeAdapter } from "./gemini-summarize.js";
 import { recordAdapterEmitted } from "./status.js";
-import type { DiscoverPayload, ModelCapability, RegisteredAdapter } from "./types.js";
+import type {
+	DiscoverPayload,
+	ModelCapability,
+	RegisteredAdapter,
+} from "./types.js";
 
 const ADAPTER_ID = "gemini-acp";
 const PRIORITY = 50;

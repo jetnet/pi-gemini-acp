@@ -11,6 +11,7 @@ import type {
 	GeminiAcpSearchRequest,
 } from "../acp/client.js";
 import type { SearchProviderMetadata, SearchResultItem } from "../types.js";
+import { coerceString } from "../coerce.js";
 import { loadGeminiApiKeyConfig } from "./config.js";
 
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -208,20 +209,15 @@ function normalizeSearchItem(item: unknown, ranking: number): SearchResultItem {
 		typeof item === "object" && item !== null
 			? (item as Record<string, unknown>)
 			: {};
-	const url = stringValue(record.url) ?? stringValue(record.link) ?? "";
+	const url = coerceString(record.url) ?? coerceString(record.link) ?? "";
 	return {
-		title: stringValue(record.title) ?? url,
+		title: coerceString(record.title) ?? url,
 		url,
 		normalizedUrl: url,
-		snippet: stringValue(record.snippet) ?? stringValue(record.summary) ?? "",
+		snippet: coerceString(record.snippet) ?? coerceString(record.summary) ?? "",
 		ranking,
 		source: apiKeyMetadata(),
 	};
-}
-
-function stringValue(value: unknown): string | undefined {
-	if (typeof value === "string") return value;
-	return undefined;
 }
 
 function apiKeyMetadata(): SearchProviderMetadata {

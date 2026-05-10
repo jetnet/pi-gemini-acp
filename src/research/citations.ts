@@ -1,3 +1,4 @@
+import { coerceFiniteNumber, coerceString } from "../coerce.js";
 import type { ResearchProviderSourceMetadata } from "../types.js";
 
 export interface NormalizedGroundingSupport {
@@ -119,7 +120,7 @@ function normalizeGroundingChunks(
 				recordValue(chunkRecord, "retrievedContext", "retrieved_context"))
 			: undefined;
 		const webRecord = asRecord(web);
-		const url = stringValue(
+		const url = coerceString(
 			firstDefined(
 				webRecord && recordValue(webRecord, "uri", "url"),
 				chunkRecord && recordValue(chunkRecord, "uri", "url"),
@@ -133,7 +134,7 @@ function normalizeGroundingChunks(
 		return {
 			index,
 			url,
-			title: stringValue(
+			title: coerceString(
 				firstDefined(
 					webRecord && recordValue(webRecord, "title"),
 					chunkRecord && recordValue(chunkRecord, "title"),
@@ -141,7 +142,7 @@ function normalizeGroundingChunks(
 				),
 			),
 			retrievalStatus:
-				stringValue(
+				coerceString(
 					firstDefined(
 						chunkRecord &&
 							recordValue(chunkRecord, "retrievalStatus", "retrieval_status"),
@@ -165,7 +166,7 @@ function normalizeGroundingSupports(
 			? asRecord(recordValue(supportRecord, "segment"))
 			: undefined;
 		return {
-			startByte: numberValue(
+			startByte: coerceFiniteNumber(
 				firstDefined(
 					segment && recordValue(segment, "startIndex", "start_index"),
 					supportRecord &&
@@ -174,14 +175,14 @@ function normalizeGroundingSupports(
 						recordValue(supportRecord, "startIndex", "start_index"),
 				),
 			),
-			endByte: numberValue(
+			endByte: coerceFiniteNumber(
 				firstDefined(
 					segment && recordValue(segment, "endIndex", "end_index"),
 					supportRecord && recordValue(supportRecord, "endByte", "end_byte"),
 					supportRecord && recordValue(supportRecord, "endIndex", "end_index"),
 				),
 			),
-			text: stringValue(segment && recordValue(segment, "text")),
+			text: coerceString(segment && recordValue(segment, "text")),
 			sourceIndexes: numberArray(
 				supportRecord &&
 					recordValue(
@@ -208,7 +209,7 @@ function normalizeRetrievedUrls(
 	return entries.flatMap((entry, index) => {
 		if (typeof entry === "string") return [{ index, url: entry }];
 		const entryRecord = asRecord(entry);
-		const url = stringValue(
+		const url = coerceString(
 			entryRecord &&
 				firstDefined(
 					recordValue(entryRecord, "retrievedUrl", "retrieved_url"),
@@ -220,8 +221,8 @@ function normalizeRetrievedUrls(
 			{
 				index,
 				url,
-				title: stringValue(entryRecord && recordValue(entryRecord, "title")),
-				retrievalStatus: stringValue(
+				title: coerceString(entryRecord && recordValue(entryRecord, "title")),
+				retrievalStatus: coerceString(
 					entryRecord &&
 						firstDefined(
 							recordValue(entryRecord, "retrievalStatus", "retrieval_status"),
@@ -278,12 +279,6 @@ function firstDefined(...values: unknown[]): unknown {
 	return values.find((value) => value !== undefined);
 }
 
-function numberValue(value: unknown): number | undefined {
-	return typeof value === "number" && Number.isFinite(value)
-		? value
-		: undefined;
-}
-
 function numberArray(value: unknown): number[] {
 	return Array.isArray(value)
 		? value.filter(
@@ -291,12 +286,6 @@ function numberArray(value: unknown): number[] {
 					typeof entry === "number" && Number.isInteger(entry) && entry >= 0,
 			)
 		: [];
-}
-
-function stringValue(value: unknown): string | undefined {
-	return typeof value === "string" && value.trim().length > 0
-		? value.trim()
-		: undefined;
 }
 
 function isContinuationByte(value: number | undefined): boolean {

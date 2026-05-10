@@ -7,6 +7,7 @@ import type {
 	SearchProviderMetadata,
 	SearchResultItem,
 } from "../types.js";
+import { coerceFiniteNumber, coerceString } from "../coerce.js";
 import { normalizeUrl } from "../url/normalize.js";
 import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.js";
 import { searchPrompt } from "./search-prompt.js";
@@ -142,23 +143,23 @@ export function normalizeGeminiAcpSearchResults(
 	return candidates.flatMap((entry, index) => {
 		const record = asRecord(entry);
 		const url = record
-			? (stringValue(record.url) ??
-				stringValue(record.link) ??
-				stringValue(record.uri))
+			? (coerceString(record.url) ??
+				coerceString(record.link) ??
+				coerceString(record.uri))
 			: undefined;
 		if (!record || !url) return [];
 		try {
 			const normalizedUrl = normalizedSearchUrl(url, normalizedUrls);
 			return [
 				{
-					title: stringValue(record.title) ?? normalizedUrl,
+					title: coerceString(record.title) ?? normalizedUrl,
 					url,
 					normalizedUrl,
 					snippet:
-						stringValue(record.snippet) ??
-						stringValue(record.summary) ??
-						stringValue(record.description),
-					ranking: numberValue(record.ranking) ?? index + 1,
+						coerceString(record.snippet) ??
+						coerceString(record.summary) ??
+						coerceString(record.description),
+					ranking: coerceFiniteNumber(record.ranking) ?? index + 1,
 					source: { ...metadata, raw: record },
 				},
 			];
@@ -247,17 +248,5 @@ function geminiMetadata(): SearchProviderMetadata {
 function asRecord(value: unknown): Record<string, unknown> | undefined {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
 		? (value as Record<string, unknown>)
-		: undefined;
-}
-
-function stringValue(value: unknown): string | undefined {
-	return typeof value === "string" && value.trim().length > 0
-		? value.trim()
-		: undefined;
-}
-
-function numberValue(value: unknown): number | undefined {
-	return typeof value === "number" && Number.isFinite(value)
-		? value
 		: undefined;
 }
