@@ -198,12 +198,9 @@ async function loadSourceText(
 			phase: "source_fetch",
 			text: `Fetching ${url.toString()} via safe direct fetch.`,
 		});
-		const fetched = await (deps.fetcher ?? directFetcher).fetch(
-			url.toString(),
-			{
-				signal,
-			},
-		);
+		const fetched = await (deps.fetcher ?? directFetcher).fetch(url.toString(), {
+			signal,
+		});
 		return { text: fetched.text, url: fetched.url };
 	} catch (cause) {
 		return {
