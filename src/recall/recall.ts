@@ -41,9 +41,7 @@ export interface RecallOptions extends StorageOptions {
 export type RecallRunResult = RecallResult | { error: StructuredError };
 
 /** Searches local FTS recall rows for prior Gemini results. */
-export async function runRecall(
-	options: RecallOptions,
-): Promise<RecallRunResult> {
+export async function runRecall(options: RecallOptions): Promise<RecallRunResult> {
 	const config = await loadConfig({ rootDir: options.rootDir });
 	if (!recallEnabledFromConfig(config)) {
 		return { error: recallUnavailable("Local recall is disabled.") };
@@ -61,8 +59,7 @@ export async function runRecall(
 			error: {
 				code: "GEMINI_ACP_RECALL_QUERY_FAILED",
 				phase: "recall_query",
-				message:
-					cause instanceof Error ? cause.message : "Local recall query failed.",
+				message: cause instanceof Error ? cause.message : "Local recall query failed.",
 				retryable: true,
 				provider: "gemini-acp",
 			},

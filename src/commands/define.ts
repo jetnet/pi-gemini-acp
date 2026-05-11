@@ -18,9 +18,7 @@ export type CommandExecute<TParams> = (
 export type PiCommandCompletion = AutocompleteItem;
 
 /** Supplies argument completions for a Pi slash command. */
-export type CommandArgumentCompletions = NonNullable<
-	RegisteredCommand["getArgumentCompletions"]
->;
+export type CommandArgumentCompletions = NonNullable<RegisteredCommand["getArgumentCompletions"]>;
 
 /** Parses a raw Pi slash-command argument string into typed command parameters. */
 export type CommandArgumentParser<TParams> = (args: string) => TParams;
@@ -45,19 +43,11 @@ export type PiCommandContext = Partial<
 	session?: unknown;
 	settings?: unknown;
 	auth?: unknown;
-	ui?: Partial<
-		Pick<
-			ExtensionCommandContext["ui"],
-			"select" | "confirm" | "input" | "notify"
-		>
-	>;
+	ui?: Partial<Pick<ExtensionCommandContext["ui"], "select" | "confirm" | "input" | "notify">>;
 };
 
 /** Slash command handler shape expected by the Pi host. */
-export type PiCommandHandler = (
-	args: string,
-	ctx: PiCommandContext,
-) => Promise<void>;
+export type PiCommandHandler = (args: string, ctx: PiCommandContext) => Promise<void>;
 
 /** Options accepted by `pi.registerCommand`, mirroring the host's signature. */
 export type PiCommandOptions = Omit<RegisteredCommand, "name" | "sourceInfo">;

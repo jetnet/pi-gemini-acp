@@ -5,10 +5,7 @@ import type {
 	GeminiAcpPromptRequest,
 } from "../acp/client.js";
 import { getCachedGeminiAcpClient } from "../acp/client-cache.js";
-import {
-	emitGeminiBackendProgress,
-	withGeminiBackendProgress,
-} from "../acp/prompt-progress.js";
+import { emitGeminiBackendProgress, withGeminiBackendProgress } from "../acp/prompt-progress.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
 import { GeminiApiKeyClient } from "../api/client.js";
 import { geminiApiKeyConfigured } from "../api/config.js";
@@ -17,22 +14,14 @@ import {
 	isQuotaExhaustedError,
 	recordQuotaExhausted,
 } from "../api/quota-cache.js";
-import {
-	configFromEnv,
-	loadConfig,
-	withDefaultGeminiAcpConfig,
-} from "../config/settings.js";
+import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
 import {
 	type GeminiAcpAuthProbe,
 	preflightGeminiAcpProvider,
 	type StatusCommandChecker,
 } from "../config/status.js";
 import { storeResult } from "../storage/results.js";
-import type {
-	GeminiAcpConfig,
-	GeminiAcpProviderSettings,
-	StructuredError,
-} from "../types.js";
+import type { GeminiAcpConfig, GeminiAcpProviderSettings, StructuredError } from "../types.js";
 import { promptWorkflowProgressEmitter } from "./progress-emitter.js";
 import {
 	classifyProviderError,
@@ -66,9 +55,7 @@ export interface PromptOptions {
 /** Injectable dependencies for prompt tests and future shared status wiring. */
 export interface PromptDeps {
 	geminiAcpClient?: GeminiAcpClient;
-	geminiAcpClientFactory?: (
-		settings: GeminiAcpCommandSettings,
-	) => GeminiAcpClient;
+	geminiAcpClientFactory?: (settings: GeminiAcpCommandSettings) => GeminiAcpClient;
 	geminiApiKeyClientFactory?: () => GeminiAcpClient;
 	commandExists?: StatusCommandChecker;
 	authProbe?: GeminiAcpAuthProbe;
@@ -96,9 +83,7 @@ export interface PromptRunResult {
 	error?: StructuredError;
 }
 
-export type PromptUpdateHandler = (
-	update: PromptWorkflowUpdate,
-) => void | Promise<void>;
+export type PromptUpdateHandler = (update: PromptWorkflowUpdate) => void | Promise<void>;
 
 /** Result returned by the shared provider prompt turn before per-tool shaping. */
 export interface ProviderPromptRunResult {
@@ -119,12 +104,8 @@ export interface ProviderPromptContext {
 export interface ProviderPromptOptions extends PromptOptions {
 	parts?: GeminiAcpPromptPart[];
 	requireSearchGrounding?: boolean;
-	commandSettingsTransform?: (
-		settings: GeminiAcpCommandSettings,
-	) => GeminiAcpCommandSettings;
-	prePromptCheck?: (
-		context: Omit<ProviderPromptContext, "request">,
-	) => StructuredError | undefined;
+	commandSettingsTransform?: (settings: GeminiAcpCommandSettings) => GeminiAcpCommandSettings;
+	prePromptCheck?: (context: Omit<ProviderPromptContext, "request">) => StructuredError | undefined;
 	errorClassification?: ProviderErrorClassificationOptions;
 	promptExecutor?: (
 		context: ProviderPromptContext,
@@ -146,12 +127,9 @@ export async function runProviderPrompt(
 		text: "Checking Gemini ACP configuration.",
 	});
 	const loadedConfig =
-		options.config ??
-		configFromEnv(await loadConfig({ rootDir: options.rootDir }));
+		options.config ?? configFromEnv(await loadConfig({ rootDir: options.rootDir }));
 	const config =
-		options.useDefaultConfig === false
-			? loadedConfig
-			: withDefaultGeminiAcpConfig(loadedConfig);
+		options.useDefaultConfig === false ? loadedConfig : withDefaultGeminiAcpConfig(loadedConfig);
 	const settings = config.providers?.["gemini-acp"];
 	const preflight = await preflightGeminiAcpProvider(settings, {
 		commandExists: deps.commandExists,
@@ -159,35 +137,18 @@ export async function runProviderPrompt(
 		rootDir: options.rootDir,
 		signal,
 		authProbe: deps.authProbe,
-		persistAuthConfirmation: options.config ? false : true,
+		persistAuthConfirmation: !options.config,
 	});
 	const baseCommandSettings = buildGeminiAcpCommandSettings(settings);
 	const commandSettings =
-		options.commandSettingsTransform?.(baseCommandSettings) ??
-		baseCommandSettings;
+		options.commandSettingsTransform?.(baseCommandSettings) ?? baseCommandSettings;
 	const model = geminiAcpModelLabel(settings, commandSettings);
 	const quotaExhausted = isQuotaExhausted(model);
-	if (preflight && isAcpFallbackError(preflight)) {
-		if (geminiApiKeyConfigured(config)) {
-			return await runApiKeyPrompt(
-				options,
-				deps,
-				config,
-				model,
-				signal,
-				onUpdate,
-			);
-		}
+	if (preflight && isAcpFallbackError(preflight) && geminiApiKeyConfigured(config)) {
+		return await runApiKeyPrompt(options, deps, config, model, signal, onUpdate);
 	}
 	if (quotaExhausted && geminiApiKeyConfigured(config)) {
-		return await runApiKeyPrompt(
-			options,
-			deps,
-			config,
-			model,
-			signal,
-			onUpdate,
-		);
+		return await runApiKeyPrompt(options, deps, config, model, signal, onUpdate);
 	}
 	if (preflight) return { text: "", error: preflight };
 
@@ -218,39 +179,21 @@ export async function runProviderPrompt(
 		const executed = options.promptExecutor
 			? await options.promptExecutor(context, signal, onUpdate)
 			: await defaultPromptExecutor(context, deps, signal, onUpdate);
-		return typeof executed === "string"
-			? { text: executed, model }
-			: { ...executed, model };
+		return typeof executed === "string" ? { text: executed, model } : { ...executed, model };
 	} catch (cause) {
 		if (isQuotaExhaustedError(cause)) {
-			recordQuotaExhausted(
-				model,
-				cause instanceof Error ? cause.message : String(cause),
-			);
+			recordQuotaExhausted(model, cause instanceof Error ? cause.message : String(cause));
 			if (geminiApiKeyConfigured(config)) {
-				return await runApiKeyPrompt(
-					options,
-					deps,
-					config,
-					model,
-					signal,
-					onUpdate,
-				);
+				return await runApiKeyPrompt(options, deps, config, model, signal, onUpdate);
 			}
 		}
-		const classified = classifyProviderError(
-			cause,
-			signal,
-			options.errorClassification,
-		);
+		const classified = classifyProviderError(cause, signal, options.errorClassification);
 		return {
 			text: "",
-			error: providerError(
-				classified.code,
-				"provider_prompt",
-				classified.message,
-				{ retryable: classified.retryable, cause },
-			),
+			error: providerError(classified.code, "provider_prompt", classified.message, {
+				retryable: classified.retryable,
+				cause,
+			}),
 		};
 	}
 }
@@ -263,11 +206,7 @@ export async function runPrompt(
 	onUpdate?: PromptUpdateHandler,
 ): Promise<PromptRunResult> {
 	if (!options.prompt.trim()) {
-		return promptError(
-			"GEMINI_ACP_EMPTY_PROMPT",
-			"input_validation",
-			"Prompt text is required.",
-		);
+		return promptError("GEMINI_ACP_EMPTY_PROMPT", "input_validation", "Prompt text is required.");
 	}
 	const promptResult = await runProviderPrompt(options, deps, signal, onUpdate);
 	return promptResult.error
@@ -286,10 +225,9 @@ async function defaultPromptExecutor(
 ): Promise<string> {
 	const client =
 		deps.geminiAcpClient ??
-		(
-			deps.geminiAcpClientFactory ??
-			((settings) => getCachedGeminiAcpClient(settings, "prompt"))
-		)(context.commandSettings);
+		(deps.geminiAcpClientFactory ?? ((settings) => getCachedGeminiAcpClient(settings, "prompt")))(
+			context.commandSettings,
+		);
 	const header = context.requestSummary
 		? formatPromptRequestSummary(context.requestSummary)
 		: undefined;
@@ -300,7 +238,7 @@ async function defaultPromptExecutor(
 	);
 	const wrappedOnUpdate = onUpdate
 		? withGeminiBackendProgress(
-				async (chunk) => onUpdate(chunk),
+				async (chunk) => await onUpdate(chunk),
 				promptWorkflowProgressEmitter(onUpdate, "provider_stream"),
 				header,
 			)
@@ -327,9 +265,7 @@ async function runApiKeyPrompt(
 		text: `${header}\n\n● ${fallbackNote}`,
 		request: requestSummary,
 	});
-	const client =
-		deps.geminiApiKeyClientFactory?.() ??
-		new GeminiApiKeyClient({ config, model });
+	const client = deps.geminiApiKeyClientFactory?.() ?? new GeminiApiKeyClient({ config, model });
 	const request: GeminiAcpPromptRequest = {
 		prompt: options.prompt,
 		cwd: options.cwd,
@@ -362,10 +298,7 @@ function isAcpFallbackError(error: StructuredError): boolean {
 	);
 }
 
-async function compactPromptResult(
-	text: string,
-	options: PromptOptions,
-): Promise<PromptRunResult> {
+async function compactPromptResult(text: string, options: PromptOptions): Promise<PromptRunResult> {
 	const responseLength = text.length;
 	const inlineLimit = options.inlineLimit ?? PROMPT_RESPONSE_INLINE_LIMIT;
 	if (responseLength <= inlineLimit) {
@@ -390,10 +323,7 @@ async function compactPromptResult(
 	};
 }
 
-function promptRequestSummary(
-	options: PromptOptions,
-	model: string,
-): PromptRequestSummary {
+function promptRequestSummary(options: PromptOptions, model: string): PromptRequestSummary {
 	const summary = options.requestSummary ?? {
 		toolName: "gemini_prompt" as const,
 		action: "Sending prompt",
@@ -406,21 +336,14 @@ function promptRequestSummary(
 }
 
 /** Formats sanitized prompt request metadata for visible progress text. */
-export function formatPromptRequestSummary(
-	summary: PromptRequestSummary,
-): string {
-	const args = Object.entries(summary.arguments ?? {}).flatMap(
-		([key, value]) =>
-			value === undefined ? [] : `${key} ${formatRequestArgument(value)}`,
+export function formatPromptRequestSummary(summary: PromptRequestSummary): string {
+	const args = Object.entries(summary.arguments ?? {}).flatMap(([key, value]) =>
+		value === undefined ? [] : `${key} ${formatRequestArgument(value)}`,
 	);
 	const model = summary.arguments?.model;
 	const withoutModel = args.filter((arg) => !arg.startsWith("model "));
-	const subject = summary.subject
-		? `: "${truncateSummaryText(summary.subject)}"`
-		: "";
-	const withArgs = withoutModel.length
-		? ` with ${withoutModel.join(", ")}`
-		: "";
+	const subject = summary.subject ? `: "${truncateSummaryText(summary.subject)}"` : "";
+	const withArgs = withoutModel.length > 0 ? ` with ${withoutModel.join(", ")}` : "";
 	const via = model ? ` via ${formatRequestArgument(model)}` : "";
 	return `${summary.action}${subject}${withArgs}${via}.`;
 }
@@ -429,9 +352,7 @@ function truncateSummaryText(value: string): string {
 	return value.length <= 160 ? value : `${value.slice(0, 159)}…`;
 }
 
-function formatRequestArgument(
-	value: Exclude<PromptRequestArgument, undefined>,
-): string {
+function formatRequestArgument(value: Exclude<PromptRequestArgument, undefined>): string {
 	return typeof value === "string" ? value : String(value);
 }
 
@@ -439,16 +360,10 @@ function geminiAcpModelLabel(
 	settings: GeminiAcpProviderSettings | undefined,
 	commandSettings: GeminiAcpCommandSettings,
 ): string {
-	return (
-		settings?.model?.trim() ||
-		modelFromArgs(commandSettings.args) ||
-		"Gemini ACP default"
-	);
+	return settings?.model?.trim() ?? modelFromArgs(commandSettings.args) ?? "Gemini ACP default";
 }
 
-function modelFromArgs(
-	args: readonly string[] | undefined,
-): string | undefined {
+function modelFromArgs(args: readonly string[] | undefined): string | undefined {
 	if (!args) return undefined;
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
@@ -472,11 +387,7 @@ function emptyPromptResult(): PromptRunResult {
 	};
 }
 
-function promptError(
-	code: string,
-	phase: string,
-	message: string,
-): PromptRunResult {
+function promptError(code: string, phase: string, message: string): PromptRunResult {
 	return {
 		...emptyPromptResult(),
 		error: providerError(code, phase, message, { retryable: false }),

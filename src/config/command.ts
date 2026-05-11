@@ -41,8 +41,7 @@ export async function resolveGeminiAcpCommand(
 	const platform = options.platform ?? process.platform;
 	const pathApi = platform === "win32" ? path.win32 : path;
 	const searched: string[] = [];
-	if (!input)
-		return { input, found: false, source: "not-found", platform, searched };
+	if (!input) return { input, found: false, source: "not-found", platform, searched };
 	const canAccess = options.access ?? access;
 	const mode = platform === "win32" ? constants.F_OK : constants.X_OK;
 	if (isPathLikeCommand(input, platform)) {
@@ -60,11 +59,7 @@ export async function resolveGeminiAcpCommand(
 			: { input, found: false, source: "not-found", platform, searched };
 	}
 	for (const dir of pathEntries(options.env ?? process.env, platform)) {
-		for (const name of commandCandidateNames(
-			input,
-			options.env ?? process.env,
-			platform,
-		)) {
+		for (const name of commandCandidateNames(input, options.env ?? process.env, platform)) {
 			const candidate = pathApi.join(dir, name);
 			if (searched.includes(candidate)) continue;
 			searched.push(candidate);
@@ -84,9 +79,7 @@ export async function resolveGeminiAcpCommand(
 }
 
 /** Checks whether a Gemini ACP command can be resolved for the current process. */
-export async function defaultGeminiAcpCommandExists(
-	command: string,
-): Promise<boolean> {
+export async function defaultGeminiAcpCommandExists(command: string): Promise<boolean> {
 	return (await resolveGeminiAcpCommand(command)).found;
 }
 
@@ -107,6 +100,7 @@ export function spawnCommandForGeminiAcpResolution(
 				"/c",
 				"call",
 				quoteCmdArg(resolution.command),
+				// oxlint-disable-next-line unicorn/no-array-callback-reference -- quoteCmdArg takes one arg
 				...args.map(quoteCmdArg),
 			],
 			windowsVerbatimArguments: true,
@@ -116,9 +110,7 @@ export function spawnCommandForGeminiAcpResolution(
 }
 
 /** Explains how command resolution failed without leaking unrelated environment values. */
-export function geminiAcpCommandNotFoundMessage(
-	resolution: GeminiAcpCommandResolution,
-): string {
+export function geminiAcpCommandNotFoundMessage(resolution: GeminiAcpCommandResolution): string {
 	const searched = resolution.searched.length;
 	const windowsHint =
 		resolution.platform === "win32"
@@ -127,10 +119,7 @@ export function geminiAcpCommandNotFoundMessage(
 	return `Gemini ACP command '${resolution.input || "gemini"}' was not found from this Pi process. Searched ${searched} candidate${searched === 1 ? "" : "s"}.${windowsHint}`;
 }
 
-function isPathLikeCommand(
-	command: string,
-	platform: NodeJS.Platform,
-): boolean {
+function isPathLikeCommand(command: string, platform: NodeJS.Platform): boolean {
 	return (
 		(platform === "win32" ? path.win32 : path).isAbsolute(command) ||
 		command.includes("/") ||
@@ -151,14 +140,9 @@ async function isExecutable(
 	}
 }
 
-function pathEntries(
-	env: NodeJS.ProcessEnv,
-	platform: NodeJS.Platform,
-): string[] {
+function pathEntries(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string[] {
 	const value = envValue(env, "PATH", platform);
-	return (value ?? "")
-		.split(platform === "win32" ? ";" : path.delimiter)
-		.filter(Boolean);
+	return (value ?? "").split(platform === "win32" ? ";" : path.delimiter).filter(Boolean);
 }
 
 function commandCandidateNames(
@@ -169,9 +153,7 @@ function commandCandidateNames(
 	if (platform !== "win32") return [command];
 	const ext = path.win32.extname(command);
 	if (ext) return [command];
-	const names = windowsExecutableExtensions(env).map(
-		(suffix) => `${command}${suffix}`,
-	);
+	const names = windowsExecutableExtensions(env).map((suffix) => `${command}${suffix}`);
 	names.push(command);
 	return [...new Set(names)];
 }
@@ -182,7 +164,7 @@ function windowsExecutableExtensions(env: NodeJS.ProcessEnv): string[] {
 		.split(";")
 		.map((extension) => extension.trim())
 		.filter((extension) => extension && extension.toUpperCase() !== ".PS1");
-	return extensions.length ? extensions : [".COM", ".EXE", ".BAT", ".CMD"];
+	return extensions.length > 0 ? extensions : [".COM", ".EXE", ".BAT", ".CMD"];
 }
 
 function envValue(
@@ -191,9 +173,7 @@ function envValue(
 	platform: NodeJS.Platform,
 ): string | undefined {
 	if (platform !== "win32") return env[name];
-	const key = Object.keys(env).find(
-		(candidate) => candidate.toLowerCase() === name.toLowerCase(),
-	);
+	const key = Object.keys(env).find((candidate) => candidate.toLowerCase() === name.toLowerCase());
 	return key ? env[key] : undefined;
 }
 
@@ -206,7 +186,7 @@ function quoteCmdArg(value: string): string {
 	// cmd.exe /s performs special quote stripping when the /c payload starts
 	// with a quoted executable. `call` keeps the payload from starting with a
 	// quote, while windowsVerbatimArguments preserves these cmd-native escapes.
-	return `"${value.replace(/["^&|<>()]/gu, "^$&").replace(/%/gu, "%%")}"`;
+	return `"${value.replaceAll(/["^&|<>()]/gu, "^$&").replaceAll("%", "%%")}"`;
 }
 
 function commandProcessor(env: NodeJS.ProcessEnv): string {

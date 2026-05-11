@@ -221,9 +221,7 @@ describe("runPrompt", () => {
 		expect(result.error).toBeUndefined();
 		expect(result.text).toBe("ok");
 		expect(probeCalls).toBe(1);
-		expect(
-			(await loadConfig({ rootDir })).providers?.["gemini-acp"]?.authenticated,
-		).toBe(true);
+		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]?.authenticated).toBe(true);
 	});
 
 	it("returns structured provider preflight errors", async () => {
@@ -297,10 +295,7 @@ class AbortAwareGeminiClient extends FakeGeminiClient {
 		super([]);
 	}
 
-	override async prompt(
-		_request: GeminiAcpPromptRequest,
-		signal?: AbortSignal,
-	): Promise<string> {
+	override async prompt(_request: GeminiAcpPromptRequest, signal?: AbortSignal): Promise<string> {
 		if (signal?.aborted) {
 			throw new DOMException("aborted", "AbortError");
 		}

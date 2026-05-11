@@ -60,10 +60,8 @@ export const geminiResultsTool = defineGeminiTool({
 		});
 	},
 	renderResult(result, options, theme, context) {
-		const target = isRecallResult(result)
-			? resultsRecallRoute
-			: resultsGetRoute;
-		return target.renderResult!(result, options, theme, context);
+		const target = isRecallResult(result) ? resultsRecallRoute : resultsGetRoute;
+		return target.renderResult(result, options, theme, context);
 	},
 });
 

@@ -8,9 +8,7 @@ import {
 
 describe("provider-result helpers", () => {
 	it("builds canonical Gemini ACP structured errors", () => {
-		expect(
-			providerError("GEMINI_ACP_FAILED", "provider_prompt", "failed"),
-		).toEqual({
+		expect(providerError("GEMINI_ACP_FAILED", "provider_prompt", "failed")).toEqual({
 			code: "GEMINI_ACP_FAILED",
 			phase: "provider_prompt",
 			message: "failed",
@@ -23,22 +21,18 @@ describe("provider-result helpers", () => {
 		const controller = new AbortController();
 		controller.abort();
 
-		expect(classifyProviderError(new Error("late"), controller.signal)).toEqual(
-			{
-				code: "GEMINI_ACP_ABORTED",
-				message: "Gemini ACP prompt was aborted.",
-				retryable: true,
-			},
-		);
+		expect(classifyProviderError(new Error("late"), controller.signal)).toEqual({
+			code: "GEMINI_ACP_ABORTED",
+			message: "Gemini ACP prompt was aborted.",
+			retryable: true,
+		});
 	});
 
 	it("detects DOMException and Error abort shapes", () => {
 		const error = new Error("cancelled");
 		error.name = "AbortError";
 
-		expect(isAbortError(new DOMException("cancelled", "AbortError"))).toBe(
-			true,
-		);
+		expect(isAbortError(new DOMException("cancelled", "AbortError"))).toBe(true);
 		expect(isAbortError(error)).toBe(true);
 	});
 
@@ -60,9 +54,7 @@ describe("provider-result helpers", () => {
 		expect(classifyProviderError(new Error("unauthenticated"))).toMatchObject({
 			code: "GEMINI_ACP_UNAUTHENTICATED",
 		});
-		expect(
-			classifyProviderError(new Error("search unavailable")),
-		).toMatchObject({
+		expect(classifyProviderError(new Error("search unavailable"))).toMatchObject({
 			code: "GEMINI_ACP_SEARCH_UNAVAILABLE",
 		});
 	});

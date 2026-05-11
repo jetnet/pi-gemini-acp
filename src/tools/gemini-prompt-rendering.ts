@@ -25,9 +25,7 @@ export function renderPromptToolResult<TData>(
 	theme: unknown,
 	display: PromptToolDisplay<TData>,
 ): Component {
-	return boxedToolText(
-		dimToolText(formatPromptToolDisplay(result, options, display), theme),
-	);
+	return boxedToolText(dimToolText(formatPromptToolDisplay(result, options, display), theme));
 }
 
 /** Formats shared prompt workflow progress and streaming chunks for Pi render modes. */
@@ -47,8 +45,7 @@ export function resultMetadataLines(result: PiToolShell): string[] {
 	const details = result.details as Partial<ResultEnvelope<unknown>>;
 	const lines: string[] = [];
 	if (details.responseId) lines.push(`responseId: ${details.responseId}`);
-	if (details.fullOutputPath)
-		lines.push(`fullOutputPath: ${details.fullOutputPath}`);
+	if (details.fullOutputPath) lines.push(`fullOutputPath: ${details.fullOutputPath}`);
 	return lines;
 }
 
@@ -66,10 +63,7 @@ export function storedOutputLine(value: {
 }
 
 /** Appends the shared Ctrl+O expansion hint to collapsed display lines. */
-export function appendExpansionHint(
-	lines: string[],
-	details: string,
-): string[] {
+export function appendExpansionHint(lines: string[], details: string): string[] {
 	return [...lines, expandedToolOutputHint(details)];
 }
 
@@ -129,14 +123,11 @@ function formatPromptProgressExpanded(
 	return [`${toolName} ${update.phase}`, `message: ${update.text}`].join("\n");
 }
 
-export function isPromptWorkflowUpdate(
-	value: unknown,
-): value is PromptWorkflowUpdate {
+export function isPromptWorkflowUpdate(value: unknown): value is PromptWorkflowUpdate {
 	return (
 		isRecord(value) &&
 		(value.type === "chunk"
-			? typeof value.text === "string" &&
-				typeof value.accumulatedText === "string"
+			? typeof value.text === "string" && typeof value.accumulatedText === "string"
 			: value.type === "progress" &&
 				typeof value.phase === "string" &&
 				typeof value.text === "string")

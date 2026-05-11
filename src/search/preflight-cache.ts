@@ -67,9 +67,7 @@ export function invalidateSearchPreflight(
 	settings: GeminiAcpCommandSettings,
 	requireSearchGrounding: boolean,
 ): void {
-	searchPreflightCache.delete(
-		searchPreflightCacheKey(settings, requireSearchGrounding),
-	);
+	searchPreflightCache.delete(searchPreflightCacheKey(settings, requireSearchGrounding));
 }
 
 function cachedSearchPreflight(key: string): PreflightCacheEntry | undefined {
@@ -94,9 +92,7 @@ function setSuccessfulSearchPreflight(
 
 function searchPreflightTtlMs(env: NodeJS.ProcessEnv = process.env): number {
 	const parsed = Number(env[SEARCH_PREFLIGHT_TTL_ENV]);
-	return Number.isInteger(parsed) && parsed > 0
-		? parsed
-		: DEFAULT_SEARCH_PREFLIGHT_TTL_MS;
+	return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_SEARCH_PREFLIGHT_TTL_MS;
 }
 
 function searchPreflightCacheKey(
@@ -109,9 +105,7 @@ function searchPreflightCacheKey(
 	});
 }
 
-function invalidateSearchPreflightForClientCacheKey(
-	clientCacheKey: string,
-): void {
+function invalidateSearchPreflightForClientCacheKey(clientCacheKey: string): void {
 	for (const [key, entry] of searchPreflightCache) {
 		if (entry.clientCacheKey === clientCacheKey) {
 			searchPreflightCache.delete(key);

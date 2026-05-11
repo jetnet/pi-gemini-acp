@@ -2,10 +2,7 @@
  * @fileoverview Internal image-analysis route used by the gemini_analyze umbrella tool.
  */
 import { type Static, Type } from "@earendil-works/pi-ai";
-import {
-	type ImageDescribeResult,
-	runImageDescribe,
-} from "../prompt/image-describe.js";
+import { type ImageDescribeResult, runImageDescribe } from "../prompt/image-describe.js";
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import type { PiToolShell } from "../types.js";
 import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
@@ -50,9 +47,7 @@ const analyzeImageParamsSchema = Type.Object({
 			description: "Base dir for resolving imagePath; no scanning.",
 		}),
 	),
-	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response cache." }),
-	),
+	bypassCache: Type.Optional(Type.Boolean({ description: "Skip response cache." })),
 });
 
 type Params = Static<typeof analyzeImageParamsSchema>;
@@ -65,11 +60,7 @@ export const analyzeImageRoute = {
 		onUpdate?: ToolUpdate,
 		_ctx?: unknown,
 	) {
-		const result = await runImageDescribe(
-			params,
-			signal,
-			imageDescribeToolUpdate(onUpdate),
-		);
+		const result = await runImageDescribe(params, signal, imageDescribeToolUpdate(onUpdate));
 		if (result.error) {
 			return errorResult(result.error, resultText(result), { data: result });
 		}
@@ -117,26 +108,18 @@ function formatImageDescribeCollapsed(result: ImageDescribeResult): string {
 		).join("\n");
 	}
 	return appendExpansionHint(
-		[
-			`Image description completed: ${input}`,
-			truncateToolText(result.caption ?? "", 240),
-		],
+		[`Image description completed: ${input}`, truncateToolText(result.caption ?? "", 240)],
 		"full image description",
 	).join("\n");
 }
 
-function formatImageDescribeExpanded(
-	result: ImageDescribeResult,
-	shell: PiToolShell,
-): string {
+function formatImageDescribeExpanded(result: ImageDescribeResult, shell: PiToolShell): string {
 	const imageLines = result.image
 		? [
 				`image.kind: ${result.image.kind}`,
 				`image.mimeType: ${result.image.mimeType}`,
 				`image.sizeBytes: ${result.image.sizeBytes}`,
-				result.image.kind === "path"
-					? `image.path: ${result.image.path}`
-					: undefined,
+				result.image.kind === "path" ? `image.path: ${result.image.path}` : undefined,
 			]
 		: ["image: none"];
 	return [
@@ -177,11 +160,8 @@ function resultText(result: ImageDescribeResult): string {
 }
 
 function cacheMarker(result: ImageDescribeResult): string {
-	const status = (result as { cacheStatus?: { hit?: boolean; ageMs?: number } })
-		.cacheStatus;
-	return status?.hit
-		? `[cache: hit, age ${Math.round((status.ageMs ?? 0) / 1000)}s]\n`
-		: "";
+	const status = (result as { cacheStatus?: { hit?: boolean; ageMs?: number } }).cacheStatus;
+	return status?.hit ? `[cache: hit, age ${Math.round((status.ageMs ?? 0) / 1000)}s]\n` : "";
 }
 
 function imageDescribeToolUpdate(

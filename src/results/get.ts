@@ -51,16 +51,11 @@ export const resultsGetRoute = {
 		theme: unknown,
 		_context?: unknown,
 	) {
-		return boxedToolText(
-			dimToolText(formatGetResultToolDisplay(result, options), theme),
-		);
+		return boxedToolText(dimToolText(formatGetResultToolDisplay(result, options), theme));
 	},
 };
 
-function formatGetResultToolDisplay(
-	result: PiToolShell,
-	options: ToolRenderResultOptions,
-): string {
+function formatGetResultToolDisplay(result: PiToolShell, options: ToolRenderResultOptions): string {
 	const details = result.details as Partial<ResultEnvelope<unknown>>;
 	if (details.error) return formatError(details.error, options);
 	return formatCollapsedOrExpanded(result, options, {
@@ -86,9 +81,7 @@ function formatGetResultExpanded(result: PiToolShell): string {
 	return [
 		result.content[0]?.text,
 		details.responseId ? `responseId: ${details.responseId}` : undefined,
-		details.fullOutputPath
-			? `fullOutputPath: ${details.fullOutputPath}`
-			: undefined,
+		details.fullOutputPath ? `fullOutputPath: ${details.fullOutputPath}` : undefined,
 		"Stored result preview:",
 		truncateToolText(JSON.stringify(details.data, null, 2), 4_000),
 	]
@@ -96,18 +89,11 @@ function formatGetResultExpanded(result: PiToolShell): string {
 		.join("\n");
 }
 
-function formatError(
-	error: StructuredError,
-	options: ToolRenderResultOptions,
-): string {
+function formatError(error: StructuredError, options: ToolRenderResultOptions): string {
 	return formatCollapsedOrExpanded(error, options, {
 		collapsed: (value) => value.message,
 		expanded: (value) =>
-			[
-				value.message,
-				`code: ${value.code}`,
-				value.phase ? `phase: ${value.phase}` : undefined,
-			]
+			[value.message, `code: ${value.code}`, value.phase ? `phase: ${value.phase}` : undefined]
 				.filter(Boolean)
 				.join("\n"),
 	});
@@ -116,7 +102,7 @@ function formatError(
 function storedValueSummary(value: unknown): string | undefined {
 	if (isRecord(value)) {
 		const keys = Object.keys(value).slice(0, 6);
-		return keys.length ? `top-level keys: ${keys.join(", ")}` : undefined;
+		return keys.length > 0 ? `top-level keys: ${keys.join(", ")}` : undefined;
 	}
 	if (typeof value === "string") return truncateToolText(value, 180);
 	return value === undefined ? undefined : typeof value;

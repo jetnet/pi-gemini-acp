@@ -4,11 +4,7 @@
 import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import type { ExtractRunResult } from "../../prompt/extract.js";
-import type {
-	PiToolShell,
-	ResearchResult,
-	ResultEnvelope,
-} from "../../types.js";
+import type { PiToolShell, ResearchResult, ResultEnvelope } from "../../types.js";
 import { formatExtractToolText } from "../../ask/extract.js";
 import { formatResearchToolText } from "../gemini-research.js";
 import { geminiAcpTools } from "../register.js";
@@ -27,14 +23,8 @@ describe("gemini ACP tools smoke", () => {
 	});
 
 	it("gemini_status output includes modelAdapter field with expected shape", async () => {
-		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_status",
-		);
-		const result = await tool?.execute(
-			"x",
-			{} as never,
-			new AbortController().signal,
-		);
+		const tool = geminiAcpTools.find((candidate) => candidate.name === "gemini_status");
+		const result = await tool?.execute("x", {} as never, new AbortController().signal);
 		assertShell(result);
 		const data = (result.details as ResultEnvelope<unknown>).data as {
 			modelAdapter: {
@@ -50,17 +40,13 @@ describe("gemini ACP tools smoke", () => {
 	});
 
 	it("returns Pi shell with visible data and progress for local search", async () => {
-		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_search",
-		);
+		const tool = geminiAcpTools.find((candidate) => candidate.name === "gemini_search");
 		const updates: PiToolShell[] = [];
 		const result = await tool?.execute(
 			"x",
 			{
 				query: "alpha",
-				localDocuments: [
-					{ title: "Alpha", url: "https://example.com/", text: "alpha text" },
-				],
+				localDocuments: [{ title: "Alpha", url: "https://example.com/", text: "alpha text" }],
 			} as never,
 			new AbortController().signal,
 			(update) => {
@@ -71,39 +57,30 @@ describe("gemini ACP tools smoke", () => {
 		expect(result.content[0]?.text).toContain("1 result");
 		expect(result.content[0]?.text).toContain("https://example.com/");
 		expect(result.content[0]?.text).not.toContain("Search result data JSON");
-		expect(
-			(result.details as ResultEnvelope<{ results: unknown[] }>).data.results,
-		).toHaveLength(1);
+		expect((result.details as ResultEnvelope<{ results: unknown[] }>).data.results).toHaveLength(1);
 		const collapsed = tool?.renderResult?.(
 			result,
 			{ expanded: false, isPartial: false },
 			undefined,
 			{ expanded: false, isPartial: false },
 		);
-		const expanded = tool?.renderResult?.(
-			result,
-			{ expanded: true, isPartial: false },
-			undefined,
-			{ expanded: true, isPartial: false },
-		);
+		const expanded = tool?.renderResult?.(result, { expanded: true, isPartial: false }, undefined, {
+			expanded: true,
+			isPartial: false,
+		});
 		expect(collapsed?.render(120).join("\n")).toContain("Press Ctrl+O");
 		expect(collapsed?.render(120).join("\n")).not.toContain("Top result");
 		expect(expanded?.render(120).join("\n")).toContain("provider: local");
 		expect(expanded?.render(120).join("\n")).toContain("Alpha");
 		const phases = updates.map(
 			(update) =>
-				(update.details as ResultEnvelope<{ progress: { phase: string } }>).data
-					.progress.phase,
+				(update.details as ResultEnvelope<{ progress: { phase: string } }>).data.progress.phase,
 		);
-		expect(phases).toEqual(
-			expect.arrayContaining(["local_search", "store_results", "complete"]),
-		);
+		expect(phases).toEqual(expect.arrayContaining(["local_search", "store_results", "complete"]));
 	});
 
 	it("renders search call title through the shared renderer lifecycle", () => {
-		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_search",
-		);
+		const tool = geminiAcpTools.find((candidate) => candidate.name === "gemini_search");
 		const state: Record<string, unknown> = {};
 		const partial = tool?.renderCall?.({} as never, undefined, {
 			expanded: false,
@@ -194,9 +171,7 @@ describe("gemini ACP tools smoke", () => {
 	});
 
 	it("renders prompt-style output collapsed and expanded without changing content", () => {
-		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_ask",
-		);
+		const tool = geminiAcpTools.find((candidate) => candidate.name === "gemini_ask");
 		const text = `${"alpha response ".repeat(30)}done`;
 		const result = toolResult({
 			text: `Gemini ACP response:\n${text}`,
@@ -215,12 +190,10 @@ describe("gemini ACP tools smoke", () => {
 			undefined,
 			{ expanded: false, isPartial: false },
 		);
-		const expanded = tool?.renderResult?.(
-			result,
-			{ expanded: true, isPartial: false },
-			undefined,
-			{ expanded: true, isPartial: false },
-		);
+		const expanded = tool?.renderResult?.(result, { expanded: true, isPartial: false }, undefined, {
+			expanded: true,
+			isPartial: false,
+		});
 		expect(collapsed?.render(120).join("\n")).toContain("Press Ctrl+O");
 		expect(collapsed?.render(120).join("\n")).toContain("Preview:");
 		const expandedText = expanded?.render(120).join("\n");
@@ -230,9 +203,7 @@ describe("gemini ACP tools smoke", () => {
 	});
 
 	it("renders prompt-style streaming progress in collapsed and expanded modes", () => {
-		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_ask",
-		);
+		const tool = geminiAcpTools.find((candidate) => candidate.name === "gemini_ask");
 		const update = toolResult({
 			text: "stream chunk",
 			status: "streaming",
@@ -248,23 +219,17 @@ describe("gemini ACP tools smoke", () => {
 			undefined,
 			{ expanded: false, isPartial: true },
 		);
-		const expanded = tool?.renderResult?.(
-			update,
-			{ expanded: true, isPartial: true },
-			undefined,
-			{ expanded: true, isPartial: true },
-		);
-		expect(collapsed?.render(120).join("\n")).toContain(
-			"Receiving: stream chunk",
-		);
+		const expanded = tool?.renderResult?.(update, { expanded: true, isPartial: true }, undefined, {
+			expanded: true,
+			isPartial: true,
+		});
+		expect(collapsed?.render(120).join("\n")).toContain("Receiving: stream chunk");
 		expect(expanded?.render(120).join("\n")).toContain("accumulated preview:");
 		expect(expanded?.render(120).join("\n")).toContain("first stream chunk");
 	});
 
 	it("renders code review findings concisely until expanded", () => {
-		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_ask",
-		);
+		const tool = geminiAcpTools.find((candidate) => candidate.name === "gemini_ask");
 		const reviewText = [
 			"## Blockers",
 			"- [blocker] Crash on empty input — evidence; impact; recommendation.",
@@ -300,25 +265,19 @@ describe("gemini ACP tools smoke", () => {
 			undefined,
 			{ expanded: false, isPartial: false },
 		);
-		const expanded = tool?.renderResult?.(
-			result,
-			{ expanded: true, isPartial: false },
-			undefined,
-			{ expanded: true, isPartial: false },
-		);
+		const expanded = tool?.renderResult?.(result, { expanded: true, isPartial: false }, undefined, {
+			expanded: true,
+			isPartial: false,
+		});
 		expect(collapsed?.render(120).join("\n")).toContain("2 finding");
 		expect(collapsed?.render(120).join("\n")).toContain("Press Ctrl+O");
-		expect(collapsed?.render(120).join("\n")).not.toContain(
-			"Crash on empty input",
-		);
+		expect(collapsed?.render(120).join("\n")).not.toContain("Crash on empty input");
 		expect(expanded?.render(120).join("\n")).toContain("Crash on empty input");
 		expect(expanded?.render(120).join("\n")).toContain("responseLength:");
 	});
 
 	it("renders translation previews and structured progress metadata", () => {
-		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_ask",
-		);
+		const tool = geminiAcpTools.find((candidate) => candidate.name === "gemini_ask");
 		const translation = `${"hola ".repeat(60)}fin`;
 		const result: PiToolShell = {
 			content: [
@@ -357,12 +316,10 @@ describe("gemini ACP tools smoke", () => {
 			undefined,
 			{ expanded: false, isPartial: false },
 		);
-		const expanded = tool?.renderResult?.(
-			result,
-			{ expanded: true, isPartial: false },
-			undefined,
-			{ expanded: true, isPartial: false },
-		);
+		const expanded = tool?.renderResult?.(result, { expanded: true, isPartial: false }, undefined, {
+			expanded: true,
+			isPartial: false,
+		});
 		const progressCollapsed = tool?.renderResult?.(
 			progress,
 			{ expanded: false, isPartial: true },
@@ -373,20 +330,15 @@ describe("gemini ACP tools smoke", () => {
 		expect(collapsed?.render(120).join("\n").length).toBeLessThan(
 			expanded?.render(120).join("\n").length ?? 0,
 		);
-		expect(expanded?.render(120).join("\n")).toContain(
-			"targetLanguage: Spanish",
-		);
+		expect(expanded?.render(120).join("\n")).toContain("targetLanguage: Spanish");
 		expect(progressCollapsed?.render(120).join("\n")).toContain("hola");
 		expect(
-			(progress.details as ResultEnvelope<{ progress: { type: string } }>).data
-				.progress.type,
+			(progress.details as ResultEnvelope<{ progress: { type: string } }>).data.progress.type,
 		).toBe("chunk");
 	});
 
 	it("returns Pi shell for file analysis validation errors", async () => {
-		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_analyze",
-		);
+		const tool = geminiAcpTools.find((candidate) => candidate.name === "gemini_analyze");
 		const progress: PiToolShell[] = [];
 		const result = await tool?.execute(
 			"x",
@@ -401,9 +353,7 @@ describe("gemini ACP tools smoke", () => {
 			},
 		);
 		assertShell(result);
-		expect(result?.content[0]?.text).toContain(
-			"Hidden files or directories are rejected",
-		);
+		expect(result?.content[0]?.text).toContain("Hidden files or directories are rejected");
 		expect(result?.details).toMatchObject({
 			status: "error",
 			error: { code: "GEMINI_FILE_ANALYZE_HIDDEN_PATH_REJECTED" },
@@ -413,15 +363,13 @@ describe("gemini ACP tools smoke", () => {
 	});
 
 	it("returns explicit base64-unsupported shell for image description", async () => {
-		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_analyze",
-		);
+		const tool = geminiAcpTools.find((candidate) => candidate.name === "gemini_analyze");
 		const result = await tool?.execute(
 			"x",
 			{
-				imageDataBase64: Buffer.from([
-					0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-				]).toString("base64"),
+				imageDataBase64: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).toString(
+					"base64",
+				),
 				mimeType: "image/png",
 			} as never,
 			new AbortController().signal,
@@ -434,17 +382,13 @@ describe("gemini ACP tools smoke", () => {
 	});
 
 	it("renders local research progress and collapsed/expanded results", async () => {
-		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_research",
-		);
+		const tool = geminiAcpTools.find((candidate) => candidate.name === "gemini_research");
 		const updates: PiToolShell[] = [];
 		const result = await tool?.execute(
 			"x",
 			{
 				query: "alpha",
-				sources: [
-					{ title: "Alpha", url: "https://example.com/", text: "alpha text" },
-				],
+				sources: [{ title: "Alpha", url: "https://example.com/", text: "alpha text" }],
 			} as never,
 			new AbortController().signal,
 			(update) => {
@@ -461,23 +405,19 @@ describe("gemini ACP tools smoke", () => {
 		});
 
 		const collapsedProgress = tool?.renderResult?.(
-			updates[0] as PiToolShell,
+			updates[0],
 			{ expanded: false, isPartial: true },
 			undefined,
 			{ expanded: false, isPartial: true },
 		);
 		const expandedProgress = tool?.renderResult?.(
-			updates[0] as PiToolShell,
+			updates[0],
 			{ expanded: true, isPartial: true },
 			undefined,
 			{ expanded: true, isPartial: true },
 		);
-		expect(collapsedProgress?.render(120).join("\n")).toContain(
-			"Collecting sources",
-		);
-		expect(expandedProgress?.render(120).join("\n")).toContain(
-			"gemini_research search",
-		);
+		expect(collapsedProgress?.render(120).join("\n")).toContain("Collecting sources");
+		expect(expandedProgress?.render(120).join("\n")).toContain("gemini_research search");
 
 		const collapsed = tool?.renderResult?.(
 			result,
@@ -485,12 +425,10 @@ describe("gemini ACP tools smoke", () => {
 			undefined,
 			{ expanded: false, isPartial: false },
 		);
-		const expanded = tool?.renderResult?.(
-			result,
-			{ expanded: true, isPartial: false },
-			undefined,
-			{ expanded: true, isPartial: false },
-		);
+		const expanded = tool?.renderResult?.(result, { expanded: true, isPartial: false }, undefined, {
+			expanded: true,
+			isPartial: false,
+		});
 		const collapsedText = collapsed?.render(120).join("\n");
 		const expandedText = expanded?.render(120).join("\n");
 		expect(collapsedText).toContain("sources: 1; findings: 1; citations: 1");
@@ -503,9 +441,7 @@ describe("gemini ACP tools smoke", () => {
 	});
 });
 
-function assertShell(
-	result: PiToolShell | undefined,
-): asserts result is PiToolShell {
+function assertShell(result: PiToolShell | undefined): asserts result is PiToolShell {
 	expect(result?.content[0]?.type).toBe("text");
 	expect(result?.details).toBeTruthy();
 }

@@ -156,8 +156,7 @@ describe("runResearch", () => {
 			expect.arrayContaining([
 				expect.objectContaining({
 					phase: "search",
-					message:
-						'Sending search prompt: "alpha" with 2 max results via Gemini ACP default.',
+					message: 'Sending search prompt: "alpha" with 2 max results via Gemini ACP default.',
 					provider: "gemini-acp",
 					model: "Gemini ACP default",
 					maxResults: 2,
@@ -185,9 +184,7 @@ describe("runResearch", () => {
 					text: "Alpha élan confirmed",
 					providerMetadata: {
 						grounding_metadata: {
-							grounding_chunks: [
-								{ web: { uri: "https://example.com/a", title: "Alpha" } },
-							],
+							grounding_chunks: [{ web: { uri: "https://example.com/a", title: "Alpha" } }],
 							grounding_supports: [
 								{
 									segment: {
@@ -209,9 +206,7 @@ describe("runResearch", () => {
 			expect.arrayContaining([
 				expect.objectContaining({
 					marker: "[1]",
-					providerSources: [
-						expect.objectContaining({ url: "https://example.com/a" }),
-					],
+					providerSources: [expect.objectContaining({ url: "https://example.com/a" })],
 				}),
 				expect.objectContaining({
 					sourceId: "s1",

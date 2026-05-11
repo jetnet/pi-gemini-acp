@@ -33,9 +33,7 @@ describe("Gemini ACP model configuration", () => {
 		expect(result.status.selectedModel).toBe("gemini-2.5-pro");
 		const config = await loadConfig({ rootDir });
 		expect(config.providers?.["gemini-acp"]?.model).toBe("gemini-2.5-pro");
-		expect(config.providers?.["gemini-acp"]?.modelSelectionAvailable).toBe(
-			true,
-		);
+		expect(config.providers?.["gemini-acp"]?.modelSelectionAvailable).toBe(true);
 		expect(config.providers?.["gemini-acp"]?.modelSelectionCheckedAt).toBe(
 			"2026-05-02T00:00:00.000Z",
 		);
@@ -46,10 +44,7 @@ describe("Gemini ACP model configuration", () => {
 		async () => {
 			const binDir = await mkdtemp(path.join(rootDir, "bin-"));
 			const geminiPath = path.join(binDir, "gemini");
-			await writeFile(
-				geminiPath,
-				"#!/bin/sh\necho 'Usage: gemini --acp --model <model>'\n",
-			);
+			await writeFile(geminiPath, "#!/bin/sh\necho 'Usage: gemini --acp --model <model>'\n");
 			await chmod(geminiPath, 0o755);
 			process.env.PATH = `${binDir}${path.delimiter}${originalPath ?? ""}`;
 			await saveGeminiAcpSettings(
@@ -94,10 +89,7 @@ describe("Gemini ACP model configuration", () => {
 	});
 
 	it("reports unsupported model selection without persisting the requested model", async () => {
-		await saveGeminiAcpSettings(
-			{ enabled: true, command: "gemini", args: ["--acp"] },
-			{ rootDir },
-		);
+		await saveGeminiAcpSettings({ enabled: true, command: "gemini", args: ["--acp"] }, { rootDir });
 
 		const result = await setGeminiAcpModel(
 			{ model: "models/gemini-2.5-flash", rootDir },

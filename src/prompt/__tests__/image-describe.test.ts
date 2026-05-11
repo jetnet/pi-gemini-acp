@@ -84,9 +84,7 @@ describe("gemini image describe", () => {
 			path: path.join(rootDir, "sample.png"),
 			relativePath: "sample.png",
 		});
-		expect(commandSettings?.allowedReadPaths).toEqual([
-			path.join(rootDir, "sample.png"),
-		]);
+		expect(commandSettings?.allowedReadPaths).toEqual([path.join(rootDir, "sample.png")]);
 		expect(JSON.stringify(prompts[0])).toContain('"resource_link"');
 		expect(JSON.stringify(prompts[0])).toContain(
 			pathToFileURL(path.join(rootDir, "sample.png")).href,
@@ -319,9 +317,7 @@ describe("gemini image describe", () => {
 			imagePath: path.join(rootDir, "vector.svg"),
 		});
 
-		expect("error" in result && result.error.code).toBe(
-			"GEMINI_IMAGE_DESCRIBE_UNSUPPORTED_TYPE",
-		);
+		expect("error" in result && result.error.code).toBe("GEMINI_IMAGE_DESCRIBE_UNSUPPORTED_TYPE");
 	});
 
 	it("rejects mismatched file extension and image header", async () => {
@@ -330,9 +326,7 @@ describe("gemini image describe", () => {
 
 		const result = await validateImageInput({ imagePath, cwd: rootDir });
 
-		expect("error" in result && result.error.code).toBe(
-			"GEMINI_IMAGE_DESCRIBE_MIME_MISMATCH",
-		);
+		expect("error" in result && result.error.code).toBe("GEMINI_IMAGE_DESCRIBE_MIME_MISMATCH");
 	});
 
 	it("does not follow symbolic links for image paths", async () => {
@@ -346,9 +340,7 @@ describe("gemini image describe", () => {
 			cwd: rootDir,
 		});
 
-		expect("error" in result && result.error.code).toBe(
-			"GEMINI_IMAGE_DESCRIBE_SYMLINK_DENIED",
-		);
+		expect("error" in result && result.error.code).toBe("GEMINI_IMAGE_DESCRIBE_SYMLINK_DENIED");
 	});
 });
 

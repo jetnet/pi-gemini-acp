@@ -55,10 +55,7 @@ export async function validateAnalyzeFiles(
 			return {
 				rootDir,
 				files,
-				error: inputError(
-					"GEMINI_FILE_ANALYZE_FILE_NOT_FOUND",
-					`File was not found: ${trimmed}`,
-				),
+				error: inputError("GEMINI_FILE_ANALYZE_FILE_NOT_FOUND", `File was not found: ${trimmed}`),
 			};
 		}
 		if (stat.isDirectory()) {
@@ -124,10 +121,7 @@ function unsafePathReason(
 			`File analysis paths must resolve under cwd: ${inputPath}`,
 		);
 	}
-	const inputSegments = path
-		.normalize(inputPath)
-		.split(path.sep)
-		.filter(Boolean);
+	const inputSegments = path.normalize(inputPath).split(path.sep).filter(Boolean);
 	if (inputSegments.some((segment) => segment.startsWith("."))) {
 		return inputError(
 			"GEMINI_FILE_ANALYZE_HIDDEN_PATH_REJECTED",
@@ -171,10 +165,7 @@ function mimeTypeForPath(filePath: string): string {
 
 function isWithinRoot(filePath: string, rootDir: string): boolean {
 	const relative = path.relative(rootDir, filePath);
-	return (
-		relative === "" ||
-		(!relative.startsWith("..") && !path.isAbsolute(relative))
-	);
+	return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 function toPosix(value: string): string {
@@ -183,9 +174,7 @@ function toPosix(value: string): string {
 
 function secretLikePath(basename: string, lowerPath: string): boolean {
 	return (
-		/^(id_rsa|id_dsa|id_ecdsa|id_ed25519|known_hosts|authorized_keys)$/u.test(
-			basename,
-		) ||
+		/^(id_rsa|id_dsa|id_ecdsa|id_ed25519|known_hosts|authorized_keys)$/u.test(basename) ||
 		/\.(pem|p12|pfx|key|keystore|jks)$/u.test(basename) ||
 		/(^|[-_.])(secret|token|password|passwd|credential|credentials|api[-_]?key)([-_.]|$)/u.test(
 			basename,

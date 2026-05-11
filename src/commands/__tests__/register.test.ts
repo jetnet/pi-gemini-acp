@@ -5,10 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadConfig } from "../../config/settings.js";
 import type { ResultEnvelope } from "../../types.js";
 import type { PiCommandOptions } from "../define.js";
-import {
-	parseGeminiConfigCommandArgs,
-	runGeminiConfig,
-} from "../gemini-config.js";
+import { parseGeminiConfigCommandArgs, runGeminiConfig } from "../gemini-config.js";
 import {
 	getGeminiModelCompletions,
 	runGeminiModelCommand,
@@ -35,21 +32,13 @@ describe("Gemini ACP command registration", () => {
 			},
 		});
 
-		expect(registered.map((entry) => entry.name)).toEqual([
-			"gemini-config",
-			"gemini-model",
-		]);
-		expect(
-			registered.every((entry) => typeof entry.options.handler === "function"),
-		).toBe(true);
+		expect(registered.map((entry) => entry.name)).toEqual(["gemini-config", "gemini-model"]);
+		expect(registered.every((entry) => typeof entry.options.handler === "function")).toBe(true);
 		expect(geminiAcpCommands.every((command) => command.parameters)).toBe(true);
 		expect(
-			registered.find((entry) => entry.name === "gemini-model")?.options
-				.getArgumentCompletions,
+			registered.find((entry) => entry.name === "gemini-model")?.options.getArgumentCompletions,
 		).toBe(getGeminiModelCompletions);
-		expect(
-			geminiAcpCommands.every((command) => command.name.startsWith("gemini-")),
-		).toBe(true);
+		expect(geminiAcpCommands.every((command) => command.name.startsWith("gemini-"))).toBe(true);
 	});
 
 	it("falls back to text model choices when UI is unavailable", async () => {
@@ -128,17 +117,14 @@ describe("Gemini ACP command registration", () => {
 						},
 					},
 				},
-				commandExists: async (command) =>
-					command === "/opt/homebrew/bin/gemini",
+				commandExists: async (command) => command === "/opt/homebrew/bin/gemini",
 			},
 		);
 
 		expect((result.details as ResultEnvelope).error).toBeUndefined();
 		expect(result.content[0]?.text).toContain("- settingsPersisted: yes");
 		expect(result.content[0]?.text).toContain("- command: gemini");
-		expect(result.content[0]?.text).toContain(
-			"- args: --acp --model gemini-3-flash-preview",
-		);
+		expect(result.content[0]?.text).toContain("- args: --acp --model gemini-3-flash-preview");
 		expect(result.content[0]?.text).toContain("- executable: found");
 		expect(result.content[0]?.text).toContain("- auth: confirmed");
 		expect(result.content[0]?.text).toContain("- search grounding: available");
@@ -148,12 +134,8 @@ describe("Gemini ACP command registration", () => {
 		expect(result.content[0]?.text).toContain(
 			"- image input: unknown (transport: unconfirmed; requires filesystem-read permission)",
 		);
-		expect(result.content[0]?.text).toContain(
-			"Selected model: gemini-3-flash-preview",
-		);
-		expect(result.content[0]?.text).toContain(
-			"- permission policy: file-read: filesystem read",
-		);
+		expect(result.content[0]?.text).toContain("Selected model: gemini-3-flash-preview");
+		expect(result.content[0]?.text).toContain("- permission policy: file-read: filesystem read");
 		expect(result.content[0]?.text).toContain("- filesystem read: enabled");
 	});
 
@@ -211,9 +193,7 @@ describe("Gemini ACP command registration", () => {
 		);
 
 		const config = await loadConfig({ rootDir });
-		expect((result.details as ResultEnvelope).error?.code).toBe(
-			"GEMINI_ACP_COMMAND_NOT_FOUND",
-		);
+		expect((result.details as ResultEnvelope).error?.code).toBe("GEMINI_ACP_COMMAND_NOT_FOUND");
 		expect(result.content[0]?.text).toContain("Install and authenticate");
 		expect(config.providers?.["gemini-acp"]).toMatchObject({
 			command: "missing-gemini",
@@ -222,11 +202,7 @@ describe("Gemini ACP command registration", () => {
 	});
 
 	it("parses command and args from raw slash-command text", () => {
-		expect(
-			parseGeminiConfigCommandArgs(
-				"command gemini --acp --model gemini-2.5-flash",
-			),
-		).toEqual({
+		expect(parseGeminiConfigCommandArgs("command gemini --acp --model gemini-2.5-flash")).toEqual({
 			action: "command",
 			executable: "gemini",
 			args: ["--acp", "--model", "gemini-2.5-flash"],
@@ -267,9 +243,10 @@ describe("Gemini ACP command registration", () => {
 		);
 
 		expect(result.content[0]?.text).toContain("--skip-trust");
-		expect(
-			(await loadConfig({ rootDir })).providers?.["gemini-acp"],
-		).toMatchObject({ command: "gemini", args: ["--acp", "--skip-trust"] });
+		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]).toMatchObject({
+			command: "gemini",
+			args: ["--acp", "--skip-trust"],
+		});
 	});
 
 	it("refuses secret-like args instead of persisting them", async () => {
@@ -322,9 +299,9 @@ describe("Gemini ACP command registration", () => {
 		);
 
 		expect(result.content[0]?.text).toContain("gemini-3.1-pro-preview");
-		expect(
-			(await loadConfig({ rootDir })).providers?.["gemini-acp"]?.model,
-		).toBe("gemini-3.1-pro-preview");
+		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]?.model).toBe(
+			"gemini-3.1-pro-preview",
+		);
 	});
 
 	it("offers slash-command completions for selectable models", () => {
@@ -339,27 +316,20 @@ describe("Gemini ACP command registration", () => {
 	});
 
 	it("shows Gemini ACP capability settings with descriptions", async () => {
-		const result = await runGeminiConfig(
-			{ action: "permissions" },
-			{ rootDir },
-		);
+		const result = await runGeminiConfig({ action: "permissions" }, { rootDir });
 
 		expect(result.content[0]?.text).toContain("Gemini ACP Capabilities:");
 		expect(result.content[0]?.text).toContain(
 			"- [ ] Filesystem read — Allow Gemini ACP to read text files from your workspace.",
 		);
-		expect(result.content[0]?.text).toContain(
-			"Required for: file analysis, reading project docs.",
-		);
+		expect(result.content[0]?.text).toContain("Required for: file analysis, reading project docs.");
 		expect(result.content[0]?.text).toContain(
 			"- [ ] Filesystem write — Allow Gemini ACP to write text files to your workspace. ⚠️ Requires confirmation.",
 		);
 		expect(result.content[0]?.text).toContain(
 			"- [ ] Terminal execution — Allow Gemini ACP to execute shell commands. ⚠️ Requires confirmation.",
 		);
-		expect(result.content[0]?.text).toContain(
-			"Current: restrictive (no capabilities enabled)",
-		);
+		expect(result.content[0]?.text).toContain("Current: restrictive (no capabilities enabled)");
 	});
 
 	it("toggles filesystemRead without risk confirmation", async () => {

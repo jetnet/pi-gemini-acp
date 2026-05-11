@@ -35,11 +35,7 @@ export interface JsonRpcNotification extends JsonRpcMessage {
 export interface JsonRpcStdioHandlers {
 	onRequest?: (message: JsonRpcRequest) => Promise<unknown> | unknown;
 	onNotification?: (message: JsonRpcNotification) => Promise<void> | void;
-	formatInvalidJsonError?: (
-		line: string,
-		cause: unknown,
-		stderrText: string,
-	) => Error;
+	formatInvalidJsonError?: (line: string, cause: unknown, stderrText: string) => Error;
 }
 
 /** Options for one outgoing JSON-RPC request. */
@@ -82,10 +78,7 @@ export class JsonRpcStdioClient {
 	private readonly child: ChildProcessWithoutNullStreams;
 	private readonly handlers: JsonRpcStdioHandlers;
 
-	constructor(
-		child: ChildProcessWithoutNullStreams,
-		handlers: JsonRpcStdioHandlers = {},
-	) {
+	constructor(child: ChildProcessWithoutNullStreams, handlers: JsonRpcStdioHandlers = {}) {
 		this.child = child;
 		this.handlers = handlers;
 		child.stdout.setEncoding("utf8");
@@ -142,11 +135,12 @@ export class JsonRpcStdioClient {
 				}
 			};
 			if (options.timeoutMs) {
+				const timeoutMs = options.timeoutMs;
 				timeout = setTimeout(() => {
 					this.pending.delete(id);
 					cleanup();
-					reject(new Error(`Timed out after ${options.timeoutMs}ms`));
-				}, options.timeoutMs);
+					reject(new Error(`Timed out after ${timeoutMs}ms`));
+				}, timeoutMs);
 			}
 			options.signal?.addEventListener("abort", abort, { once: true });
 		});
@@ -206,8 +200,8 @@ export class JsonRpcStdioClient {
 
 	private handleStdoutLine(line: string): void {
 		try {
-			void this.handleMessage(JSON.parse(line) as JsonRpcMessage).catch(
-				(cause: unknown) => this.rejectAll(errorFromCause(cause)),
+			void this.handleMessage(JSON.parse(line) as JsonRpcMessage).catch((cause: unknown) =>
+				this.rejectAll(errorFromCause(cause)),
 			);
 		} catch (cause) {
 			this.rejectAll(this.invalidJsonError(line, cause));
@@ -252,10 +246,7 @@ export class JsonRpcStdioClient {
 	private invalidJsonError(line: string, cause: unknown): Error {
 		return (
 			this.handlers.formatInvalidJsonError?.(line, cause, this.stderrBuffer) ??
-			new Error(
-				`JSON-RPC stdio emitted non-JSON stdout: ${line.slice(0, 240)}`,
-				{ cause },
-			)
+			new Error(`JSON-RPC stdio emitted non-JSON stdout: ${line.slice(0, 240)}`, { cause })
 		);
 	}
 

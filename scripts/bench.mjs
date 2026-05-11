@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import {
-	JsonRpcResponseError,
-	JsonRpcStdioClient,
-} from "../src/acp/jsonrpc-stdio.ts";
+import { JsonRpcResponseError, JsonRpcStdioClient } from "../src/acp/jsonrpc-stdio.ts";
 import { readFile } from "node:fs/promises";
 import { searchPrompt } from "../src/acp/search-prompt.ts";
 import { homedir } from "node:os";
@@ -13,15 +10,8 @@ import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const PROJECT_DIR = resolve(SCRIPT_DIR, "..");
-const DEFAULT_SETTINGS_PATH = join(
-	homedir(),
-	".pi",
-	"gemini-acp",
-	"config",
-	"settings.json",
-);
-const DEFAULT_QUERY =
-	"Amsterdam Netherlands current weather temperature conditions";
+const DEFAULT_SETTINGS_PATH = join(homedir(), ".pi", "gemini-acp", "config", "settings.json");
+const DEFAULT_QUERY = "Amsterdam Netherlands current weather temperature conditions";
 const DEFAULT_MODE = "warm";
 const DEFAULT_RUNS = 3;
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -104,10 +94,7 @@ function parseArgs(argv) {
 				options.maxResults = positiveInteger(value(), "--max-results");
 				break;
 			case "--lower-max-results":
-				options.lowerMaxResults = positiveInteger(
-					value(),
-					"--lower-max-results",
-				);
+				options.lowerMaxResults = positiveInteger(value(), "--lower-max-results");
 				break;
 			case "--mode":
 				options.mode = modeValue(value());
@@ -167,9 +154,7 @@ function modeValue(raw) {
 
 function promptVariantValue(raw) {
 	if ([...PROMPT_VARIANTS, "all"].includes(raw)) return raw;
-	throw new Error(
-		"--prompt-variant must be current, short-json, web-json, or all",
-	);
+	throw new Error("--prompt-variant must be current, short-json, web-json, or all");
 }
 
 function suiteValue(raw) {
@@ -182,8 +167,7 @@ function splitQueries(raw) {
 		.split("|")
 		.map((query) => query.trim())
 		.filter(Boolean);
-	if (queries.length === 0)
-		throw new Error("--parallel-queries must include at least one query");
+	if (queries.length === 0) throw new Error("--parallel-queries must include at least one query");
 	return queries;
 }
 
@@ -212,11 +196,8 @@ function benchmarkCases(options) {
 			benchCase(options, "web-json", options.maxResults),
 		];
 	}
-	const variants =
-		options.promptVariant === "all" ? PROMPT_VARIANTS : [options.promptVariant];
-	return variants.map((variant) =>
-		benchCase(options, variant, options.maxResults),
-	);
+	const variants = options.promptVariant === "all" ? PROMPT_VARIANTS : [options.promptVariant];
+	return variants.map((variant) => benchCase(options, variant, options.maxResults));
 }
 
 function benchCase(options, promptVariant, maxResults) {
@@ -312,10 +293,7 @@ class BenchAcpSession {
 		if (message.method === "session/request_permission") {
 			return { outcome: { outcome: "cancelled" } };
 		}
-		throw new JsonRpcResponseError(
-			-32601,
-			`Method not found: ${message.method}`,
-		);
+		throw new JsonRpcResponseError(-32601, `Method not found: ${message.method}`);
 	}
 }
 
@@ -352,13 +330,7 @@ async function measureFreshRun({
 		const sessionStart = performance.now();
 		const sessionId = await session.newSession();
 		const sessionMs = performance.now() - sessionStart;
-		const prompt = await measurePrompt(
-			session,
-			sessionId,
-			query,
-			maxResults,
-			promptVariant,
-		);
+		const prompt = await measurePrompt(session, sessionId, query, maxResults, promptVariant);
 		return {
 			run,
 			query,
@@ -446,24 +418,13 @@ async function runParallelBenchmark(options, commandSettings, bench) {
 		promptVariant: bench.promptVariant,
 		maxResults: bench.maxResults,
 		runs: batches,
-		summary: summarize(
-			batches.map((batch) => ({ totalMs: batch.wallClockMs })),
-		),
+		summary: summarize(batches.map((batch) => ({ totalMs: batch.wallClockMs }))),
 	};
 }
 
-async function measurePrompt(
-	session,
-	sessionId,
-	query,
-	maxResults,
-	promptVariant,
-) {
+async function measurePrompt(session, sessionId, query, maxResults, promptVariant) {
 	const promptStart = performance.now();
-	const text = await session.prompt(
-		sessionId,
-		buildSearchPrompt(query, maxResults, promptVariant),
-	);
+	const text = await session.prompt(sessionId, buildSearchPrompt(query, maxResults, promptVariant));
 	const promptMs = performance.now() - promptStart;
 	const parseStart = performance.now();
 	const parsed = parseSearchPayload(text);
@@ -511,13 +472,7 @@ function section(mode, bench, runs) {
 }
 
 function summarize(rows) {
-	const metrics = [
-		"totalMs",
-		"initializeMs",
-		"sessionMs",
-		"promptMs",
-		"parseMs",
-	];
+	const metrics = ["totalMs", "initializeMs", "sessionMs", "promptMs", "parseMs"];
 	return Object.fromEntries(
 		metrics
 			.filter((metric) => rows.every((row) => typeof row[metric] === "number"))
@@ -538,8 +493,7 @@ function stats(values) {
 
 function printProgress(options, mode, bench, row) {
 	if (options.json) return;
-	const batchLabel =
-		options.batches > 1 ? ` batch ${options.batch}/${options.batches}` : "";
+	const batchLabel = options.batches > 1 ? ` batch ${options.batch}/${options.batches}` : "";
 	console.log(
 		`completed ${mode} ${bench.label}${batchLabel} run ${row.run}/${options.runs}: total=${Math.round(row.totalMs)}ms results=${row.results}`,
 	);
@@ -547,8 +501,7 @@ function printProgress(options, mode, bench, row) {
 
 function printParallelProgress(options, bench, batch) {
 	if (options.json) return;
-	const batchLabel =
-		options.batches > 1 ? ` suite ${options.batch}/${options.batches}` : "";
+	const batchLabel = options.batches > 1 ? ` suite ${options.batch}/${options.batches}` : "";
 	console.log(
 		`completed parallel ${bench.label}${batchLabel} batch ${batch.run}/${options.runs}: wall=${Math.round(batch.wallClockMs)}ms queries=${batch.queries.length}`,
 	);
@@ -556,9 +509,7 @@ function printParallelProgress(options, bench, batch) {
 
 function printHuman({ commandSettings, options, sections }) {
 	console.log(`\nGemini ACP search benchmark`);
-	console.log(
-		`command: ${commandSettings.command} ${commandSettings.args.join(" ")}`,
-	);
+	console.log(`command: ${commandSettings.command} ${commandSettings.args.join(" ")}`);
 	console.log(`runs: ${options.runs}`);
 	console.log(`batches: ${options.batches}`);
 	for (const item of sections) {

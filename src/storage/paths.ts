@@ -20,9 +20,7 @@ export function expandHome(input: string): string {
 	return input;
 }
 
-export function resolveStoragePaths(
-	options: StorageOptions = {},
-): StoragePaths {
+export function resolveStoragePaths(options: StorageOptions = {}): StoragePaths {
 	const root = path.resolve(expandHome(options.rootDir ?? "~/.pi/gemini-acp"));
 	return {
 		root,

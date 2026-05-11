@@ -36,8 +36,7 @@ afterEach(async () => {
 describe("runTranslate", () => {
 	it("translates provided text through an injected Gemini ACP client", async () => {
 		const client = new FakeGeminiClient("Hola mundo");
-		const updates: Array<{ phase?: string; text: string; request?: unknown }> =
-			[];
+		const updates: Array<{ phase?: string; text: string; request?: unknown }> = [];
 		const result = await runTranslate(
 			{
 				text: "Hello world",
@@ -60,15 +59,9 @@ describe("runTranslate", () => {
 		expect(result.translatedText).toBe("Hola mundo");
 		expect(result.provider).toBe("gemini-acp");
 		expect(client.promptText).toContain("Target language: Spanish");
-		expect(client.promptText).toContain(
-			'Source text JSON: {"text":"Hello world"}',
-		);
-		const providerPrompt = updates.find(
-			(update) => update.phase === "provider_prompt",
-		);
-		expect(providerPrompt?.text).toContain(
-			'Sending translation prompt: "Spanish"',
-		);
+		expect(client.promptText).toContain('Source text JSON: {"text":"Hello world"}');
+		const providerPrompt = updates.find((update) => update.phase === "provider_prompt");
+		expect(providerPrompt?.text).toContain('Sending translation prompt: "Spanish"');
 		expect(providerPrompt?.text).toContain("targetLanguage Spanish");
 		expect(providerPrompt?.text).toContain("mode single");
 		expect(providerPrompt?.text).toContain("itemCount 1");
@@ -92,28 +85,17 @@ describe("runTranslate", () => {
 				{ source: "Pi", target: "Pi", note: "product name" },
 			],
 			preserve: ["{count}", "Pi", "{count}"],
-			preservationRules: [
-				"Keep ICU placeholders intact.",
-				"Retain Markdown links.",
-			],
+			preservationRules: ["Keep ICU placeholders intact.", "Retain Markdown links."],
 		});
 
 		expect(prompt).toContain(
-			[
-				"Glossary:",
-				'1. "Pi" => "Pi" (product name)',
-				'2. "tool" => "outil"',
-			].join("\n"),
+			["Glossary:", '1. "Pi" => "Pi" (product name)', '2. "tool" => "outil"'].join("\n"),
 		);
+		expect(prompt).toContain(["Preserve unchanged:", '1. "{count}"', '2. "Pi"'].join("\n"));
 		expect(prompt).toContain(
-			["Preserve unchanged:", '1. "{count}"', '2. "Pi"'].join("\n"),
-		);
-		expect(prompt).toContain(
-			[
-				"Preservation rules:",
-				"1. Keep ICU placeholders intact.",
-				"2. Retain Markdown links.",
-			].join("\n"),
+			["Preservation rules:", "1. Keep ICU placeholders intact.", "2. Retain Markdown links."].join(
+				"\n",
+			),
 		);
 	});
 
@@ -179,10 +161,7 @@ describe("runTranslate", () => {
 
 		expect(result.truncated).toBe(true);
 		expect(result.responseId).toBeTruthy();
-		const stored = await getStoredResult<{ text: string }>(
-			result.responseId ?? "",
-			{ rootDir },
-		);
+		const stored = await getStoredResult<{ text: string }>(result.responseId ?? "", { rootDir });
 		expect(stored.value.text).toBe(fullText);
 	});
 });

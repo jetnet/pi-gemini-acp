@@ -35,8 +35,8 @@ const DEFAULT_EMBEDDING_DIM = 768;
  */
 export class UnavailableGeminiEmbedder implements Embedder {
 	async status(options: StorageOptions = {}): Promise<EmbedderStatus> {
-		const configuredModel = configFromEnv(await loadConfig(options))
-			.providers?.["gemini-acp"]?.model;
+		const configuredModel = configFromEnv(await loadConfig(options)).providers?.["gemini-acp"]
+			?.model;
 		return {
 			available: false,
 			model: configuredModel ?? DEFAULT_EMBEDDING_MODEL,
@@ -47,9 +47,7 @@ export class UnavailableGeminiEmbedder implements Embedder {
 	}
 
 	async embed(): Promise<EmbeddingResult> {
-		throw new Error(
-			"Gemini ACP embedding transport is not available in this package version.",
-		);
+		throw new Error("Gemini ACP embedding transport is not available in this package version.");
 	}
 }
 

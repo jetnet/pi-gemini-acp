@@ -130,8 +130,7 @@ describe("runSearch", () => {
 					model: "gemini-test",
 					query: "weather",
 					maxResults: 7,
-					message:
-						'Sending search prompt: "weather" with 7 max results via gemini-test.',
+					message: 'Sending search prompt: "weather" with 7 max results via gemini-test.',
 				}),
 				expect.objectContaining({
 					phase: "provider_stream",
@@ -262,15 +261,11 @@ describe("runSearch", () => {
 			geminiAcpClient: client,
 		};
 
-		expect(
-			(await runSearch({ query: "one", rootDir }, deps)).error,
-		).toBeUndefined();
+		expect((await runSearch({ query: "one", rootDir }, deps)).error).toBeUndefined();
 		expect((await runSearch({ query: "two", rootDir }, deps)).error?.code).toBe(
 			"GEMINI_ACP_FAILED",
 		);
-		expect(
-			(await runSearch({ query: "three", rootDir }, deps)).error,
-		).toBeUndefined();
+		expect((await runSearch({ query: "three", rootDir }, deps)).error).toBeUndefined();
 
 		expect(commandChecks).toBe(2);
 	});

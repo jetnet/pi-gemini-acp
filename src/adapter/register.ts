@@ -3,11 +3,7 @@
  */
 import { createGeminiSummarizeAdapter } from "./gemini-summarize.js";
 import { recordAdapterEmitted } from "./status.js";
-import type {
-	DiscoverPayload,
-	ModelCapability,
-	RegisteredAdapter,
-} from "./types.js";
+import type { DiscoverPayload, ModelCapability, RegisteredAdapter } from "./types.js";
 
 const ADAPTER_ID = "gemini-acp";
 const PRIORITY = 50;
@@ -53,15 +49,13 @@ function matchesDiscoverFilter(
 
 	const requiredCapabilities = discover.filter.capabilities;
 	if (requiredCapabilities && Array.isArray(requiredCapabilities)) {
-		const hasOverlap = requiredCapabilities.some((cap) =>
-			capabilities.includes(cap),
-		);
+		const hasOverlap = requiredCapabilities.some((cap) => capabilities.includes(cap));
 		if (!hasOverlap) return false;
 	}
 
 	const minPriority = discover.filter.minPriority;
-	if (typeof minPriority === "number" && !Number.isNaN(minPriority)) {
-		if (priority < minPriority) return false;
+	if (typeof minPriority === "number" && !Number.isNaN(minPriority) && priority < minPriority) {
+		return false;
 	}
 
 	return true;

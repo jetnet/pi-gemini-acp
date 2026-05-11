@@ -2,18 +2,10 @@
  * @fileoverview Internal recall route used by the gemini_results umbrella tool.
  */
 import { type Static, Type } from "@earendil-works/pi-ai";
-import {
-	runRecall,
-	type RecallHit,
-	type RecallResult,
-} from "../recall/recall.js";
+import { runRecall, type RecallHit, type RecallResult } from "../recall/recall.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 
-import {
-	boxedToolText,
-	dimToolText,
-	truncateToolText,
-} from "../tools/gemini-rendering.js";
+import { boxedToolText, dimToolText, truncateToolText } from "../tools/gemini-rendering.js";
 import { errorResult, toolResult } from "../tools/result.js";
 
 const resultsRecallParamsSchema = Type.Object({
@@ -66,12 +58,7 @@ export const resultsRecallRoute = {
 		if ("error" in result) return errorResult(result.error);
 		return toolResult({ text: formatRecallToolText(result), data: result });
 	},
-	renderResult(
-		result: PiToolShell,
-		_options: unknown,
-		theme: unknown,
-		_context?: unknown,
-	) {
+	renderResult(result: PiToolShell, _options: unknown, theme: unknown, _context?: unknown) {
 		return boxedToolText(dimToolText(formatRecallToolDisplay(result), theme));
 	},
 };
@@ -99,8 +86,7 @@ export function formatRecallToolText(result: RecallResult): string {
 			`model: ${hit.model}`,
 			`summary: ${truncateToolText(hit.summary, 500)}`,
 		);
-		if (hit.inputsSummary)
-			lines.push(`inputs: ${truncateToolText(hit.inputsSummary, 240)}`);
+		if (hit.inputsSummary) lines.push(`inputs: ${truncateToolText(hit.inputsSummary, 240)}`);
 	}
 	return lines.join("\n");
 }

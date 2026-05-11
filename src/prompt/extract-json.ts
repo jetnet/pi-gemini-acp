@@ -5,8 +5,7 @@ export function parseExtractionPayload(
 	text: string,
 ): { ok: true; value: unknown } | { ok: false; message: string } {
 	const trimmed = text.trim();
-	if (!trimmed)
-		return { ok: false, message: "Gemini returned an empty response." };
+	if (!trimmed) return { ok: false, message: "Gemini returned an empty response." };
 	const direct = tryParseJson(trimmed);
 	if (direct.ok) return direct;
 
@@ -28,9 +27,7 @@ export function parseExtractionPayload(
 }
 
 /** Normalizes optional provider metadata from camelCase or snake_case payload fields. */
-export function normalizeExtractMetadata(
-	value: unknown,
-): ExtractProviderMetadata | undefined {
+export function normalizeExtractMetadata(value: unknown): ExtractProviderMetadata | undefined {
 	const record = asRecord(value);
 	const raw =
 		asRecord(record?.providerMetadata) ??
@@ -46,9 +43,7 @@ export function normalizeExtractMetadata(
 	};
 }
 
-function tryParseJson(
-	text: string,
-): { ok: true; value: unknown } | { ok: false; message: string } {
+function tryParseJson(text: string): { ok: true; value: unknown } | { ok: false; message: string } {
 	try {
 		return { ok: true, value: JSON.parse(text) };
 	} catch (cause) {
@@ -97,10 +92,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 		: undefined;
 }
 
-function firstString(
-	record: Record<string, unknown>,
-	keys: string[],
-): string | undefined {
+function firstString(record: Record<string, unknown>, keys: string[]): string | undefined {
 	for (const key of keys) {
 		const value = record[key];
 		if (typeof value === "string" && value.trim()) return value.trim();

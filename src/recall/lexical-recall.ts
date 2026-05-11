@@ -2,11 +2,7 @@ import { openResponseCacheDb } from "../storage/cache-db.js";
 import type { StorageOptions } from "../storage/paths.js";
 import type { SearchResultItem } from "../types.js";
 import { buildRecallText } from "./recall-text.js";
-import {
-	ftsMatchExpression,
-	normalizeRecallQuery,
-	searchableTokens,
-} from "./query-normalize.js";
+import { ftsMatchExpression, normalizeRecallQuery, searchableTokens } from "./query-normalize.js";
 
 /** Metadata persisted for local lexical recall over cached Gemini results. */
 export interface PutLexicalRecallEntry extends StorageOptions {
@@ -66,9 +62,7 @@ const DEFAULT_K = 5;
 const MAX_K = 20;
 
 /** Indexes a cached tool response for local FTS recall without requiring embeddings. */
-export async function upsertLexicalRecallEntry(
-	entry: PutLexicalRecallEntry,
-): Promise<void> {
+export async function upsertLexicalRecallEntry(entry: PutLexicalRecallEntry): Promise<void> {
 	const db = await openResponseCacheDb({ rootDir: entry.rootDir });
 	try {
 		ensureLexicalRecallSchema(db.db);
@@ -134,11 +128,7 @@ export async function runLexicalRecall(
 		const normalized = normalizeRecallQuery(options.query);
 		const filters = buildFilters(options);
 		const exactRows = exactQueryRows(db.db, normalized.normalizedQuery);
-		const ftsRows = ftsQueryRows(
-			db.db,
-			normalized.expandedQuery,
-			candidateLimit(options.k),
-		);
+		const ftsRows = ftsQueryRows(db.db, normalized.expandedQuery, candidateLimit(options.k));
 		const tokens = searchableTokens(normalized.expandedQuery);
 		const seen = new Map<string, LexicalRecallHit>();
 		for (const row of exactRows) {
@@ -151,7 +141,7 @@ export async function runLexicalRecall(
 			.filter((hit) => hit.similarity >= filters.minScore)
 			.filter((hit) => hit.createdAtMs >= filters.sinceMs)
 			.filter((hit) => filters.tools.size === 0 || filters.tools.has(hit.tool))
-			.sort((a, b) => b.similarity - a.similarity)
+			.toSorted((a, b) => b.similarity - a.similarity)
 			.slice(0, clampK(options.k));
 		return { hits, totalCandidates: seen.size };
 	} finally {
@@ -174,9 +164,7 @@ function ensureLexicalRecallSchema(db: { exec(sql: string): void }): void {
 	db.exec(
 		`CREATE INDEX IF NOT EXISTS idx_lexical_recall_query ON lexical_recall(normalized_query)`,
 	);
-	db.exec(
-		`CREATE INDEX IF NOT EXISTS idx_lexical_recall_tool ON lexical_recall(tool)`,
-	);
+	db.exec(`CREATE INDEX IF NOT EXISTS idx_lexical_recall_tool ON lexical_recall(tool)`);
 	db.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS lexical_recall_fts USING fts5(
 		response_id UNINDEXED,
 		original_query,
@@ -243,20 +231,16 @@ function rowScore(row: LexicalRecallRow, queryTokens: string[]): number {
 		),
 	);
 	const overlap = queryTokens.filter((token) => rowTokens.has(token)).length;
-	const queryCoverage = queryTokens.length ? overlap / queryTokens.length : 0;
-	const indexedQueryTokens = searchableTokens(
-		`${row.normalized_query} ${row.expanded_query}`,
-	);
-	const indexedCoverage = indexedQueryTokens.length
-		? indexedQueryTokens.filter((token) => queryTokens.includes(token)).length /
-			indexedQueryTokens.length
-		: 0;
+	const queryCoverage = queryTokens.length > 0 ? overlap / queryTokens.length : 0;
+	const indexedQueryTokens = searchableTokens(`${row.normalized_query} ${row.expanded_query}`);
+	const indexedCoverage =
+		indexedQueryTokens.length > 0
+			? indexedQueryTokens.filter((token) => queryTokens.includes(token)).length /
+				indexedQueryTokens.length
+			: 0;
 	const tokenScore = Math.max(queryCoverage, indexedCoverage);
 	const rankBoost = row.rank === undefined ? 0 : 1 / (1 + Math.abs(row.rank));
-	return Math.max(
-		0,
-		Math.min(0.99, 0.35 + tokenScore * 0.5 + rankBoost * 0.15),
-	);
+	return Math.max(0, Math.min(0.99, 0.35 + tokenScore * 0.5 + rankBoost * 0.15));
 }
 
 function rowToHit(
@@ -278,13 +262,9 @@ function rowToHit(
 	};
 }
 
-function rememberHit(
-	hits: Map<string, LexicalRecallHit>,
-	hit: LexicalRecallHit,
-): void {
+function rememberHit(hits: Map<string, LexicalRecallHit>, hit: LexicalRecallHit): void {
 	const existing = hits.get(hit.responseId);
-	if (!existing || hit.similarity > existing.similarity)
-		hits.set(hit.responseId, hit);
+	if (!existing || hit.similarity > existing.similarity) hits.set(hit.responseId, hit);
 }
 
 function buildFilters(options: LexicalRecallOptions): {
@@ -296,13 +276,9 @@ function buildFilters(options: LexicalRecallOptions): {
 		minScore: clampScore(options.minScore),
 		sinceMs: options.since ? Date.parse(options.since) : 0,
 		tools: new Set(
-			(Array.isArray(options.tool)
-				? options.tool
-				: options.tool
-					? [options.tool]
-					: []
-			)
+			(Array.isArray(options.tool) ? options.tool : options.tool ? [options.tool] : [])
 				.filter(Boolean)
+				// oxlint-disable-next-line unicorn/no-array-callback-reference -- publicRecallToolName takes one arg
 				.map(publicRecallToolName),
 		),
 	};
@@ -328,9 +304,7 @@ function clampScore(score: number | undefined): number {
 }
 
 /** Extracts cacheable source/page snippets from Gemini search results for future extension. */
-export function sourceTextForLexicalRecall(
-	result: unknown,
-): string | undefined {
+export function sourceTextForLexicalRecall(result: unknown): string | undefined {
 	const record = result as {
 		data?: { results?: SearchResultItem[] };
 		results?: SearchResultItem[];
@@ -344,9 +318,7 @@ export function sourceTextForLexicalRecall(
 			? record.data.results
 			: undefined;
 	return results
-		?.map((item) =>
-			[item.title, item.url, item.snippet].filter(Boolean).join(" "),
-		)
+		?.map((item) => [item.title, item.url, item.snippet].filter(Boolean).join(" "))
 		.join("\n");
 }
 

@@ -2,11 +2,7 @@
  * @fileoverview Internal prompt route used by the gemini_ask umbrella tool.
  */
 import { type Static, Type } from "@earendil-works/pi-ai";
-import {
-	type PromptRunResult,
-	type PromptWorkflowUpdate,
-	runPrompt,
-} from "../prompt/run.js";
+import { type PromptRunResult, type PromptWorkflowUpdate, runPrompt } from "../prompt/run.js";
 import type { PiToolShell } from "../types.js";
 import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
 import {
@@ -37,25 +33,15 @@ const askPromptParamsSchema = Type.Object({
 type Params = Static<typeof askPromptParamsSchema>;
 
 export const askPromptRoute = {
-	async execute(
-		toolCallId: string,
-		params: Params,
-		signal: AbortSignal,
-		onUpdate?: ToolUpdate,
-	) {
-		return withToolResponseCache({
+	async execute(toolCallId: string, params: Params, signal: AbortSignal, onUpdate?: ToolUpdate) {
+		return await withToolResponseCache({
 			toolName: "gemini_prompt",
 			inputs: params,
 			enabledByDefault: false,
 			useCache: params.useCache,
 			bypassCache: params.bypassCache,
 			execute: async () => {
-				const result = await runPrompt(
-					params,
-					{},
-					signal,
-					promptToolUpdate(onUpdate),
-				);
+				const result = await runPrompt(params, {}, signal, promptToolUpdate(onUpdate));
 				if (result.error) return errorResult(result.error);
 				return toolResultWithCost(
 					toolCallId,
@@ -65,7 +51,7 @@ export const askPromptRoute = {
 					{},
 					{
 						text: result.truncated
-							? `Gemini ACP response stored as responseId ${result.responseId}. Preview:\n${result.text}`
+							? `Gemini ACP response stored as responseId ${result.responseId ?? "(none)"}. Preview:\n${result.text}`
 							: `Gemini ACP response:\n${result.text}`,
 						data: result,
 						responseId: result.responseId,
@@ -75,11 +61,7 @@ export const askPromptRoute = {
 			},
 		});
 	},
-	renderResult(
-		result: PiToolShell,
-		options: ToolRenderResultOptions,
-		theme: unknown,
-	) {
+	renderResult(result: PiToolShell, options: ToolRenderResultOptions, theme: unknown) {
 		return renderPromptToolResult(result, options, theme, {
 			toolName: "gemini_prompt",
 			isData: isPromptRunResult,
@@ -92,20 +74,14 @@ export const askPromptRoute = {
 function formatPromptCollapsedDisplay(result: PromptRunResult): string {
 	const lines = [
 		result.truncated
-			? `Gemini ACP response stored as responseId ${result.responseId}.`
+			? `Gemini ACP response stored as responseId ${result.responseId ?? "(none)"}.`
 			: "Gemini ACP response received.",
 		`Preview: ${truncateToolText(result.text, 240)}`,
 	];
-	return appendExpansionHint(
-		lines,
-		"the full response and storage details",
-	).join("\n");
+	return appendExpansionHint(lines, "the full response and storage details").join("\n");
 }
 
-function formatPromptExpandedDisplay(
-	result: PromptRunResult,
-	shell: PiToolShell,
-): string {
+function formatPromptExpandedDisplay(result: PromptRunResult, shell: PiToolShell): string {
 	const lines = [
 		"Gemini ACP response:",
 		result.text,

@@ -14,6 +14,7 @@ import {
 	withDefaultGeminiAcpConfig,
 } from "./settings.js";
 
+// oxlint-disable-next-line typescript/strict-void-return -- node:util.promisify expects a Node-style callback function whose signature does not align with the rule's "returns void" expectation
 const execFileAsync = promisify(execFile);
 const MODEL_PATTERN = /^(?:models\/)?gemini-[a-z0-9][a-z0-9._-]{1,80}$/u;
 
@@ -29,22 +30,19 @@ export const GEMINI_MODEL_CHOICES = [
 	{
 		id: "gemini-3.1-pro-preview",
 		label: "Gemini 3.1 Pro Preview",
-		description:
-			"Latest preview flagship for complex reasoning and high-context tasks.",
+		description: "Latest preview flagship for complex reasoning and high-context tasks.",
 		aliases: ["pro", "3.1-pro", "3.1-pro-preview", "pro-preview"],
 	},
 	{
 		id: "gemini-3-flash-preview",
 		label: "Gemini 3 Flash Preview",
-		description:
-			"Latest Flash preview optimized for fast, cost-effective tasks.",
+		description: "Latest Flash preview optimized for fast, cost-effective tasks.",
 		aliases: ["flash", "3-flash", "3-flash-preview", "flash-preview"],
 	},
 	{
 		id: "gemini-3.1-flash-lite-preview",
 		label: "Gemini 3.1 Flash-Lite Preview",
-		description:
-			"Latest Flash-Lite preview optimized for latency-sensitive tasks.",
+		description: "Latest Flash-Lite preview optimized for latency-sensitive tasks.",
 		aliases: ["flash-lite", "lite", "3.1-flash-lite", "3.1-flash-lite-preview"],
 	},
 	{
@@ -144,11 +142,7 @@ export async function setGeminiAcpModel(
 	if (commandError) {
 		return {
 			status: modelStatus(settings),
-			error: providerError(
-				"GEMINI_ACP_COMMAND_NOT_FOUND",
-				"model_preflight",
-				commandError,
-			),
+			error: providerError("GEMINI_ACP_COMMAND_NOT_FOUND", "model_preflight", commandError),
 		};
 	}
 
@@ -184,9 +178,7 @@ export async function setGeminiAcpModel(
 	return { settings: saved, status: modelStatus(saved) };
 }
 
-export function modelStatus(
-	settings: GeminiAcpProviderSettings | undefined,
-): GeminiAcpModelStatus {
+export function modelStatus(settings: GeminiAcpProviderSettings | undefined): GeminiAcpModelStatus {
 	const selectedModel = settings?.model;
 	const availability = settings?.modelSelectionAvailable ?? "unknown";
 	const message = selectedModel
@@ -205,9 +197,9 @@ export function listGeminiModelChoices(): readonly GeminiModelChoice[] {
 }
 
 export function describeGeminiModelChoices(): string {
-	return GEMINI_MODEL_CHOICES.map(
-		(choice) => `${choice.id} (${choice.aliases.join("/")})`,
-	).join(", ");
+	return GEMINI_MODEL_CHOICES.map((choice) => `${choice.id} (${choice.aliases.join("/")})`).join(
+		", ",
+	);
 }
 
 export function resolveGeminiModelName(model: string): string | undefined {
@@ -217,8 +209,7 @@ export function resolveGeminiModelName(model: string): string | undefined {
 	const key = trimmed.toLowerCase();
 	return GEMINI_MODEL_CHOICES.find(
 		(choice) =>
-			choice.id.toLowerCase() === key ||
-			(choice.aliases as readonly string[]).includes(key),
+			choice.id.toLowerCase() === key || (choice.aliases as readonly string[]).includes(key),
 	)?.id;
 }
 
@@ -233,9 +224,7 @@ async function probeModelSelection(
 	deps: ModelSelectionDeps,
 ): Promise<ModelSelectionProbe> {
 	try {
-		const help = await (deps.readCommandHelp ?? defaultReadCommandHelp)(
-			settings,
-		);
+		const help = await (deps.readCommandHelp ?? defaultReadCommandHelp)(settings);
 		const supported = /(?:^|\s)(?:-m,\s*)?--model(?:\s|,|$)/u.test(help);
 		return {
 			supported,
@@ -256,25 +245,17 @@ async function probeModelSelection(
 	}
 }
 
-async function defaultReadCommandHelp(
-	settings: GeminiAcpProviderSettings,
-): Promise<string> {
-	const resolution = await resolveGeminiAcpCommand(
-		settings.command ?? "gemini",
-	);
+async function defaultReadCommandHelp(settings: GeminiAcpProviderSettings): Promise<string> {
+	const resolution = await resolveGeminiAcpCommand(settings.command ?? "gemini");
 	const spawnCommand = spawnCommandForGeminiAcpResolution(resolution, [
 		...(settings.args ?? []),
 		"--help",
 	]);
-	const { stdout, stderr } = await execFileAsync(
-		spawnCommand.command,
-		spawnCommand.args,
-		{
-			timeout: 5_000,
-			maxBuffer: 256_000,
-			windowsVerbatimArguments: spawnCommand.windowsVerbatimArguments,
-		},
-	);
+	const { stdout, stderr } = await execFileAsync(spawnCommand.command, spawnCommand.args, {
+		timeout: 5_000,
+		maxBuffer: 256_000,
+		windowsVerbatimArguments: spawnCommand.windowsVerbatimArguments,
+	});
 	return `${stdout}\n${stderr}`;
 }
 
@@ -288,7 +269,5 @@ async function commandResolutionError(
 			: `Gemini ACP command '${command}' was not found.`;
 	}
 	const resolution = await resolveGeminiAcpCommand(command);
-	return resolution.found
-		? undefined
-		: geminiAcpCommandNotFoundMessage(resolution);
+	return resolution.found ? undefined : geminiAcpCommandNotFoundMessage(resolution);
 }

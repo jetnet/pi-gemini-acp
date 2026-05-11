@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	insertProviderCitationMarkers,
-	normalizeResearchProviderMetadata,
-} from "../citations.js";
+import { insertProviderCitationMarkers, normalizeResearchProviderMetadata } from "../citations.js";
 
 describe("research citation helpers", () => {
 	it("inserts citation markers at multibyte byte offsets", () => {
@@ -56,9 +53,7 @@ describe("research citation helpers", () => {
 	it("normalizes camelCase provider metadata", () => {
 		const metadata = normalizeResearchProviderMetadata({
 			groundingMetadata: {
-				groundingChunks: [
-					{ web: { uri: "https://example.com/a", title: "Example A" } },
-				],
+				groundingChunks: [{ web: { uri: "https://example.com/a", title: "Example A" } }],
 				groundingSupports: [
 					{
 						segment: { startIndex: 1, endIndex: 7, text: "answer" },
@@ -91,9 +86,7 @@ describe("research citation helpers", () => {
 	it("normalizes snake_case provider metadata", () => {
 		const metadata = normalizeResearchProviderMetadata({
 			grounding_metadata: {
-				grounding_chunks: [
-					{ web: { uri: "https://example.com/b", title: "Example B" } },
-				],
+				grounding_chunks: [{ web: { uri: "https://example.com/b", title: "Example B" } }],
 				grounding_supports: [
 					{
 						segment: { start_index: 2, end_index: 8, text: "answer" },

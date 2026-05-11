@@ -6,10 +6,7 @@ import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import { runTranslate, type TranslateRunResult } from "../prompt/translate.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
-import {
-	isPromptWorkflowUpdate,
-	isRecord,
-} from "../tools/gemini-prompt-rendering.js";
+import { isPromptWorkflowUpdate, isRecord } from "../tools/gemini-prompt-rendering.js";
 import {
 	boxedToolText,
 	dimToolText,
@@ -73,9 +70,7 @@ const askTranslateParamsSchema = Type.Object({
 			description: "Extra preservation rules.",
 		}),
 	),
-	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response cache." }),
-	),
+	bypassCache: Type.Optional(Type.Boolean({ description: "Skip response cache." })),
 });
 
 type Params = Static<typeof askTranslateParamsSchema>;
@@ -83,30 +78,16 @@ type Params = Static<typeof askTranslateParamsSchema>;
 type TranslateProgressData = { progress: PromptWorkflowUpdate };
 
 export const askTranslateRoute = {
-	async execute(
-		toolCallId: string,
-		params: Params,
-		signal: AbortSignal,
-		onUpdate?: ToolUpdate,
-	) {
-		return withToolResponseCache({
+	async execute(toolCallId: string, params: Params, signal: AbortSignal, onUpdate?: ToolUpdate) {
+		return await withToolResponseCache({
 			toolName: "gemini_translate",
 			inputs: params,
 			bypassCache: params.bypassCache,
 			execute: async () => {
-				const result = await runTranslate(
-					params,
-					{},
-					signal,
-					translateToolUpdate(onUpdate),
-				);
+				const result = await runTranslate(params, {}, signal, translateToolUpdate(onUpdate));
 				if (result.error) return errorResult(result.error);
 				const inputText =
-					params.text ??
-					params.batch
-						?.map((b: { text?: string }) => b.text ?? "")
-						.join("\n") ??
-					"";
+					params.text ?? params.batch?.map((b: { text?: string }) => b.text ?? "").join("\n") ?? "";
 				return toolResultWithCost(
 					toolCallId,
 					"gemini_ask",
@@ -123,14 +104,8 @@ export const askTranslateRoute = {
 			},
 		});
 	},
-	renderResult(
-		result: PiToolShell,
-		options: ToolRenderResultOptions,
-		theme: unknown,
-	) {
-		return boxedToolText(
-			dimToolText(formatTranslateToolDisplay(result, options), theme),
-		);
+	renderResult(result: PiToolShell, options: ToolRenderResultOptions, theme: unknown) {
+		return boxedToolText(dimToolText(formatTranslateToolDisplay(result, options), theme));
 	},
 };
 
@@ -151,7 +126,7 @@ function translateToolUpdate(
 
 function translateToolText(result: TranslateRunResult): string {
 	if (result.truncated) {
-		return `Gemini ACP translation stored as responseId ${result.responseId}. Preview:\n${result.text}`;
+		return `Gemini ACP translation stored as responseId ${result.responseId ?? "(none)"}. Preview:\n${result.text}`;
 	}
 	const headline =
 		result.mode === "batch"
@@ -160,10 +135,7 @@ function translateToolText(result: TranslateRunResult): string {
 	return `${headline}\n${result.text}`;
 }
 
-function formatTranslateToolDisplay(
-	result: PiToolShell,
-	options: ToolRenderResultOptions,
-): string {
+function formatTranslateToolDisplay(result: PiToolShell, options: ToolRenderResultOptions): string {
 	const details = result.details as Partial<ResultEnvelope<unknown>>;
 	if (isTranslateProgressData(details.data)) {
 		return formatCollapsedOrExpanded(details.data.progress, options, {
@@ -177,14 +149,10 @@ function formatTranslateToolDisplay(
 			expanded: formatTranslateExpandedDisplay,
 		});
 	}
-	return (
-		result.content[0]?.text ?? details.error?.message ?? "gemini_translate"
-	);
+	return result.content[0]?.text ?? details.error?.message ?? "gemini_translate";
 }
 
-function formatTranslateProgressCollapsed(
-	update: PromptWorkflowUpdate,
-): string {
+function formatTranslateProgressCollapsed(update: PromptWorkflowUpdate): string {
 	if (update.type === "chunk") {
 		return `Translating: ${truncateToolText(update.text.trim(), 220)}`;
 	}
@@ -201,11 +169,9 @@ function formatTranslateProgressExpanded(update: PromptWorkflowUpdate): string {
 			truncateToolText(update.accumulatedText, 1_200),
 		].join("\n");
 	}
-	return [
-		"gemini_translate progress",
-		`phase: ${update.phase}`,
-		`message: ${update.text}`,
-	].join("\n");
+	return ["gemini_translate progress", `phase: ${update.phase}`, `message: ${update.text}`].join(
+		"\n",
+	);
 }
 
 function formatTranslateCollapsedDisplay(result: TranslateRunResult): string {
@@ -214,11 +180,7 @@ function formatTranslateCollapsedDisplay(result: TranslateRunResult): string {
 		lines.push(truncateToolText(result.text, 220));
 	}
 	if (result.mode === "batch" || result.truncated || result.text.length > 220) {
-		lines.push(
-			expandedToolOutputHint(
-				"the full translation, response ID, and structured details",
-			),
-		);
+		lines.push(expandedToolOutputHint("the full translation, response ID, and structured details"));
 	}
 	return lines.join("\n");
 }
@@ -231,33 +193,35 @@ function formatTranslateCollapsedHeadline(result: TranslateRunResult): string {
 }
 
 function formatTranslateExpandedDisplay(result: TranslateRunResult): string {
-	const lines = [translateToolText(result), "", "Details:"];
-	lines.push(`provider: ${result.provider}`);
-	lines.push(`mode: ${result.mode}`);
-	lines.push(`targetLanguage: ${result.targetLanguage}`);
-	if (result.sourceLanguage)
-		lines.push(`sourceLanguage: ${result.sourceLanguage}`);
-	if (result.tone) lines.push(`tone: ${result.tone}`);
-	lines.push(`itemCount: ${result.itemCount}`);
-	lines.push(`responseLength: ${result.responseLength}`);
-	lines.push(`truncated: ${result.truncated}`);
-	if (result.responseId) lines.push(`responseId: ${result.responseId}`);
-	if (result.fullOutputPath)
-		lines.push(`fullOutputPath: ${result.fullOutputPath}`);
-	if (result.items) {
-		lines.push("items:");
-		for (const item of result.items) {
-			const label = item.id ? `${item.index} (${item.id})` : `${item.index}`;
-			const status = item.error ? `error: ${item.error}` : "ok";
-			lines.push(`- ${label}: ${status}`);
-		}
-	}
+	const lines = [
+		translateToolText(result),
+		"",
+		"Details:",
+		`provider: ${result.provider}`,
+		`mode: ${result.mode}`,
+		`targetLanguage: ${result.targetLanguage}`,
+		...(result.sourceLanguage ? [`sourceLanguage: ${result.sourceLanguage}`] : []),
+		...(result.tone ? [`tone: ${result.tone}`] : []),
+		`itemCount: ${result.itemCount}`,
+		`responseLength: ${result.responseLength}`,
+		`truncated: ${result.truncated}`,
+		...(result.responseId ? [`responseId: ${result.responseId}`] : []),
+		...(result.fullOutputPath ? [`fullOutputPath: ${result.fullOutputPath}`] : []),
+		...(result.items
+			? [
+					"items:",
+					...result.items.map((item) => {
+						const label = item.id ? `${item.index} (${item.id})` : `${item.index}`;
+						const status = item.error ? `error: ${item.error}` : "ok";
+						return `- ${label}: ${status}`;
+					}),
+				]
+			: []),
+	];
 	return lines.join("\n");
 }
 
-function isTranslateProgressData(
-	value: unknown,
-): value is TranslateProgressData {
+function isTranslateProgressData(value: unknown): value is TranslateProgressData {
 	return isRecord(value) && isPromptWorkflowUpdate(value.progress);
 }
 

@@ -21,9 +21,7 @@ describe("gemini_ask compact-schema runtime validation", () => {
 			style: "verbose",
 		});
 		expect((badStyle.details as ResultEnvelope).status).toBe("error");
-		expect((badStyle.details as ResultEnvelope).error?.code).toBe(
-			"GEMINI_ASK_INVALID_PARAMETER",
-		);
+		expect((badStyle.details as ResultEnvelope).error?.code).toBe("GEMINI_ASK_INVALID_PARAMETER");
 
 		const badCount = await executeAsk({
 			task: "summarize",
@@ -31,9 +29,7 @@ describe("gemini_ask compact-schema runtime validation", () => {
 			bulletCount: 21,
 		});
 		expect((badCount.details as ResultEnvelope).status).toBe("error");
-		expect((badCount.details as ResultEnvelope).error?.message).toContain(
-			"Allowed range: 1 to 20",
-		);
+		expect((badCount.details as ResultEnvelope).error?.message).toContain("Allowed range: 1 to 20");
 	});
 
 	it("rejects invalid code review focus and severity before delegation", async () => {
@@ -43,9 +39,7 @@ describe("gemini_ask compact-schema runtime validation", () => {
 			focus: ["correctness", "style"],
 		});
 		expect((badFocus.details as ResultEnvelope).status).toBe("error");
-		expect((badFocus.details as ResultEnvelope).error?.message).toContain(
-			"Invalid focus",
-		);
+		expect((badFocus.details as ResultEnvelope).error?.message).toContain("Invalid focus");
 
 		const badSeverity = await executeAsk({
 			task: "code_review",
@@ -65,9 +59,7 @@ describe("gemini_ask compact-schema runtime validation", () => {
 			batch: [{ id: "a" }],
 		});
 		expect((badBatch.details as ResultEnvelope).status).toBe("error");
-		expect((badBatch.details as ResultEnvelope).error?.message).toContain(
-			"batch item",
-		);
+		expect((badBatch.details as ResultEnvelope).error?.message).toContain("batch item");
 
 		const badGlossary = await executeAsk({
 			task: "translate",
@@ -76,8 +68,6 @@ describe("gemini_ask compact-schema runtime validation", () => {
 			glossary: [{ source: "Pi" }],
 		});
 		expect((badGlossary.details as ResultEnvelope).status).toBe("error");
-		expect((badGlossary.details as ResultEnvelope).error?.message).toContain(
-			"glossary entry",
-		);
+		expect((badGlossary.details as ResultEnvelope).error?.message).toContain("glossary entry");
 	});
 });

@@ -1,13 +1,6 @@
 import { stat } from "node:fs/promises";
-import {
-	configFromEnv,
-	loadConfig,
-	withDefaultGeminiAcpConfig,
-} from "../config/settings.js";
-import {
-	sourceTextForLexicalRecall,
-	upsertLexicalRecallEntry,
-} from "../recall/lexical-recall.js";
+import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
+import { sourceTextForLexicalRecall, upsertLexicalRecallEntry } from "../recall/lexical-recall.js";
 import { runRecall, type RecallHit } from "../recall/recall.js";
 import { deriveCacheKey } from "../storage/cache-key.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
@@ -63,10 +56,9 @@ export async function withToolResponseCache<TData extends object | null>(
 			try {
 				const row = db.lookup(key.cacheKey);
 				if (row) {
-					const cached = await getStoredResult<CachedShell<TData>>(
-						row.responseId,
-						{ rootDir: options.rootDir },
-					);
+					const cached = await getStoredResult<CachedShell<TData>>(row.responseId, {
+						rootDir: options.rootDir,
+					});
 					options.onCacheHit?.(cached.value.shell);
 					return withCacheStatus(cached.value.shell, {
 						hit: true,
@@ -86,9 +78,7 @@ export async function withToolResponseCache<TData extends object | null>(
 	if (recalled) return recalled;
 	const fresh = await options.execute();
 	if (fresh.details.status === "error") {
-		return lookupWarning
-			? withCacheStatus(fresh, { hit: false, warning: lookupWarning })
-			: fresh;
+		return lookupWarning ? withCacheStatus(fresh, { hit: false, warning: lookupWarning }) : fresh;
 	}
 	try {
 		const recallInputs = stripCacheControls(options.inputs);
@@ -132,9 +122,7 @@ export async function withToolResponseCache<TData extends object | null>(
 			warning: "Response cache write failed; live result returned.",
 		});
 	}
-	return lookupWarning
-		? withCacheStatus(fresh, { hit: false, warning: lookupWarning })
-		: fresh;
+	return lookupWarning ? withCacheStatus(fresh, { hit: false, warning: lookupWarning }) : fresh;
 }
 
 /** Adds cache metadata and a visible marker without changing the underlying tool data shape. */
@@ -144,9 +132,7 @@ export function withCacheStatus<TData extends object | null>(
 ): PiToolShell<ResultEnvelope<TData>> {
 	const data = shell.details.data;
 	const dataWithStatus =
-		data && typeof data === "object"
-			? ({ ...data, cacheStatus } as TData)
-			: data;
+		data && typeof data === "object" ? ({ ...data, cacheStatus } as TData) : data;
 	const prefix = cacheStatus.hit
 		? cacheStatus.source === "recall"
 			? `[recall hit, similarity ${(cacheStatus.similarity ?? 0).toFixed(2)}, age ${formatAge(cacheStatus.ageMs ?? 0)}, responseId ${cacheStatus.responseId ?? "unknown"}]`
@@ -169,8 +155,7 @@ export function withCacheStatus<TData extends object | null>(
 async function recallShortCircuit<TData extends object | null>(
 	options: ToolCacheOptions<TData>,
 ): Promise<PiToolShell<ResultEnvelope<TData>> | undefined> {
-	if (!options.useRecall || options.bypassRecall || !options.recallQuery)
-		return undefined;
+	if (!options.useRecall || options.bypassRecall || !options.recallQuery) return undefined;
 	const result = await runRecall({
 		query: options.recallQuery,
 		k: 1,
@@ -179,9 +164,7 @@ async function recallShortCircuit<TData extends object | null>(
 		rootDir: options.rootDir,
 	});
 	if ("error" in result) return undefined;
-	const hit = result.hits.find((candidate) =>
-		isFreshRecallHit(candidate, options),
-	);
+	const hit = result.hits.find((candidate) => isFreshRecallHit(candidate, options));
 	if (!hit) return undefined;
 	try {
 		const cached = await getStoredResult<CachedShell<TData>>(hit.responseId, {
@@ -201,18 +184,13 @@ async function recallShortCircuit<TData extends object | null>(
 	}
 }
 
-function isFreshRecallHit(
-	hit: RecallHit,
-	options: ToolCacheOptions<unknown>,
-): boolean {
+function isFreshRecallHit(hit: RecallHit, options: ToolCacheOptions<unknown>): boolean {
 	return Date.now() - hit.createdAtMs <= recallMaxAgeMs(options);
 }
 
 function recallThreshold(options: ToolCacheOptions<unknown>): number {
 	const configured = Number(process.env.PI_GEMINI_ACP_RECALL_THRESHOLD);
-	return Number.isFinite(configured)
-		? configured
-		: (options.recallThreshold ?? 0.85);
+	return Number.isFinite(configured) ? configured : (options.recallThreshold ?? 0.85);
 }
 
 function recallMaxAgeMs(options: ToolCacheOptions<unknown>): number {

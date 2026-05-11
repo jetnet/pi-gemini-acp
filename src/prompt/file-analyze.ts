@@ -8,40 +8,17 @@ import {
 	type GeminiAcpCommandSettings,
 	type GeminiAcpPromptPart,
 } from "../acp/client.js";
-import {
-	emitGeminiBackendProgress,
-	withGeminiBackendProgress,
-} from "../acp/prompt-progress.js";
-import {
-	AcpProcessSession,
-	type GeminiAcpProcessSessionFactory,
-} from "../acp/session.js";
+import { emitGeminiBackendProgress, withGeminiBackendProgress } from "../acp/prompt-progress.js";
+import { AcpProcessSession, type GeminiAcpProcessSessionFactory } from "../acp/session.js";
 import { requirePermissionCapability } from "../config/permission-policy.js";
-import type {
-	GeminiAcpAuthProbe,
-	StatusCommandChecker,
-} from "../config/status.js";
+import type { GeminiAcpAuthProbe, StatusCommandChecker } from "../config/status.js";
 import { storeResult } from "../storage/results.js";
 import type { GeminiAcpConfig, StructuredError } from "../types.js";
-import {
-	abortedResultEnvelope,
-	isAbortError,
-	providerError,
-} from "./provider-result.js";
+import { abortedResultEnvelope, isAbortError, providerError } from "./provider-result.js";
 import { promptWorkflowProgressEmitter } from "./progress-emitter.js";
-import {
-	formatPromptRequestSummary,
-	type PromptUpdateHandler,
-	runProviderPrompt,
-} from "./run.js";
-import {
-	readFileAnalyzeCache,
-	writeFileAnalyzeCache,
-} from "./file-analyze-cache.js";
-import {
-	type ValidatedAnalyzeFile,
-	validateAnalyzeFiles,
-} from "./file-analyze-validation.js";
+import { formatPromptRequestSummary, type PromptUpdateHandler, runProviderPrompt } from "./run.js";
+import { readFileAnalyzeCache, writeFileAnalyzeCache } from "./file-analyze-cache.js";
+import { type ValidatedAnalyzeFile, validateAnalyzeFiles } from "./file-analyze-validation.js";
 export { FILE_ANALYZE_MAX_BYTES } from "./file-analyze-validation.js";
 export type { ValidatedAnalyzeFile } from "./file-analyze-validation.js";
 
@@ -128,16 +105,14 @@ export async function runFileAnalyze(
 	if (signal?.aborted) return abortedInputResult();
 	const validation = await validateAnalyzeFiles(options.paths, options.cwd);
 	if (signal?.aborted) return abortedInputResult();
-	if (validation.error)
-		return { ...emptyFileAnalyzeResult(), error: validation.error };
+	if (validation.error) return { ...emptyFileAnalyzeResult(), error: validation.error };
 
-	const cached = await readFileAnalyzeCache(
-		options,
-		instructions,
-		validation.files,
-	).catch(() => undefined);
+	const cached = await readFileAnalyzeCache(options, instructions, validation.files).catch(
+		() => undefined,
+	);
 	if (cached) return cached;
 
+	// oxlint-disable-next-line typescript/unbound-method -- AcpProcessSession.start is static and does not reference `this`
 	const sessionFactory = deps.acpSessionFactory ?? AcpProcessSession.start;
 	const firstAttempt = await executeFileAnalyzePrompt({
 		deps,
@@ -150,18 +125,12 @@ export async function runFileAnalyze(
 		onUpdate,
 	});
 	if (!firstAttempt.error || !isTrustRequiredError(firstAttempt.error)) {
-		await writeFileAnalyzeCache(
-			options,
-			instructions,
-			validation.files,
-			firstAttempt,
-		).catch(() => undefined);
+		await writeFileAnalyzeCache(options, instructions, validation.files, firstAttempt).catch(
+			() => undefined,
+		);
 		return firstAttempt;
 	}
-	const trustedFolderPath = trustedFolderForFiles(
-		validation.files,
-		validation.rootDir,
-	);
+	const trustedFolderPath = trustedFolderForFiles(validation.files, validation.rootDir);
 	const trusted = await requestFolderTrust(
 		deps.trustFolder,
 		trustedFolderPath,
@@ -179,12 +148,9 @@ export async function runFileAnalyze(
 		signal,
 		onUpdate,
 	});
-	await writeFileAnalyzeCache(
-		options,
-		instructions,
-		validation.files,
-		trustedResult,
-	).catch(() => undefined);
+	await writeFileAnalyzeCache(options, instructions, validation.files, trustedResult).catch(
+		() => undefined,
+	);
 	return trustedResult;
 }
 
@@ -206,9 +172,7 @@ async function requestFolderTrust(
 				"GEMINI_ACP_TRUST_REQUIRED",
 				"provider_prompt",
 				trustRequiredMessage(
-					cause instanceof Error
-						? cause.message
-						: "Gemini CLI folder trust was not saved.",
+					cause instanceof Error ? cause.message : "Gemini CLI folder trust was not saved.",
 				),
 			),
 		};
@@ -243,26 +207,16 @@ async function executeFileAnalyzePrompt(
 				subject: attempt.files.map((file) => file.path).join(", "),
 				arguments: { fileCount: attempt.files.length },
 			},
-			commandSettingsTransform: (settings) =>
-				withAllowedReadPaths(settings, attempt.files),
+			commandSettingsTransform: (settings) => withAllowedReadPaths(settings, attempt.files),
 			prePromptCheck: ({ settings }) =>
-				requirePermissionCapability(
-					settings?.permissionPolicy,
-					"filesystemRead",
-				),
+				requirePermissionCapability(settings?.permissionPolicy, "filesystemRead"),
 			errorClassification: {
 				abortedMessage: "Gemini ACP file analysis was aborted.",
 				failedMessage: "Gemini ACP file analysis failed.",
 				trustRequiredMessage,
 			},
-			promptExecutor: async (
-				{ commandSettings, request, requestSummary },
-				signal,
-				onUpdate,
-			) => {
-				let session:
-					| Awaited<ReturnType<GeminiAcpProcessSessionFactory>>
-					| undefined;
+			promptExecutor: async ({ commandSettings, request, requestSummary }, signal, onUpdate) => {
+				let session: Awaited<ReturnType<GeminiAcpProcessSessionFactory>> | undefined;
 				try {
 					session = await attempt.sessionFactory(commandSettings, signal);
 					const initializeResult = await session.initialize();
@@ -276,12 +230,8 @@ async function executeFileAnalyzePrompt(
 							),
 						};
 					}
-					const sessionId = await session.newSession(
-						request.cwd ?? attempt.sessionCwd,
-					);
-					const header = requestSummary
-						? formatPromptRequestSummary(requestSummary)
-						: undefined;
+					const sessionId = await session.newSession(request.cwd ?? attempt.sessionCwd);
+					const header = requestSummary ? formatPromptRequestSummary(requestSummary) : undefined;
 					await emitGeminiBackendProgress(
 						promptWorkflowProgressEmitter(onUpdate, "provider_wait"),
 						"waiting",
@@ -289,15 +239,14 @@ async function executeFileAnalyzePrompt(
 					);
 					const promptUpdate = onUpdate
 						? withGeminiBackendProgress(
-								async (chunk) => onUpdate(chunk),
+								async (chunk) => await onUpdate(chunk),
 								promptWorkflowProgressEmitter(onUpdate, "provider_stream"),
 								header,
 							)
 						: undefined;
 					return await session.prompt(
 						sessionId,
-						request.parts ??
-							fileAnalyzePromptParts(attempt.instructions, attempt.files),
+						request.parts ?? fileAnalyzePromptParts(attempt.instructions, attempt.files),
 						promptUpdate,
 						{ signal },
 					);
@@ -317,17 +266,10 @@ async function executeFileAnalyzePrompt(
 			error: promptResult.error,
 		};
 	}
-	return await compactFileAnalyzeResult(
-		promptResult.text,
-		attempt.files,
-		attempt.options,
-	);
+	return await compactFileAnalyzeResult(promptResult.text, attempt.files, attempt.options);
 }
 
-function trustedFolderForFiles(
-	files: ValidatedAnalyzeFile[],
-	rootDir: string,
-): string {
+function trustedFolderForFiles(files: ValidatedAnalyzeFile[], rootDir: string): string {
 	return files.length === 1 ? path.dirname(files[0].resolvedPath) : rootDir;
 }
 
@@ -344,8 +286,7 @@ function fileAnalyzePromptParts(
 				`Instructions: ${instructions}`,
 				"Files:",
 				...files.map(
-					(file) =>
-						`- @${file.relativePath} (${file.mimeType}, ${file.sizeBytes} bytes)`,
+					(file) => `- @${file.relativePath} (${file.mimeType}, ${file.sizeBytes} bytes)`,
 				),
 			].join("\n"),
 		},
@@ -404,11 +345,7 @@ function withAllowedReadPaths(
 	};
 }
 
-function fileAnalyzeError(
-	code: string,
-	phase: string,
-	message: string,
-): FileAnalyzeResult {
+function fileAnalyzeError(code: string, phase: string, message: string): FileAnalyzeResult {
 	return {
 		...emptyFileAnalyzeResult(),
 		error: providerError(code, phase, message),
@@ -423,9 +360,7 @@ function abortedInputResult(): FileAnalyzeResult {
 	);
 }
 
-function abortedProviderResult(
-	files: ValidatedAnalyzeFile[],
-): FileAnalyzeResult {
+function abortedProviderResult(files: ValidatedAnalyzeFile[]): FileAnalyzeResult {
 	return abortedResultEnvelope(
 		{ ...emptyFileAnalyzeResult(), files },
 		"provider_prompt",

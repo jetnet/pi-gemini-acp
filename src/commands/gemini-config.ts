@@ -11,47 +11,33 @@ import { getModelAdapterStatus } from "../adapter/status.js";
 import { toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { defineGeminiCommand, type PiCommandContext } from "./define.js";
-import {
-	runGeminiConfigCache,
-	type GeminiConfigCacheResult,
-} from "./gemini-config-cache.js";
-import {
-	runGeminiConfigRecall,
-	type GeminiConfigRecallResult,
-} from "./gemini-config-recall.js";
+import { runGeminiConfigCache, type GeminiConfigCacheResult } from "./gemini-config-cache.js";
+import { runGeminiConfigRecall, type GeminiConfigRecallResult } from "./gemini-config-recall.js";
 import type {
 	GeminiConfigAcpCommandOptions,
 	GeminiConfigAcpCommandResult,
 } from "./gemini-config-command.js";
-import {
-	runAcpCommandConfig,
-	showAcpCommandPicker,
-} from "./gemini-config-command.js";
+import { runAcpCommandConfig, showAcpCommandPicker } from "./gemini-config-command.js";
 import {
 	type GeminiConfigPermissionsOptions,
 	type GeminiConfigPermissionsResult,
 	runGeminiConfigPermissions,
 	showGeminiConfigPermissionsPicker,
 } from "./gemini-config-permissions.js";
-import {
-	type GeminiConfigTrustResult,
-	runGeminiConfigTrust,
-} from "./gemini-config-trust.js";
+import { type GeminiConfigTrustResult, runGeminiConfigTrust } from "./gemini-config-trust.js";
 import { hasInteractiveUi, type InteractiveCommandContext } from "./picker.js";
 
 export const geminiConfigSchema = Type.Object({
 	action: Type.Union(
 		[
 			Type.Literal("status", {
-				description:
-					"Show read-only Gemini ACP command/auth/capability preflight state.",
+				description: "Show read-only Gemini ACP command/auth/capability preflight state.",
 			}),
 			Type.Literal("command", {
 				description: "Configure the local Gemini ACP command/args.",
 			}),
 			Type.Literal("permissions", {
-				description:
-					"Show and optionally modify Gemini ACP capability settings with descriptions.",
+				description: "Show and optionally modify Gemini ACP capability settings with descriptions.",
 			}),
 			Type.Literal("trust", {
 				description:
@@ -90,14 +76,9 @@ export const geminiConfigSchema = Type.Object({
 	),
 	capability: Type.Optional(
 		Type.Union(
-			[
-				Type.Literal("filesystemRead"),
-				Type.Literal("filesystemWrite"),
-				Type.Literal("terminal"),
-			],
+			[Type.Literal("filesystemRead"), Type.Literal("filesystemWrite"), Type.Literal("terminal")],
 			{
-				description:
-					"Capability to toggle for action=permissions. Omit to show current settings.",
+				description: "Capability to toggle for action=permissions. Omit to show current settings.",
 			},
 		),
 	),
@@ -109,25 +90,17 @@ export const geminiConfigSchema = Type.Object({
 	),
 	confirmRisk: Type.Optional(
 		Type.Boolean({
-			description:
-				"Must be true when enabling filesystemWrite or terminal permissions.",
+			description: "Must be true when enabling filesystemWrite or terminal permissions.",
 		}),
 	),
 	reason: Type.Optional(
 		Type.String({
-			description:
-				"Optional reason to store with permission changes for later status output.",
+			description: "Optional reason to store with permission changes for later status output.",
 		}),
 	),
-	cacheAction: Type.Optional(
-		Type.Union([Type.Literal("status"), Type.Literal("clear")]),
-	),
+	cacheAction: Type.Optional(Type.Union([Type.Literal("status"), Type.Literal("clear")])),
 	recallAction: Type.Optional(
-		Type.Union([
-			Type.Literal("status"),
-			Type.Literal("enable"),
-			Type.Literal("disable"),
-		]),
+		Type.Union([Type.Literal("status"), Type.Literal("enable"), Type.Literal("disable")]),
 	),
 	tool: Type.Optional(
 		Type.String({
@@ -164,17 +137,14 @@ export async function runGeminiConfig(
 	>
 > {
 	if (!params.action) {
-		throw new Error(
-			"Expected action 'status', 'command', 'permissions', 'trust', or 'cache'.",
-		);
+		throw new Error("Expected action 'status', 'command', 'permissions', 'trust', or 'cache'.");
 	}
-	if (params.action === "cache") return runGeminiConfigCache(params, options);
-	if (params.action === "recall") return runGeminiConfigRecall(params, options);
-	if (params.action === "command") return runAcpCommandConfig(params, options);
-	if (params.action === "trust")
-		return runGeminiConfigTrust(undefined, options);
+	if (params.action === "cache") return await runGeminiConfigCache(params, options);
+	if (params.action === "recall") return await runGeminiConfigRecall(params, options);
+	if (params.action === "command") return await runAcpCommandConfig(params, options);
+	if (params.action === "trust") return await runGeminiConfigTrust(undefined, options);
 	if (params.action === "permissions") {
-		return runGeminiConfigPermissions(
+		return await runGeminiConfigPermissions(
 			{
 				capability: params.capability,
 				enabled: params.enabled,
@@ -184,7 +154,7 @@ export async function runGeminiConfig(
 			options,
 		);
 	}
-	return showGeminiConfigStatus(options);
+	return await showGeminiConfigStatus(options);
 }
 
 export async function runGeminiConfigCommand(
@@ -193,28 +163,19 @@ export async function runGeminiConfigCommand(
 	options: GeminiConfigCommandOptions = {},
 ) {
 	if (!params.action && hasInteractiveUi(ctx)) {
-		return showGeminiConfigActionPicker(ctx, options);
+		return await showGeminiConfigActionPicker(ctx, options);
 	}
-	if (
-		params.action === "permissions" &&
-		!params.capability &&
-		hasInteractiveUi(ctx)
-	) {
-		return showGeminiConfigPermissionsPicker(ctx, options);
+	if (params.action === "permissions" && !params.capability && hasInteractiveUi(ctx)) {
+		return await showGeminiConfigPermissionsPicker(ctx, options);
 	}
 	if (params.action === "cache" && hasInteractiveUi(ctx)) {
-		return runGeminiConfigCache(params, options);
+		return await runGeminiConfigCache(params, options);
 	}
-	if (
-		params.action === "command" &&
-		!params.executable &&
-		!params.args &&
-		hasInteractiveUi(ctx)
-	) {
-		return showAcpCommandPicker(ctx, options);
+	if (params.action === "command" && !params.executable && !params.args && hasInteractiveUi(ctx)) {
+		return await showAcpCommandPicker(ctx, options);
 	}
-	if (params.action === "trust") return runGeminiConfigTrust(ctx, options);
-	return runGeminiConfig(params, options);
+	if (params.action === "trust") return await runGeminiConfigTrust(ctx, options);
+	return await runGeminiConfig(params, options);
 }
 
 /** Parses raw slash-command text into `/gemini-config` action parameters. */
@@ -311,11 +272,7 @@ function parsePermissionsArgs(parts: string[]): Params {
 function isPermissionCapability(
 	value: string | undefined,
 ): value is NonNullable<Params["capability"]> {
-	return (
-		value === "filesystemRead" ||
-		value === "filesystemWrite" ||
-		value === "terminal"
-	);
+	return value === "filesystemRead" || value === "filesystemWrite" || value === "terminal";
 }
 
 function parseBooleanToken(value: string): boolean | undefined {
@@ -350,29 +307,22 @@ async function showGeminiConfigActionPicker(
 ) {
 	const picked = await ctx.ui.select(
 		"Gemini config",
-		[
-			"Status",
-			"ACP command",
-			"Permissions",
-			"Trust current folder",
-			"Cache",
-			"Recall",
-		],
+		["Status", "ACP command", "Permissions", "Trust current folder", "Cache", "Recall"],
 		{ signal: ctx.signal },
 	);
 	if (!picked) {
 		return toolResult({ text: "Cancelled.", data: { cancelled: true } });
 	}
 	if (picked === "Permissions") {
-		return showGeminiConfigPermissionsPicker(ctx, options);
+		return await showGeminiConfigPermissionsPicker(ctx, options);
 	}
-	if (picked === "ACP command") return showAcpCommandPicker(ctx, options);
+	if (picked === "ACP command") return await showAcpCommandPicker(ctx, options);
 	if (picked === "Trust current folder") {
-		return runGeminiConfigTrust(ctx, options);
+		return await runGeminiConfigTrust(ctx, options);
 	}
-	if (picked === "Cache") return runGeminiConfigCache({}, options);
-	if (picked === "Recall") return runGeminiConfigRecall({}, options);
-	return runGeminiConfig({ action: "status" }, options);
+	if (picked === "Cache") return await runGeminiConfigCache({}, options);
+	if (picked === "Recall") return await runGeminiConfigRecall({}, options);
+	return await runGeminiConfig({ action: "status" }, options);
 }
 async function showGeminiConfigStatus(
 	options: GeminiConfigCommandOptions,
@@ -474,9 +424,7 @@ function formatCommandDisplay(status: GeminiAcpCommandStatus): string {
 
 function formatArgsDisplay(status: GeminiAcpCommandStatus): string {
 	const suffix = defaultSuffix(status);
-	return status.args.length > 0
-		? `${status.args.join(" ")}${suffix}`
-		: `(none)${suffix}`;
+	return status.args.length > 0 ? `${status.args.join(" ")}${suffix}` : `(none)${suffix}`;
 }
 
 function formatCommandKindDisplay(status: GeminiAcpCommandStatus): string {
@@ -494,11 +442,7 @@ function executableLabel(exists: boolean | "unknown"): string {
 	return exists ? "found" : "not found";
 }
 
-function boolLabel(
-	value: boolean | "unknown",
-	trueLabel: string,
-	falseLabel: string,
-): string {
+function boolLabel(value: boolean | "unknown", trueLabel: string, falseLabel: string): string {
 	if (value === "unknown") return "unknown";
 	return value ? trueLabel : falseLabel;
 }

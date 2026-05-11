@@ -24,9 +24,7 @@ describe("Gemini tool renderers", () => {
 	});
 
 	it("renders file analysis validation errors with expansion details", async () => {
-		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_analyze",
-		);
+		const tool = geminiAcpTools.find((candidate) => candidate.name === "gemini_analyze");
 		const result = await tool?.execute(
 			"x",
 			{
@@ -50,22 +48,18 @@ describe("Gemini tool renderers", () => {
 			{ expanded: true, isPartial: false },
 		);
 		expect(rendered(collapsed)).toContain("Press Ctrl+O");
-		expect(rendered(expanded)).toContain(
-			"GEMINI_FILE_ANALYZE_HIDDEN_PATH_REJECTED",
-		);
+		expect(rendered(expanded)).toContain("GEMINI_FILE_ANALYZE_HIDDEN_PATH_REJECTED");
 	});
 
 	it("renders image validation results with expansion details", async () => {
-		const tool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_analyze",
-		);
+		const tool = geminiAcpTools.find((candidate) => candidate.name === "gemini_analyze");
 		const result = await tool?.execute(
 			"x",
 			{
 				kind: "image",
-				imageDataBase64: Buffer.from([
-					0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-				]).toString("base64"),
+				imageDataBase64: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).toString(
+					"base64",
+				),
 				mimeType: "image/png",
 			} as never,
 			new AbortController().signal,
@@ -88,14 +82,8 @@ describe("Gemini tool renderers", () => {
 	});
 
 	it("renders status and get-result with shared collapsed and expanded UX", async () => {
-		const statusTool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_status",
-		);
-		const statusResult = await statusTool?.execute(
-			"x",
-			{} as never,
-			new AbortController().signal,
-		);
+		const statusTool = geminiAcpTools.find((candidate) => candidate.name === "gemini_status");
+		const statusResult = await statusTool?.execute("x", {} as never, new AbortController().signal);
 		expect(statusResult).toBeDefined();
 		const statusCollapsed = statusTool?.renderResult?.(
 			statusResult!,
@@ -112,9 +100,7 @@ describe("Gemini tool renderers", () => {
 		expect(rendered(statusCollapsed)).toContain("Press Ctrl+O");
 		expect(rendered(statusExpanded)).toContain("File analysis capability");
 
-		const getResultTool = geminiAcpTools.find(
-			(candidate) => candidate.name === "gemini_results",
-		);
+		const getResultTool = geminiAcpTools.find((candidate) => candidate.name === "gemini_results");
 		const getResultShell: PiToolShell = toolResult({
 			text: "Retrieved result abc123.",
 			data: { query: "alpha", sources: [{ url: "https://example.com" }] },

@@ -33,8 +33,7 @@ type Params = Static<typeof geminiAnalyzeSchema>;
 export const geminiAnalyzeTool = defineGeminiTool({
 	name: "gemini_analyze",
 	label: "Gemini Analyze",
-	description:
-		"Explicit file/image paths;ACP links;path/read preflight;b64 validate-only",
+	description: "Explicit file/image paths;ACP links;path/read preflight;b64 validate-only",
 	parameters: geminiAnalyzeSchema,
 	execute(toolCallId, params: Params, signal, onUpdate, ctx) {
 		if (params.kind === "file") {
@@ -57,12 +56,7 @@ export const geminiAnalyzeTool = defineGeminiTool({
 				imagePath: params.imagePath,
 				imageDataBase64: params.imageDataBase64,
 				mimeType: params.mimeType,
-				mode: params.mode as
-					| "caption"
-					| "objects"
-					| "ocr"
-					| "detailed"
-					| undefined,
+				mode: params.mode as "caption" | "objects" | "ocr" | "detailed" | undefined,
 				instructions: params.instructions,
 				cwd: params.cwd,
 				bypassCache: params.bypassCache,
@@ -79,18 +73,14 @@ export const geminiAnalyzeTool = defineGeminiTool({
 		});
 	},
 	renderResult(result, options, theme, context) {
-		const target = isImageDescribeResult(result)
-			? analyzeImageRoute
-			: analyzeFileRoute;
-		return target.renderResult!(result, options, theme, context);
+		const target = isImageDescribeResult(result) ? analyzeImageRoute : analyzeFileRoute;
+		return target.renderResult(result, options, theme, context);
 	},
 });
 
 function isImageDescribeResult(result: PiToolShell): boolean {
 	const data = (result.details as Partial<ResultEnvelope<unknown>>).data;
 	return Boolean(
-		data &&
-			typeof data === "object" &&
-			("image" in data || "caption" in data || "objects" in data),
+		data && typeof data === "object" && ("image" in data || "caption" in data || "objects" in data),
 	);
 }

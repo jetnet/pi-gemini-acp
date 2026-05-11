@@ -128,9 +128,7 @@ export class GeminiApiKeyClient implements GeminiAcpClient {
 function isQuotaErrorStatus(status: number, text: string): boolean {
 	return (
 		status === 429 ||
-		/status\s*429|quota|exhausted|capacity|rate.limit|ResourceExhausted/iu.test(
-			text,
-		)
+		/status\s*429|quota|exhausted|capacity|rate.limit|ResourceExhausted/iu.test(text)
 	);
 }
 
@@ -182,9 +180,7 @@ function extractSearchResults(
 	// Fallback: try to parse JSON array from the response text
 	const parsed = tryParseJsonArray(fallbackText);
 	if (parsed) {
-		return parsed
-			.slice(0, maxResults)
-			.map((item, index) => normalizeSearchItem(item, index + 1));
+		return parsed.slice(0, maxResults).map((item, index) => normalizeSearchItem(item, index + 1));
 	}
 
 	return [];
@@ -205,10 +201,7 @@ function tryParseJsonArray(text: string): unknown[] | undefined {
 }
 
 function normalizeSearchItem(item: unknown, ranking: number): SearchResultItem {
-	const record =
-		typeof item === "object" && item !== null
-			? (item as Record<string, unknown>)
-			: {};
+	const record = typeof item === "object" && item !== null ? (item as Record<string, unknown>) : {};
 	const url = coerceString(record.url) ?? coerceString(record.link) ?? "";
 	return {
 		title: coerceString(record.title) ?? url,

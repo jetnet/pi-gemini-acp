@@ -16,24 +16,11 @@ import {
 	isQuotaExhaustedError,
 	recordQuotaExhausted,
 } from "../api/quota-cache.js";
-import {
-	configFromEnv,
-	loadConfig,
-	withDefaultGeminiAcpConfig,
-} from "../config/settings.js";
-import type {
-	GeminiAcpAuthProbe,
-	StatusCommandChecker,
-} from "../config/status.js";
+import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
+import type { GeminiAcpAuthProbe, StatusCommandChecker } from "../config/status.js";
 import { isAbortError, providerError } from "../prompt/provider-result.js";
-import {
-	sourceTextForLexicalRecall,
-	upsertLexicalRecallEntry,
-} from "../recall/lexical-recall.js";
-import {
-	invalidateSearchPreflight,
-	preflightSearchProvider,
-} from "./preflight-cache.js";
+import { sourceTextForLexicalRecall, upsertLexicalRecallEntry } from "../recall/lexical-recall.js";
+import { invalidateSearchPreflight, preflightSearchProvider } from "./preflight-cache.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
 import { storeResult } from "../storage/results.js";
 import type {
@@ -88,16 +75,12 @@ export interface SearchProgressUpdate {
 }
 
 /** Receives search progress updates for Pi tool streaming. */
-export type SearchProgressHandler = (
-	update: SearchProgressUpdate,
-) => void | Promise<void>;
+export type SearchProgressHandler = (update: SearchProgressUpdate) => void | Promise<void>;
 
 /** Injectable dependencies for tests and provider/runtime adapters. */
 export interface SearchDeps {
 	geminiAcpClient?: GeminiAcpClient;
-	geminiAcpClientFactory?: (
-		settings: GeminiAcpCommandSettings,
-	) => GeminiAcpClient;
+	geminiAcpClientFactory?: (settings: GeminiAcpCommandSettings) => GeminiAcpClient;
 	geminiApiKeyClientFactory?: () => GeminiAcpClient;
 	commandExists?: CommandChecker;
 	authProbe?: GeminiAcpAuthProbe;
@@ -130,7 +113,7 @@ export async function runSearch(
 			query: options.query,
 			provider: "local",
 		});
-		return storeSearchResults(
+		return await storeSearchResults(
 			"local",
 			localSearch(options.query, options.localDocuments),
 			options.rootDir,
@@ -142,8 +125,7 @@ export async function runSearch(
 	}
 
 	const loadedConfig =
-		options.config ??
-		configFromEnv(await loadConfig({ rootDir: options.rootDir }));
+		options.config ?? configFromEnv(await loadConfig({ rootDir: options.rootDir }));
 	const config = withDefaultGeminiAcpConfig(loadedConfig);
 	const settings = config.providers?.["gemini-acp"];
 	const commandSettings = buildGeminiAcpCommandSettings(settings);
@@ -164,21 +146,18 @@ export async function runSearch(
 			rootDir: options.rootDir,
 			signal,
 			authProbe: deps.authProbe,
-			persistAuthConfirmation: options.config ? false : true,
+			persistAuthConfirmation: !options.config,
 		},
 		options.config === undefined,
 	);
 	const quotaExhausted = isQuotaExhausted(model);
-	if (preflight && isAcpFallbackError(preflight)) {
-		if (geminiApiKeyConfigured(config)) {
-			return await runApiKeySearch(options, deps, config, model, signal);
-		}
+	if (preflight && isAcpFallbackError(preflight) && geminiApiKeyConfigured(config)) {
+		return await runApiKeySearch(options, deps, config, model, signal);
 	}
 	if (quotaExhausted && geminiApiKeyConfigured(config)) {
 		return await runApiKeySearch(options, deps, config, model, signal);
 	}
-	if (preflight)
-		return { provider: "gemini-acp", model, results: [], error: preflight };
+	if (preflight) return { provider: "gemini-acp", model, results: [], error: preflight };
 
 	const client =
 		deps.geminiAcpClient ??
@@ -238,7 +217,7 @@ export async function runSearch(
 				),
 			};
 		}
-		return storeSearchResults(
+		return await storeSearchResults(
 			"gemini-acp",
 			results,
 			options.rootDir,
@@ -251,10 +230,7 @@ export async function runSearch(
 			invalidateSearchPreflight(commandSettings, true);
 		}
 		if (isQuotaExhaustedError(cause)) {
-			recordQuotaExhausted(
-				model,
-				cause instanceof Error ? cause.message : String(cause),
-			);
+			recordQuotaExhausted(model, cause instanceof Error ? cause.message : String(cause));
 			if (geminiApiKeyConfigured(config)) {
 				return await runApiKeySearch(options, deps, config, model, signal);
 			}
@@ -287,10 +263,7 @@ function isAuthOrGroundingFailure(cause: unknown): boolean {
 	);
 }
 
-function structuredErrorCode(
-	cause: unknown,
-	seen = new Set<object>(),
-): string | undefined {
+function structuredErrorCode(cause: unknown, seen = new Set<object>()): string | undefined {
 	const record = asRecord(cause);
 	if (!record || seen.has(record)) return undefined;
 	seen.add(record);
@@ -300,9 +273,7 @@ function structuredErrorCode(
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-	return value && typeof value === "object"
-		? (value as Record<string, unknown>)
-		: undefined;
+	return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
 }
 
 async function storeSearchResults(
@@ -411,8 +382,7 @@ function localSearch(
 	const results: SearchResultItem[] = [];
 	for (let index = 0; index < docs.length; index += 1) {
 		const doc = docs[index];
-		const haystack =
-			`${doc.title ?? ""} ${doc.text ?? ""} ${doc.snippet ?? ""}`.toLowerCase();
+		const haystack = `${doc.title ?? ""} ${doc.text ?? ""} ${doc.snippet ?? ""}`.toLowerCase();
 		if (terms) {
 			if (!terms.some((term) => haystack.includes(term))) continue;
 		} else if (!haystack.includes(normalizedQuery)) continue;
@@ -438,16 +408,10 @@ function geminiAcpModelLabel(
 	settings: GeminiAcpProviderSettings | undefined,
 	commandSettings: GeminiAcpCommandSettings,
 ): string {
-	return (
-		settings?.model?.trim() ||
-		modelFromArgs(commandSettings.args) ||
-		"Gemini ACP default"
-	);
+	return settings?.model?.trim() ?? modelFromArgs(commandSettings.args) ?? "Gemini ACP default";
 }
 
-function modelFromArgs(
-	args: readonly string[] | undefined,
-): string | undefined {
+function modelFromArgs(args: readonly string[] | undefined): string | undefined {
 	if (!args) return undefined;
 	for (let index = 0; index < args.length; index += 1) {
 		const arg = args[index];
@@ -481,14 +445,9 @@ async function runApiKeySearch(
 		model,
 		maxResults,
 	});
-	const client =
-		deps.geminiApiKeyClientFactory?.() ??
-		new GeminiApiKeyClient({ config, model });
+	const client = deps.geminiApiKeyClientFactory?.() ?? new GeminiApiKeyClient({ config, model });
 	try {
-		const results = await client.search(
-			{ query: options.query, maxResults, model },
-			signal,
-		);
+		const results = await client.search({ query: options.query, maxResults, model }, signal);
 		if (results.length === 0) {
 			return {
 				provider: "gemini-acp",
@@ -501,7 +460,7 @@ async function runApiKeySearch(
 				),
 			};
 		}
-		return storeSearchResults(
+		return await storeSearchResults(
 			"gemini-acp",
 			results,
 			options.rootDir,
@@ -517,9 +476,7 @@ async function runApiKeySearch(
 			error: providerError(
 				"GEMINI_API_KEY_FAILED",
 				"provider_search",
-				cause instanceof Error
-					? cause.message
-					: "Gemini API key search failed.",
+				cause instanceof Error ? cause.message : "Gemini API key search failed.",
 				{ cause },
 			),
 		};

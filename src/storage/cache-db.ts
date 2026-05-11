@@ -1,11 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { load as loadSqliteVec } from "sqlite-vec";
-import {
-	ensureDir,
-	resolveStoragePaths,
-	type StorageOptions,
-} from "./paths.js";
+import { ensureDir, resolveStoragePaths, type StorageOptions } from "./paths.js";
 
 /** Row stored in the persistent response cache index. */
 export interface ResponseCacheRow {
@@ -134,9 +130,7 @@ export class ResponseCacheDatabase {
 	}
 
 	delete(cacheKey: string): void {
-		this.db
-			.prepare("DELETE FROM response_cache WHERE cache_key = ?")
-			.run(cacheKey);
+		this.db.prepare("DELETE FROM response_cache WHERE cache_key = ?").run(cacheKey);
 	}
 
 	clear(tool?: string): number {
@@ -148,17 +142,15 @@ export class ResponseCacheDatabase {
 
 	deleteExpired(now = Date.now()): number {
 		const result = this.db
-			.prepare(
-				"DELETE FROM response_cache WHERE expires_at IS NOT NULL AND expires_at < ?",
-			)
+			.prepare("DELETE FROM response_cache WHERE expires_at IS NOT NULL AND expires_at < ?")
 			.run(now);
 		return Number(result.changes ?? 0);
 	}
 
 	liveResponseIds(): Set<string> {
-		const rows = this.db
-			.prepare("SELECT response_id FROM response_cache")
-			.all() as Array<{ response_id: string }>;
+		const rows = this.db.prepare("SELECT response_id FROM response_cache").all() as Array<{
+			response_id: string;
+		}>;
 		return new Set(rows.map((row) => row.response_id));
 	}
 
@@ -202,14 +194,11 @@ export class ResponseCacheDatabase {
 				ORDER BY enqueued_at ASC LIMIT ?`,
 			)
 			.all(now, limit) as unknown as DbEmbeddingQueueRow[];
+		// oxlint-disable-next-line unicorn/no-array-callback-reference -- mapEmbeddingQueueRow takes one arg
 		return rows.map(mapEmbeddingQueueRow);
 	}
 
-	markEmbeddingFailure(
-		responseId: string,
-		message: string,
-		now = Date.now(),
-	): void {
+	markEmbeddingFailure(responseId: string, message: string, now = Date.now()): void {
 		const row = this.db
 			.prepare("SELECT attempts FROM embedding_queue WHERE response_id = ?")
 			.get(responseId) as { attempts: number } | undefined;
@@ -238,27 +227,16 @@ export class ResponseCacheDatabase {
 				(response_id, tool, recall_text, model, dim, embedded_at)
 				VALUES (?, ?, ?, ?, ?, ?)`,
 			)
-			.run(
-				row.responseId,
-				row.tool,
-				row.recallText,
-				row.model,
-				row.embedding.length,
-				embeddedAt,
-			);
+			.run(row.responseId, row.tool, row.recallText, row.model, row.embedding.length, embeddedAt);
 		if (this.sqliteVecAvailable) {
 			this.db
-				.prepare(
-					"INSERT OR REPLACE INTO embeddings_vec(response_id, embedding) VALUES (?, ?)",
-				)
+				.prepare("INSERT OR REPLACE INTO embeddings_vec(response_id, embedding) VALUES (?, ?)")
 				.run(row.responseId, JSON.stringify(row.embedding));
 		}
 	}
 
 	deleteEmbeddingJob(responseId: string): void {
-		this.db
-			.prepare("DELETE FROM embedding_queue WHERE response_id = ?")
-			.run(responseId);
+		this.db.prepare("DELETE FROM embedding_queue WHERE response_id = ?").run(responseId);
 	}
 
 	embeddingSummary(currentModel?: string): EmbeddingSummary {
@@ -275,15 +253,13 @@ export class ResponseCacheDatabase {
 		const stale = currentModel
 			? (
 					this.db
-						.prepare(
-							"SELECT COUNT(*) AS count FROM embeddings WHERE model != ?",
-						)
+						.prepare("SELECT COUNT(*) AS count FROM embeddings WHERE model != ?")
 						.get(currentModel) as { count: number }
 				).count
 			: undefined;
 		return {
 			rowCount: base.row_count,
-			models: base.models ? base.models.split(",").filter(Boolean).sort() : [],
+			models: base.models ? base.models.split(",").filter(Boolean).toSorted() : [],
 			queueDepth: queue.depth,
 			deadQueueDepth: queue.dead,
 			sqliteVecAvailable: this.sqliteVecAvailable,

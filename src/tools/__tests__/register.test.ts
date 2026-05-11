@@ -16,7 +16,7 @@ const PUBLIC_TOOL_FILES = [
 	"gemini-results.ts",
 	"gemini-search.ts",
 	"gemini-status.ts",
-].sort();
+].toSorted();
 
 describe("Gemini tool registration", () => {
 	afterEach(() => {
@@ -38,21 +38,18 @@ describe("Gemini tool registration", () => {
 	});
 
 	it("keeps public tool adapters limited to the registered umbrella files", async () => {
-		const files = (await readdir(TOOLS_DIR, { recursive: true })).filter(
-			(file) => file.endsWith(".ts"),
+		const files = (await readdir(TOOLS_DIR, { recursive: true })).filter((file) =>
+			file.endsWith(".ts"),
 		);
 		const publicToolFiles: string[] = [];
 
 		for (const file of files) {
-			const source = await readFile(
-				new URL(`../${file}`, import.meta.url),
-				"utf8",
-			);
-			if (/export const \w+ = defineGeminiTool\(/.test(source)) {
+			const source = await readFile(new URL(`../${file}`, import.meta.url), "utf8");
+			if (/export const \w+ = defineGeminiTool\(/u.test(source)) {
 				publicToolFiles.push(file);
 			}
 		}
 
-		expect(publicToolFiles.sort()).toEqual(PUBLIC_TOOL_FILES);
+		expect(publicToolFiles.toSorted()).toEqual(PUBLIC_TOOL_FILES);
 	});
 });

@@ -1,8 +1,5 @@
 import { configureGeminiAcpSettings } from "../config/configure-acp.js";
-import {
-	DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS,
-	loadConfig,
-} from "../config/settings.js";
+import { DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS, loadConfig } from "../config/settings.js";
 import { errorResult, toolResult } from "../tools/result.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import type { PiCommandContext } from "./define.js";
@@ -23,11 +20,7 @@ export interface GeminiConfigTrustResult {
 export async function runGeminiConfigTrust(
 	ctx?: PiCommandContext,
 	options: GeminiConfigAcpCommandOptions = {},
-): Promise<
-	PiToolShell<
-		ResultEnvelope<GeminiConfigTrustResult | { cancelled: true } | null>
-	>
-> {
+): Promise<PiToolShell<ResultEnvelope<GeminiConfigTrustResult | { cancelled: true } | null>>> {
 	if (hasInteractiveUi(ctx)) {
 		const confirmed = await confirmTrustCurrentFolder(ctx);
 		if (!confirmed) {
@@ -43,10 +36,7 @@ export async function runGeminiConfigTrust(
 	const args = current.args.includes(SKIP_TRUST_ARG)
 		? current.args
 		: [...current.args, SKIP_TRUST_ARG];
-	const result = await configureGeminiAcpSettings(
-		{ command: current.command, args },
-		options,
-	);
+	const result = await configureGeminiAcpSettings({ command: current.command, args }, options);
 	if ("error" in result) return errorResult(result.error);
 
 	return toolResult({
@@ -61,10 +51,8 @@ export async function runGeminiConfigTrust(
 	});
 }
 
-async function confirmTrustCurrentFolder(
-	ctx: InteractiveCommandContext,
-): Promise<boolean> {
-	return ctx.ui.confirm(
+async function confirmTrustCurrentFolder(ctx: InteractiveCommandContext): Promise<boolean> {
+	return await ctx.ui.confirm(
 		"Trust this folder for Gemini ACP?",
 		[
 			"Gemini ACP starts a local Gemini CLI session and must pass a working folder as session context.",
@@ -79,13 +67,10 @@ async function confirmTrustCurrentFolder(
 async function loadCurrentCommand(
 	options: GeminiConfigAcpCommandOptions,
 ): Promise<{ command: string; args: string[] }> {
-	const config =
-		options.config ?? (await loadConfig({ rootDir: options.rootDir }));
+	const config = options.config ?? (await loadConfig({ rootDir: options.rootDir }));
 	const settings = config.providers?.["gemini-acp"];
 	return {
 		command: settings?.command ?? DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.command,
-		args: settings?.args
-			? [...settings.args]
-			: [...DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.args],
+		args: settings?.args ? [...settings.args] : [...DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.args],
 	};
 }

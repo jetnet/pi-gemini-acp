@@ -7,21 +7,11 @@ import {
 	type GeminiAcpCommandSettings,
 	type GeminiAcpPromptPart,
 } from "../acp/client.js";
-import {
-	emitGeminiBackendProgress,
-	withGeminiBackendProgress,
-} from "../acp/prompt-progress.js";
-import {
-	AcpProcessSession,
-	type GeminiAcpProcessSessionFactory,
-} from "../acp/session.js";
+import { emitGeminiBackendProgress, withGeminiBackendProgress } from "../acp/prompt-progress.js";
+import { AcpProcessSession, type GeminiAcpProcessSessionFactory } from "../acp/session.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
 import { requirePermissionCapability } from "../config/permission-policy.js";
-import {
-	configFromEnv,
-	loadConfig,
-	withDefaultGeminiAcpConfig,
-} from "../config/settings.js";
+import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
 import {
 	type GeminiAcpAuthProbe,
 	preflightGeminiAcpProvider,
@@ -29,10 +19,7 @@ import {
 } from "../config/status.js";
 import { storeResult } from "../storage/results.js";
 import type { GeminiAcpConfig, StructuredError } from "../types.js";
-import {
-	readImageDescribeCache,
-	writeImageDescribeCache,
-} from "./image-describe-cache.js";
+import { readImageDescribeCache, writeImageDescribeCache } from "./image-describe-cache.js";
 import {
 	IMAGE_DESCRIBE_MODES,
 	type ImageDescribeMode,
@@ -115,8 +102,7 @@ export async function runImageDescribe(
 	});
 	const validation = await validateImageInput(options);
 	if (signal?.aborted) return abortedImageDescribeResult(options);
-	if ("error" in validation)
-		return emptyImageDescribeResult(options, validation.error);
+	if ("error" in validation) return emptyImageDescribeResult(options, validation.error);
 	if (validation.image.kind !== "path") {
 		return {
 			...emptyImageDescribeResult(options, unsupportedBase64Error()),
@@ -130,8 +116,7 @@ export async function runImageDescribe(
 		text: "Checking Gemini ACP image, resource-link, and filesystem-read capabilities.",
 	});
 	const loadedConfig =
-		options.config ??
-		configFromEnv(await loadConfig({ rootDir: options.rootDir }));
+		options.config ?? configFromEnv(await loadConfig({ rootDir: options.rootDir }));
 	const config = withDefaultGeminiAcpConfig(loadedConfig);
 	const settings = config.providers?.["gemini-acp"];
 	const preflight = await preflightGeminiAcpProvider(settings, {
@@ -140,26 +125,21 @@ export async function runImageDescribe(
 		rootDir: options.rootDir,
 		signal,
 		authProbe: deps.authProbe,
-		persistAuthConfirmation: options.config ? false : true,
+		persistAuthConfirmation: !options.config,
 	});
 	if (preflight)
 		return {
 			...emptyImageDescribeResult(options, preflight),
 			image: validation.image,
 		};
-	const permissionError = requirePermissionCapability(
-		settings?.permissionPolicy,
-		"filesystemRead",
-	);
+	const permissionError = requirePermissionCapability(settings?.permissionPolicy, "filesystemRead");
 	if (permissionError)
 		return {
 			...emptyImageDescribeResult(options, permissionError),
 			image: validation.image,
 		};
 
-	const cached = await readImageDescribeCache(options, validation.image).catch(
-		() => undefined,
-	);
+	const cached = await readImageDescribeCache(options, validation.image).catch(() => undefined);
 	if (cached) return cached;
 
 	const commandSettings = withAllowedImagePath(
@@ -171,12 +151,11 @@ export async function runImageDescribe(
 		image: validation.image,
 		onUpdate,
 		options,
+		// oxlint-disable-next-line typescript/unbound-method -- AcpProcessSession.start is static and does not reference `this`
 		sessionFactory: deps.acpSessionFactory ?? AcpProcessSession.start,
 		signal,
 	});
-	await writeImageDescribeCache(options, validation.image, result).catch(
-		() => undefined,
-	);
+	await writeImageDescribeCache(options, validation.image, result).catch(() => undefined);
 	return result;
 }
 
@@ -194,20 +173,14 @@ async function executeImageDescribeSession(
 ): Promise<ImageDescribeResult> {
 	let session: Awaited<ReturnType<GeminiAcpProcessSessionFactory>> | undefined;
 	try {
-		session = await attempt.sessionFactory(
-			attempt.commandSettings,
-			attempt.signal,
-		);
+		session = await attempt.sessionFactory(attempt.commandSettings, attempt.signal);
 		const initializeResult = await session.initialize();
 		if (
 			!initializeResult.promptCapabilities.image ||
 			!initializeResult.promptCapabilities.embeddedContext
 		) {
 			return {
-				...emptyImageDescribeResult(
-					attempt.options,
-					unsupportedTransportError(),
-				),
+				...emptyImageDescribeResult(attempt.options, unsupportedTransportError()),
 				image: attempt.image,
 			};
 		}
@@ -220,7 +193,7 @@ async function executeImageDescribeSession(
 		);
 		const promptUpdate = attempt.onUpdate
 			? withGeminiBackendProgress(
-					async (chunk) => attempt.onUpdate?.(chunk),
+					async (chunk) => await attempt.onUpdate?.(chunk),
 					promptWorkflowProgressEmitter(attempt.onUpdate, "provider_stream"),
 					header,
 				)
@@ -231,11 +204,7 @@ async function executeImageDescribeSession(
 			promptUpdate,
 			{ signal: attempt.signal },
 		);
-		return await compactImageDescribeResult(
-			text,
-			attempt.image,
-			attempt.options,
-		);
+		return await compactImageDescribeResult(text, attempt.image, attempt.options);
 	} catch (cause) {
 		return {
 			...emptyImageDescribeResult(attempt.options, providerPromptError(cause)),
@@ -286,12 +255,7 @@ async function compactImageDescribeResult(
 		responseLength <= IMAGE_DESCRIBE_INLINE_LIMIT
 			? text
 			: `${text.slice(0, IMAGE_DESCRIBE_INLINE_LIMIT)}…`;
-	const base = imageDescribeResultFromText(
-		displayText,
-		image,
-		options,
-		responseLength,
-	);
+	const base = imageDescribeResultFromText(displayText, image, options, responseLength);
 	if (responseLength <= IMAGE_DESCRIBE_INLINE_LIMIT) return base;
 	const stored = await storeResult(
 		{ provider: "gemini-acp", tool: "gemini_image_describe", image, text },
@@ -362,9 +326,7 @@ function unsupportedTransportError(): StructuredError {
 	);
 }
 
-function abortedImageDescribeResult(
-	options: ImageDescribeOptions,
-): ImageDescribeResult {
+function abortedImageDescribeResult(options: ImageDescribeOptions): ImageDescribeResult {
 	return emptyImageDescribeResult(
 		options,
 		imageDescribeError(

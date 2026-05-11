@@ -3,10 +3,7 @@ import {
 	type ConfigureGeminiAcpResult,
 	configureGeminiAcpSettings,
 } from "../config/configure-acp.js";
-import {
-	DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS,
-	loadConfig,
-} from "../config/settings.js";
+import { DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS, loadConfig } from "../config/settings.js";
 import { providerError } from "../prompt/provider-result.js";
 import { errorResult, toolResult } from "../tools/result.js";
 import type { GeminiAcpConfig, PiToolShell, ResultEnvelope } from "../types.js";
@@ -18,23 +15,19 @@ export interface GeminiConfigAcpCommandParams {
 	args?: string[];
 }
 
-export interface GeminiConfigAcpCommandOptions
-	extends ConfigureGeminiAcpOptions {
+export interface GeminiConfigAcpCommandOptions extends ConfigureGeminiAcpOptions {
 	config?: GeminiAcpConfig;
 }
 
-export type GeminiConfigAcpCommandResult =
-	| ConfigureGeminiAcpResult
-	| { cancelled: true }
-	| null;
+export type GeminiConfigAcpCommandResult = ConfigureGeminiAcpResult | { cancelled: true } | null;
 
 /** Shows a settings-style picker for staging Gemini ACP command/args before saving. */
 export async function showAcpCommandPicker(
 	ctx: PiCommandContext,
 	options: GeminiConfigAcpCommandOptions = {},
 ): Promise<PiToolShell<ResultEnvelope<GeminiConfigAcpCommandResult>>> {
-	if (!hasInteractiveUi(ctx)) return runAcpCommandConfig({}, options);
-	return showInteractiveAcpCommandPicker(ctx, options);
+	if (!hasInteractiveUi(ctx)) return await runAcpCommandConfig({}, options);
+	return await showInteractiveAcpCommandPicker(ctx, options);
 }
 
 /** Saves Gemini ACP command settings and reports command preflight status. */
@@ -48,13 +41,10 @@ export async function runAcpCommandConfig(
 	);
 	if ("error" in result) return errorResult(result.error);
 
-	const commandText = formatCommand(
-		result.settings.command,
-		result.settings.args,
-	);
+	const commandText = formatCommand(result.settings.command, result.settings.args);
 	if (!result.preflight.commandFound) {
 		return warningResult(
-			`Saved Gemini ACP command: ${commandText}. ${result.preflight.message} ${result.preflight.remediation}`,
+			`Saved Gemini ACP command: ${commandText}. ${result.preflight.message} ${result.preflight.remediation ?? ""}`,
 			result,
 		);
 	}
@@ -92,18 +82,12 @@ async function showInteractiveAcpCommandPicker(
 			continue;
 		}
 		if (picked === "Save and apply") {
-			return runAcpCommandConfig(
-				{ executable: localCommand, args: localArgs },
-				options,
-			);
+			return await runAcpCommandConfig({ executable: localCommand, args: localArgs }, options);
 		}
 	}
 }
 
-async function editArgs(
-	ctx: InteractiveCommandContext,
-	initialArgs: string[],
-): Promise<string[]> {
+async function editArgs(ctx: InteractiveCommandContext, initialArgs: string[]): Promise<string[]> {
 	const localArgs = [...initialArgs];
 	while (true) {
 		const choices = argsChoices(localArgs);
@@ -127,14 +111,11 @@ async function editArgs(
 async function loadCurrentAcpCommandSettings(
 	options: GeminiConfigAcpCommandOptions,
 ): Promise<{ command: string; args: string[] }> {
-	const config =
-		options.config ?? (await loadConfig({ rootDir: options.rootDir }));
+	const config = options.config ?? (await loadConfig({ rootDir: options.rootDir }));
 	const settings = config.providers?.["gemini-acp"];
 	return {
 		command: settings?.command ?? DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.command,
-		args: settings?.args
-			? [...settings.args]
-			: [...DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.args],
+		args: settings?.args ? [...settings.args] : [...DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.args],
 	};
 }
 
@@ -178,14 +159,15 @@ function formatArgsRow(args: string[]): string {
 	return args.length > 0 ? args.join(" ") : "(none)";
 }
 
-function formatCommand(
-	command: string | undefined,
-	args: string[] | undefined,
-): string {
-	return [command, ...(args ?? [])]
-		.filter((part): part is string => Boolean(part))
-		.map(quoteArg)
-		.join(" ");
+function formatCommand(command: string | undefined, args: string[] | undefined): string {
+	return (
+		[command, ...(args ?? [])]
+			// oxlint-disable-next-line unicorn/prefer-native-coercion-functions -- type guard preserves string[] for downstream .map(quoteArg)
+			.filter((part): part is string => Boolean(part))
+			// oxlint-disable-next-line unicorn/no-array-callback-reference -- quoteArg takes one arg
+			.map(quoteArg)
+			.join(" ")
+	);
 }
 
 function quoteArg(arg: string): string {

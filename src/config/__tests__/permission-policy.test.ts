@@ -21,9 +21,7 @@ describe("Gemini ACP permission policy", () => {
 			fs: { readTextFile: false, writeTextFile: false },
 			terminal: false,
 		});
-		expect(describePermissionPolicy()).toContain(
-			"no filesystem or terminal access",
-		);
+		expect(describePermissionPolicy()).toContain("no filesystem or terminal access");
 	});
 
 	it("resolves explicit capability booleans", () => {
@@ -33,9 +31,7 @@ describe("Gemini ACP permission policy", () => {
 				filesystemWrite: true,
 			}).fs,
 		).toEqual({ readTextFile: true, writeTextFile: true });
-		expect(permissionPolicyCapabilities({ terminal: true }).terminal).toBe(
-			true,
-		);
+		expect(permissionPolicyCapabilities({ terminal: true }).terminal).toBe(true);
 		expect(describePermissionPolicy({ filesystemRead: true })).toContain(
 			"file-read: filesystem read",
 		);
@@ -63,12 +59,9 @@ describe("Gemini ACP permission policy", () => {
 		expect(requirePermissionCapability(undefined, "filesystemRead")?.code).toBe(
 			"GEMINI_ACP_PERMISSION_POLICY_DENIED",
 		);
+		expect(requirePermissionCapability({ filesystemRead: true }, "filesystemRead")).toBeUndefined();
 		expect(
-			requirePermissionCapability({ filesystemRead: true }, "filesystemRead"),
-		).toBeUndefined();
-		expect(
-			requirePermissionCapability({ filesystemRead: true }, "filesystemWrite")
-				?.message,
+			requirePermissionCapability({ filesystemRead: true }, "filesystemWrite")?.message,
 		).toContain("/gemini-config permissions");
 	});
 });

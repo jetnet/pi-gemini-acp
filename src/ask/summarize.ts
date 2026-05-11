@@ -50,11 +50,7 @@ const askSummarizeParamsSchema = Type.Object({
 	),
 	audience: Type.Optional(Type.String({ description: "Summary audience." })),
 	style: Type.Optional(
-		Type.Union([
-			Type.Literal("paragraph"),
-			Type.Literal("bullets"),
-			Type.Literal("executive"),
-		]),
+		Type.Union([Type.Literal("paragraph"), Type.Literal("bullets"), Type.Literal("executive")]),
 	),
 	maxSourceCharacters: Type.Optional(
 		Type.Number({
@@ -63,32 +59,20 @@ const askSummarizeParamsSchema = Type.Object({
 			description: "Max source chars sent to Gemini; default 20000.",
 		}),
 	),
-	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response cache." }),
-	),
+	bypassCache: Type.Optional(Type.Boolean({ description: "Skip response cache." })),
 });
 
 type Params = Static<typeof askSummarizeParamsSchema>;
 
 export const askSummarizeRoute = {
-	async execute(
-		toolCallId: string,
-		params: Params,
-		signal: AbortSignal,
-		onUpdate?: ToolUpdate,
-	) {
-		return withToolResponseCache({
+	async execute(toolCallId: string, params: Params, signal: AbortSignal, onUpdate?: ToolUpdate) {
+		return await withToolResponseCache({
 			toolName: "gemini_summarize",
 			inputs: params,
 			bypassCache: params.bypassCache,
 			ttlMs: 7 * 24 * 60 * 60 * 1000,
 			execute: async () => {
-				const result = await runSummarize(
-					params,
-					{},
-					signal,
-					summarizeToolUpdate(onUpdate),
-				);
+				const result = await runSummarize(params, {}, signal, summarizeToolUpdate(onUpdate));
 				if (result.error) return errorResult(result.error);
 				const truncationNote = result.source.truncated
 					? ` Source truncated from ${result.source.contentLength} to ${result.source.preparedLength} characters before summarization.`
@@ -101,7 +85,7 @@ export const askSummarizeRoute = {
 					{},
 					{
 						text: result.summaryTruncated
-							? `Gemini ACP summary stored as responseId ${result.responseId}.${truncationNote} Preview:\n${result.summary}`
+							? `Gemini ACP summary stored as responseId ${result.responseId ?? "(none)"}.${truncationNote} Preview:\n${result.summary}`
 							: `Gemini ACP summary:${truncationNote}\n${result.summary}`,
 						data: result,
 						responseId: result.responseId,
@@ -111,11 +95,7 @@ export const askSummarizeRoute = {
 			},
 		});
 	},
-	renderResult(
-		result: PiToolShell,
-		options: ToolRenderResultOptions,
-		theme: unknown,
-	) {
+	renderResult(result: PiToolShell, options: ToolRenderResultOptions, theme: unknown) {
 		return renderPromptToolResult(result, options, theme, {
 			toolName: "gemini_summarize",
 			isData: isSummarizeRunResult,
@@ -128,7 +108,7 @@ export const askSummarizeRoute = {
 function formatSummarizeCollapsedDisplay(result: SummarizeRunResult): string {
 	const lines = [
 		result.summaryTruncated
-			? `Gemini ACP summary stored as responseId ${result.responseId}.`
+			? `Gemini ACP summary stored as responseId ${result.responseId ?? "(none)"}.`
 			: "Gemini ACP summary received.",
 		`Source: ${formatSourceSummary(result)}`,
 		`Preview: ${truncateToolText(result.summary, 260)}`,
@@ -140,15 +120,10 @@ function formatSummarizeCollapsedDisplay(result: SummarizeRunResult): string {
 			`Source truncated from ${result.source.contentLength} to ${result.source.preparedLength} characters.`,
 		);
 	}
-	return appendExpansionHint(lines, "the full summary and source details").join(
-		"\n",
-	);
+	return appendExpansionHint(lines, "the full summary and source details").join("\n");
 }
 
-function formatSummarizeExpandedDisplay(
-	result: SummarizeRunResult,
-	shell: PiToolShell,
-): string {
+function formatSummarizeExpandedDisplay(result: SummarizeRunResult, shell: PiToolShell): string {
 	const lines = [
 		"Gemini ACP summary:",
 		result.summary,
@@ -191,9 +166,7 @@ function isSummarizeRunResult(value: unknown): value is SummarizeRunResult {
 	);
 }
 
-function summarizeToolUpdate(
-	onUpdate: ToolUpdate | undefined,
-): SummarizeUpdateHandler | undefined {
+function summarizeToolUpdate(onUpdate: ToolUpdate | undefined): SummarizeUpdateHandler | undefined {
 	if (!onUpdate) return undefined;
 	return async (update) => {
 		await onUpdate(

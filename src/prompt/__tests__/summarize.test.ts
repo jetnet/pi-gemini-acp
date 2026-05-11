@@ -87,12 +87,8 @@ describe("runSummarize", () => {
 			"store",
 		]);
 		expect(updates[1]?.text).toContain("Source truncated from 1500 to 1000");
-		const providerPrompt = updates.find(
-			(update) => update.phase === "provider_prompt",
-		);
-		expect(providerPrompt?.text).toContain(
-			'Sending summarize prompt: "content"',
-		);
+		const providerPrompt = updates.find((update) => update.phase === "provider_prompt");
+		expect(providerPrompt?.text).toContain('Sending summarize prompt: "content"');
 		expect(providerPrompt?.text).toContain("contentLength 1500");
 		expect(providerPrompt?.text).toContain("preparedLength 1000");
 		expect(providerPrompt?.text).toContain("truncated true");
@@ -125,10 +121,7 @@ describe("runSummarize", () => {
 					fetch: async (url, init) => {
 						fetchedUrl = url;
 						fetchedSignal = init?.signal;
-						return fetchedSource(
-							url,
-							"<h1>Title</h1><script>bad()</script><p>Body</p>",
-						);
+						return fetchedSource(url, "<h1>Title</h1><script>bad()</script><p>Body</p>");
 					},
 				},
 			},

@@ -8,10 +8,7 @@ import { geminiConfigCommand } from "./gemini-config.js";
 import { geminiModelCommand } from "./gemini-model.js";
 
 /** Slash commands exposed by the Gemini ACP Pi extension. */
-export const geminiAcpCommands = [
-	geminiConfigCommand,
-	geminiModelCommand,
-] as const;
+export const geminiAcpCommands = [geminiConfigCommand, geminiModelCommand] as const;
 
 /** Registers Gemini ACP slash commands with a Pi host. */
 export function registerGeminiAcpCommands(pi: PiCommandRegistrar): void {
@@ -45,16 +42,13 @@ function parseCommandArgs(command: GeminiCommand, args: string): unknown {
 	if (trimmed.startsWith("{")) return JSON.parse(trimmed);
 	const firstKey = firstSchemaKey(command);
 	if (!firstKey) {
-		throw new Error(
-			`Command /${command.name} expects no arguments or a JSON object.`,
-		);
+		throw new Error(`Command /${command.name} expects no arguments or a JSON object.`);
 	}
 	return { [firstKey]: trimmed };
 }
 
 function firstSchemaKey(command: GeminiCommand): string | undefined {
-	const properties = (command.parameters as { properties?: unknown })
-		.properties;
+	const properties = (command.parameters as { properties?: unknown }).properties;
 	if (!properties || typeof properties !== "object") return undefined;
 	const keys = Object.keys(properties as Record<string, unknown>);
 	return keys[0];
@@ -65,17 +59,12 @@ function emitResult(
 	result: { content?: Array<{ text?: string }>; details?: unknown },
 ): void {
 	const text = result?.content?.[0]?.text;
-	const errorCode = (result?.details as { error?: { code?: string } })?.error
-		?.code;
+	const errorCode = (result?.details as { error?: { code?: string } })?.error?.code;
 	const type: "info" | "error" = errorCode ? "error" : "info";
 	if (text) emit(ctx, text, type);
 }
 
-function emit(
-	ctx: PiCommandContext,
-	message: string,
-	type: "info" | "warning" | "error",
-): void {
+function emit(ctx: PiCommandContext, message: string, type: "info" | "warning" | "error"): void {
 	if (ctx?.hasUI && ctx.ui?.notify) {
 		ctx.ui.notify(message, type);
 		return;

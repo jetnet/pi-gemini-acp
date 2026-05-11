@@ -43,9 +43,7 @@ export interface GeminiAcpResourceLinkPart {
 }
 
 /** ACP prompt content block accepted by the narrow Pi Gemini client. */
-export type GeminiAcpPromptPart =
-	| { type: "text"; text: string }
-	| GeminiAcpResourceLinkPart;
+export type GeminiAcpPromptPart = { type: "text"; text: string } | GeminiAcpResourceLinkPart;
 
 /** Plain text or multipart prompt request sent through a Gemini ACP session. */
 export interface GeminiAcpPromptRequest {
@@ -62,9 +60,7 @@ export interface GeminiAcpPromptChunk {
 }
 
 /** Callback for prompt chunk updates exposed by fake and stdio ACP clients. */
-export type GeminiAcpPromptUpdateHandler = (
-	update: GeminiAcpPromptChunk,
-) => void | Promise<void>;
+export type GeminiAcpPromptUpdateHandler = (update: GeminiAcpPromptChunk) => void | Promise<void>;
 
 /** Narrow Gemini ACP capability surface used by Pi tools. */
 export interface GeminiAcpClient {
@@ -94,15 +90,10 @@ export class StdioGeminiAcpClient implements GeminiAcpClient {
 			await session.initialize();
 			const sessionId = await session.newSession(searchSessionCwd(request.cwd));
 			const earlyStop = createGeminiAcpSearchEarlyStop(onUpdate);
-			const text = await session.prompt(
-				sessionId,
-				searchPrompt(request),
-				earlyStop.onUpdate,
-				{
-					signal: earlyStop.signal,
-					returnTextOnAbort: true,
-				},
-			);
+			const text = await session.prompt(sessionId, searchPrompt(request), earlyStop.onUpdate, {
+				signal: earlyStop.signal,
+				returnTextOnAbort: true,
+			});
 			return normalizeGeminiAcpSearchResults(
 				earlyStop.parsedPayload() ?? parseSearchPayload(text),
 				geminiMetadata(),
@@ -143,9 +134,7 @@ export function normalizeGeminiAcpSearchResults(
 	return candidates.flatMap((entry, index) => {
 		const record = asRecord(entry);
 		const url = record
-			? (coerceString(record.url) ??
-				coerceString(record.link) ??
-				coerceString(record.uri))
+			? (coerceString(record.url) ?? coerceString(record.link) ?? coerceString(record.uri))
 			: undefined;
 		if (!record || !url) return [];
 		try {

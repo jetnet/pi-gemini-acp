@@ -17,16 +17,14 @@ export function normalizeUrl(input: string | URL): string {
 	) {
 		url.port = "";
 	}
+	// oxlint-disable-next-line unicorn/no-useless-spread -- snapshot keys; we mutate the iterator below
 	for (const key of [...url.searchParams.keys()]) {
 		if (TRACKING_PARAMS.has(key.toLowerCase())) url.searchParams.delete(key);
 	}
-	const sorted = [...url.searchParams.entries()].sort(([a], [b]) =>
-		a.localeCompare(b),
-	);
+	const sorted = [...url.searchParams.entries()].toSorted(([a], [b]) => a.localeCompare(b));
 	url.search = "";
 	for (const [key, value] of sorted) url.searchParams.append(key, value);
 	url.hash = "";
-	if (url.pathname !== "/" && url.pathname.endsWith("/"))
-		url.pathname = url.pathname.slice(0, -1);
+	if (url.pathname !== "/" && url.pathname.endsWith("/")) url.pathname = url.pathname.slice(0, -1);
 	return url.toString();
 }

@@ -9,16 +9,9 @@ import type {
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
 } from "./client.js";
-import {
-	normalizeGeminiAcpSearchResults,
-	parseSearchPayload,
-	searchSessionCwd,
-} from "./client.js";
+import { normalizeGeminiAcpSearchResults, parseSearchPayload, searchSessionCwd } from "./client.js";
 import { clientCacheKey } from "./client-cache-key.js";
-import {
-	geminiBackendProgressText,
-	withGeminiBackendProgress,
-} from "./prompt-progress.js";
+import { geminiBackendProgressText, withGeminiBackendProgress } from "./prompt-progress.js";
 import { geminiAcpSearchParallelEnabled } from "./search-parallel.js";
 import { createGeminiAcpSearchEarlyStop } from "./search-early-stop.js";
 import { searchPrompt } from "./search-prompt.js";
@@ -73,6 +66,7 @@ export class GeminiAcpClientCache {
 
 	constructor(options: GeminiAcpClientCacheOptions = {}) {
 		this.idleTtlMs = options.idleTtlMs ?? defaultGeminiAcpIdleTtlMs();
+		// oxlint-disable-next-line typescript/unbound-method -- AcpProcessSession.start is static and does not reference `this`
 		this.sessionFactory = options.sessionFactory ?? AcpProcessSession.start;
 	}
 
@@ -85,17 +79,12 @@ export class GeminiAcpClientCache {
 		const entry = this.entries.get(key);
 		if (entry) return entry.client;
 		let client!: CachedGeminiAcpClient;
-		client = new CachedGeminiAcpClient(
-			settings,
-			this.sessionFactory,
-			this.idleTtlMs,
-			() => {
-				if (this.entries.get(key)?.client === client) {
-					this.entries.delete(key);
-					notifyGeminiAcpClientCacheEntryRemoved(key);
-				}
-			},
-		);
+		client = new CachedGeminiAcpClient(settings, this.sessionFactory, this.idleTtlMs, () => {
+			if (this.entries.get(key)?.client === client) {
+				this.entries.delete(key);
+				notifyGeminiAcpClientCacheEntryRemoved(key);
+			}
+		});
 		this.entries.set(key, { client });
 		return client;
 	}
@@ -105,9 +94,7 @@ export class GeminiAcpClientCache {
 		settings: GeminiAcpCommandSettings,
 		options: GeminiAcpClientWarmOptions = {},
 	): Promise<void> {
-		await this.cachedClient(settings, "search").warmSearchSession(
-			options.signal,
-		);
+		await this.cachedClient(settings, "search").warmSearchSession(options.signal);
 	}
 
 	/** Closes every warm ACP subprocess currently retained by this cache. */
@@ -128,9 +115,7 @@ export class GeminiAcpClientCache {
 const defaultCache = new GeminiAcpClientCache();
 
 /** Returns the effective production idle TTL from environment or the 15 minute default. */
-export function defaultGeminiAcpIdleTtlMs(
-	env: NodeJS.ProcessEnv = process.env,
-): number {
+export function defaultGeminiAcpIdleTtlMs(env: NodeJS.ProcessEnv = process.env): number {
 	const raw = env[IDLE_TTL_ENV];
 	if (!raw) return DEFAULT_IDLE_TTL_MS;
 	const parsed = Number(raw);
@@ -138,11 +123,11 @@ export function defaultGeminiAcpIdleTtlMs(
 }
 
 /** Registers a process-local listener for cached ACP client entry removal. */
-export function onGeminiAcpClientCacheEntryRemoved(
-	listener: CacheRemovalListener,
-): () => void {
+export function onGeminiAcpClientCacheEntryRemoved(listener: CacheRemovalListener): () => void {
 	cacheRemovalListeners.add(listener);
-	return () => cacheRemovalListeners.delete(listener);
+	return () => {
+		cacheRemovalListeners.delete(listener);
+	};
 }
 
 /** Returns the stable key used for warm Gemini ACP client cache entries. */
@@ -208,11 +193,9 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 					model: request.model,
 				},
 			);
-			return normalizeGeminiAcpSearchResults(
-				earlyStop.parsedPayload() ?? parseSearchPayload(text),
-			);
+			return normalizeGeminiAcpSearchResults(earlyStop.parsedPayload() ?? parseSearchPayload(text));
 		};
-		return geminiAcpSearchParallelEnabled() ? run() : this.enqueue(run);
+		return geminiAcpSearchParallelEnabled() ? await run() : await this.enqueue(run);
 	}
 
 	async prompt(
@@ -220,15 +203,16 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
-		return this.enqueue(async () =>
-			// Prompt workflows may depend on the caller/project cwd; only search uses
-			// the neutral cwd from searchSessionCwd() to avoid project discovery churn.
-			this.promptOnFreshSession(
-				request.cwd ?? process.cwd(),
-				request.prompt,
-				signal,
-				onUpdate,
-			),
+		return await this.enqueue(
+			async () =>
+				// Prompt workflows may depend on the caller/project cwd; only search uses
+				// the neutral cwd from searchSessionCwd() to avoid project discovery churn.
+				await this.promptOnFreshSession(
+					request.cwd ?? process.cwd(),
+					request.prompt,
+					signal,
+					onUpdate,
+				),
 		);
 	}
 
@@ -252,14 +236,11 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 		promptSignal?: AbortSignal,
-		onProgress?: (
-			phase: "warm" | "session" | "search",
-			message: string,
-		) => void,
+		onProgress?: (phase: "warm" | "session" | "search", message: string) => void,
 		searchContext?: { query: string; maxResults: number; model?: string },
 	): Promise<string> {
 		const processWasWarm = this.active !== undefined;
-		return this.withWarmProcess(signal, async (active) => {
+		return await this.withWarmProcess(signal, async (active) => {
 			const model = searchContext?.model ?? "Gemini ACP";
 			const query = searchContext?.query ?? "";
 			const maxResults = searchContext?.maxResults ?? 4;
@@ -286,15 +267,10 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 				);
 
 				// Start Gemini prompt
-				const promptPromise = active.session.prompt(
-					sessionId,
-					text,
-					wrappedOnUpdate,
-					{
-						signal: promptSignal,
-						returnTextOnAbort: true,
-					},
-				);
+				const promptPromise = active.session.prompt(sessionId, text, wrappedOnUpdate, {
+					signal: promptSignal,
+					returnTextOnAbort: true,
+				});
 
 				try {
 					return await promptPromise;
@@ -307,20 +283,14 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		});
 	}
 
-	private async ensureIdleSearchSession(
-		active: ActiveProcess,
-		cwd: string,
-	): Promise<void> {
+	private async ensureIdleSearchSession(active: ActiveProcess, cwd: string): Promise<void> {
 		const entries = active.searchSessions.get(cwd) ?? [];
 		if (entries.length > 0) return;
 		const entry = this.createSearchSession(active, cwd, false);
 		await entry.sessionId;
 	}
 
-	private claimSearchSession(
-		active: ActiveProcess,
-		cwd: string,
-	): SearchSessionClaim {
+	private claimSearchSession(active: ActiveProcess, cwd: string): SearchSessionClaim {
 		const entries = active.searchSessions.get(cwd) ?? [];
 		const idle = entries.find((entry) => !entry.busy);
 		if (idle) {
@@ -363,9 +333,9 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
-		return this.withWarmProcess(signal, async (active) => {
+		return await this.withWarmProcess(signal, async (active) => {
 			const sessionId = await active.session.newSession(cwd);
-			return active.session.prompt(sessionId, text, onUpdate, { signal });
+			return await active.session.prompt(sessionId, text, onUpdate, { signal });
 		});
 	}
 

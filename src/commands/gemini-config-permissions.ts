@@ -16,11 +16,7 @@ import type {
 	ResultEnvelope,
 } from "../types.js";
 import type { PiCommandContext } from "./define.js";
-import {
-	hasInteractiveUi,
-	type InteractiveCommandContext,
-	notifyResult,
-} from "./picker.js";
+import { hasInteractiveUi, type InteractiveCommandContext, notifyResult } from "./picker.js";
 
 export interface PermissionToggle {
 	capability: PermissionCapability;
@@ -63,11 +59,8 @@ export async function runGeminiConfigPermissions(
 		return permissionsDisplayResult(currentPolicy);
 	}
 
-	const nextEnabled =
-		toggle.enabled ?? !capabilityEnabled(currentResolved, toggle.capability);
-	if (
-		requiresConfirmation(toggle.capability, nextEnabled, toggle.confirmRisk)
-	) {
+	const nextEnabled = toggle.enabled ?? !capabilityEnabled(currentResolved, toggle.capability);
+	if (requiresConfirmation(toggle.capability, nextEnabled, toggle.confirmRisk)) {
 		return errorResult(
 			providerError(
 				"GEMINI_ACP_PERMISSION_CONFIRMATION_REQUIRED",
@@ -86,12 +79,9 @@ export async function runGeminiConfigPermissions(
 		},
 		toggle.reason ?? currentResolved.reason,
 	);
-	const config = await saveGeminiAcpSettings(
-		permissionPolicySettings(permissionPolicy),
-		{
-			rootDir: options.rootDir,
-		},
-	);
+	const config = await saveGeminiAcpSettings(permissionPolicySettings(permissionPolicy), {
+		rootDir: options.rootDir,
+	});
 	const stored = config.providers?.["gemini-acp"]?.permissionPolicy;
 	return permissionsDisplayResult(stored ?? permissionPolicy, "updated");
 }
@@ -100,8 +90,8 @@ export async function showGeminiConfigPermissionsPicker(
 	ctx: PiCommandContext,
 	options: GeminiConfigPermissionsOptions = {},
 ): Promise<PiToolShell<ResultEnvelope<GeminiConfigPermissionsResult | null>>> {
-	if (!hasInteractiveUi(ctx)) return runGeminiConfigPermissions({}, options);
-	return showInteractivePermissionsPicker(ctx, options);
+	if (!hasInteractiveUi(ctx)) return await runGeminiConfigPermissions({}, options);
+	return await showInteractivePermissionsPicker(ctx, options);
 }
 
 async function showInteractivePermissionsPicker(
@@ -110,9 +100,7 @@ async function showInteractivePermissionsPicker(
 ): Promise<PiToolShell<ResultEnvelope<GeminiConfigPermissionsResult | null>>> {
 	while (true) {
 		const result = await runGeminiConfigPermissions({}, options);
-		const data = (
-			result.details as ResultEnvelope<GeminiConfigPermissionsResult>
-		).data;
+		const data = (result.details as ResultEnvelope<GeminiConfigPermissionsResult>).data;
 		if (!data) return result;
 
 		const choices = permissionsChoices(data.capabilities);
@@ -142,9 +130,7 @@ function permissionsChoices(settings: PermissionCapabilitySetting[]): string[] {
 	return [
 		...settings.map((setting) => {
 			const mark = setting.enabled ? "[x]" : "[ ]";
-			const warning = setting.requiresConfirmation
-				? " (⚠️ requires confirmation)"
-				: "";
+			const warning = setting.requiresConfirmation ? " (⚠️ requires confirmation)" : "";
 			return `${mark} ${setting.label}${warning}`;
 		}),
 		"Done",
@@ -168,8 +154,7 @@ async function confirmPermissionRisk(
 async function loadCurrentPermissionPolicy(
 	options: GeminiConfigPermissionsOptions,
 ): Promise<GeminiAcpPermissionPolicy | undefined> {
-	const config =
-		options.config ?? (await loadConfig({ rootDir: options.rootDir }));
+	const config = options.config ?? (await loadConfig({ rootDir: options.rootDir }));
 	return config.providers?.["gemini-acp"]?.permissionPolicy;
 }
 
@@ -189,9 +174,7 @@ function permissionsDisplayResult(
 	});
 }
 
-function permissionsResult(
-	policy?: GeminiAcpPermissionPolicy,
-): GeminiConfigPermissionsResult {
+function permissionsResult(policy?: GeminiAcpPermissionPolicy): GeminiConfigPermissionsResult {
 	const resolved = resolvePermissionPolicy(policy);
 	return {
 		permissionPolicy: policy ?? {},
@@ -201,9 +184,7 @@ function permissionsResult(
 	};
 }
 
-function formatPermissionsDisplay(
-	result: GeminiConfigPermissionsResult,
-): string {
+function formatPermissionsDisplay(result: GeminiConfigPermissionsResult): string {
 	return [
 		"Gemini ACP Capabilities:",
 		...result.capabilities.map(formatCapabilityLine),
@@ -213,9 +194,7 @@ function formatPermissionsDisplay(
 
 function formatCapabilityLine(setting: PermissionCapabilitySetting): string {
 	const mark = setting.enabled ? "x" : " ";
-	const warning = setting.requiresConfirmation
-		? " ⚠️ Requires confirmation."
-		: "";
+	const warning = setting.requiresConfirmation ? " ⚠️ Requires confirmation." : "";
 	return [
 		`- [${mark}] ${setting.label} — ${setting.description}${warning}`,
 		`  Required for: ${setting.requiredFor}.`,
@@ -227,14 +206,12 @@ function formatCurrentSummary(resolved: ResolvedPermissionPolicy): string {
 		resolved.filesystemRead ? "filesystem read" : undefined,
 		resolved.filesystemWrite ? "filesystem write" : undefined,
 		resolved.terminal ? "terminal" : undefined,
-	].filter((label): label is string => Boolean(label));
+	].filter(Boolean);
 	if (allowed.length === 0) return "restrictive (no capabilities enabled)";
 	return `${resolved.mode} (${allowed.join(", ")})`;
 }
 
-function capabilitySettings(
-	resolved: ResolvedPermissionPolicy,
-): PermissionCapabilitySetting[] {
+function capabilitySettings(resolved: ResolvedPermissionPolicy): PermissionCapabilitySetting[] {
 	return [
 		{
 			capability: "filesystemRead",

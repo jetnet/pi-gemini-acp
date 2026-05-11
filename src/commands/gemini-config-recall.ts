@@ -1,8 +1,4 @@
-import {
-	loadConfig,
-	recallEnabledFromConfig,
-	saveRecallEnabled,
-} from "../config/settings.js";
+import { loadConfig, recallEnabledFromConfig, saveRecallEnabled } from "../config/settings.js";
 import { lexicalRecallSummary } from "../recall/lexical-recall.js";
 import type { StorageOptions } from "../storage/paths.js";
 import { toolResult } from "../tools/result.js";
@@ -48,10 +44,8 @@ function recallText(result: GeminiConfigRecallResult): string {
 		`- env disabled: ${result.envDisabled ? "yes" : "no"}`,
 		`- lexical FTS entries: ${result.lexicalEntries ?? 0}`,
 		`- oldest lexical entry: ${result.oldestLexicalEntry ?? "none"}`,
-		result.envDisabled
-			? "- note: PI_GEMINI_ACP_RECALL=0 overrides persisted settings."
-			: undefined,
+		result.envDisabled ? "- note: PI_GEMINI_ACP_RECALL=0 overrides persisted settings." : undefined,
 	]
-		.filter((line): line is string => Boolean(line))
+		.filter(Boolean)
 		.join("\n");
 }

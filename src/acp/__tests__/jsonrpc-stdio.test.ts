@@ -1,11 +1,7 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
-import {
-	JsonRpcResponseError,
-	JsonRpcStdioClient,
-	type JsonRpcMessage,
-} from "../jsonrpc-stdio.js";
+import { JsonRpcResponseError, JsonRpcStdioClient, type JsonRpcMessage } from "../jsonrpc-stdio.js";
 
 describe("JsonRpcStdioClient", () => {
 	it("correlates request responses by id", async () => {
@@ -93,9 +89,7 @@ describe("JsonRpcStdioClient", () => {
 		child.send({ jsonrpc: "2.0", method: "session/update", params: { n: 1 } });
 		await Promise.resolve();
 
-		expect(notifications).toEqual([
-			{ jsonrpc: "2.0", method: "session/update", params: { n: 1 } },
-		]);
+		expect(notifications).toEqual([{ jsonrpc: "2.0", method: "session/update", params: { n: 1 } }]);
 		await client.close();
 	});
 
@@ -180,10 +174,7 @@ class FakeChildProcess extends EventEmitter {
 	}
 }
 
-function collectClientMessages(
-	child: FakeChildProcess,
-	count: number,
-): Promise<JsonRpcMessage[]> {
+function collectClientMessages(child: FakeChildProcess, count: number): Promise<JsonRpcMessage[]> {
 	const messages: JsonRpcMessage[] = [];
 	let buffer = "";
 	return new Promise((resolve) => {

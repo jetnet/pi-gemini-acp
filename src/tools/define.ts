@@ -12,9 +12,7 @@ import type { PiToolShell } from "../types.js";
 export type ToolUpdate = (result: PiToolShell) => void | Promise<void>;
 
 /** Pi execution context used by tools that need interactive confirmation. */
-export type ToolExecutionContext = Partial<
-	Pick<ExtensionContext, "hasUI" | "ui">
->;
+export type ToolExecutionContext = Partial<Pick<ExtensionContext, "hasUI" | "ui">>;
 
 /** Executes a Gemini tool with typed params and optional streaming updates. */
 export type ToolExecute<TParams> = (
@@ -25,19 +23,16 @@ export type ToolExecute<TParams> = (
 	ctx?: ToolExecutionContext,
 ) => Promise<PiToolShell>;
 
-type OfficialToolRenderCall = NonNullable<
-	ToolDefinition<TSchema>["renderCall"]
->;
-type OfficialToolRenderContext<TParams = unknown> =
-	Parameters<OfficialToolRenderCall>[2] & { args: TParams };
+type OfficialToolRenderCall = NonNullable<ToolDefinition<TSchema>["renderCall"]>;
+type OfficialToolRenderContext<TParams = unknown> = Parameters<OfficialToolRenderCall>[2] & {
+	args: TParams;
+};
 
 /** Pi renderer state for a tool result or partial progress update. */
 export type ToolRenderResultOptions = PiToolRenderResultOptions;
 
 /** Minimal render context consumed by this extension's custom renderers. */
-export type ToolRenderContext<TParams = unknown> = Partial<
-	OfficialToolRenderContext<TParams>
-> &
+export type ToolRenderContext<TParams = unknown> = Partial<OfficialToolRenderContext<TParams>> &
 	Pick<OfficialToolRenderContext<TParams>, "expanded" | "isPartial">;
 
 /** Renders the tool call title row for Pi's interactive tool UI. */
@@ -67,7 +62,9 @@ export type GeminiTool<TParameters extends TSchema = TSchema> = Omit<
 };
 
 type AnyGeminiTool = Omit<GeminiTool<TSchema>, "execute" | "renderCall"> & {
+	// oxlint-disable-next-line typescript/no-explicit-any
 	execute: ToolExecute<any>;
+	// oxlint-disable-next-line typescript/no-explicit-any
 	renderCall?: ToolRenderCall<any>;
 };
 

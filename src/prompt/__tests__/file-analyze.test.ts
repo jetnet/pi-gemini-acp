@@ -78,9 +78,7 @@ describe("runFileAnalyze", () => {
 		]);
 		expect(result.supported).toBe(true);
 		expect(result.transport).toBe("resource_link");
-		expect(commandSettings?.allowedReadPaths).toEqual([
-			path.join(rootDir, "notes.txt"),
-		]);
+		expect(commandSettings?.allowedReadPaths).toEqual([path.join(rootDir, "notes.txt")]);
 		expect(JSON.stringify(prompts[0])).toContain('"resource_link"');
 		expect(JSON.stringify(prompts[0])).toContain(
 			pathToFileURL(path.join(rootDir, "notes.txt")).href,
@@ -206,9 +204,7 @@ describe("runFileAnalyze", () => {
 					}),
 					newSession: async () => "session-1",
 					prompt: async () => {
-						throw new Error(
-							"Gemini CLI is not running in a trusted directory.",
-						);
+						throw new Error("Gemini CLI is not running in a trusted directory.");
 					},
 					close: async () => undefined,
 				}),

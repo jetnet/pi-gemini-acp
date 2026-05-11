@@ -2,11 +2,7 @@ import path from "node:path";
 import { AcpProcessSession } from "../acp/session.js";
 import { providerError } from "../prompt/provider-result.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
-import type {
-	GeminiAcpConfig,
-	GeminiAcpProviderSettings,
-	StructuredError,
-} from "../types.js";
+import type { GeminiAcpConfig, GeminiAcpProviderSettings, StructuredError } from "../types.js";
 import { defaultGeminiAcpCommandExists } from "./command.js";
 import { type GeminiAcpModelStatus, modelStatus } from "./model.js";
 import {
@@ -108,19 +104,14 @@ export async function getGeminiAcpStatus(
 	options: GeminiAcpStatusOptions = {},
 	deps: GeminiAcpStatusDeps = {},
 ): Promise<GeminiAcpStatusReport> {
-	const storedConfig =
-		options.config ?? (await loadConfig({ rootDir: options.rootDir }));
-	const loadedConfig = options.config
-		? storedConfig
-		: configFromEnv(storedConfig);
+	const storedConfig = options.config ?? (await loadConfig({ rootDir: options.rootDir }));
+	const loadedConfig = options.config ? storedConfig : configFromEnv(storedConfig);
 	const effectiveConfig = withDefaultGeminiAcpConfig(loadedConfig);
-	return evaluateGeminiAcpStatus(
+	return await evaluateGeminiAcpStatus(
 		effectiveConfig.providers?.["gemini-acp"],
 		deps.commandExists ?? defaultGeminiAcpCommandExists,
 		{
-			settingsPersisted: hasPersistedGeminiAcpSettings(
-				storedConfig.providers?.["gemini-acp"],
-			),
+			settingsPersisted: hasPersistedGeminiAcpSettings(storedConfig.providers?.["gemini-acp"]),
 		},
 	);
 }
@@ -134,8 +125,7 @@ export async function evaluateGeminiAcpStatus(
 	options: { settingsPersisted?: boolean } = {},
 ): Promise<GeminiAcpStatusReport> {
 	const command = settings?.command?.trim();
-	const settingsPersisted =
-		options.settingsPersisted ?? hasPersistedGeminiAcpSettings(settings);
+	const settingsPersisted = options.settingsPersisted ?? hasPersistedGeminiAcpSettings(settings);
 	const commandStatus = commandShell(settings, "unknown", settingsPersisted);
 	const capabilities = capabilityShell(settings);
 
@@ -189,10 +179,7 @@ export async function evaluateGeminiAcpStatus(
 		);
 	}
 
-	if (
-		settings.requiresSearchGrounding !== false &&
-		settings.searchGroundingAvailable !== true
-	) {
+	if (settings.requiresSearchGrounding !== false && settings.searchGroundingAvailable !== true) {
 		return statusReport(
 			"search_unavailable",
 			checkedCommand,
@@ -226,9 +213,7 @@ export async function evaluateGeminiAcpStatus(
 		);
 	}
 
-	return statusReport("ready", checkedCommand, capabilities, [
-		"No remediation required.",
-	]);
+	return statusReport("ready", checkedCommand, capabilities, ["No remediation required."]);
 }
 
 /**
@@ -259,15 +244,11 @@ export async function preflightGeminiAcpProvider(
 			return providerError(
 				"GEMINI_ACP_UNAUTHENTICATED",
 				"provider_preflight",
-				auth.message ??
-					"Gemini ACP is configured but authentication has not been confirmed.",
+				auth.message ?? "Gemini ACP is configured but authentication has not been confirmed.",
 			);
 		}
 		if (options.persistAuthConfirmation !== false) {
-			await saveGeminiAcpSettings(
-				{ authenticated: true },
-				{ rootDir: options.rootDir },
-			);
+			await saveGeminiAcpSettings({ authenticated: true }, { rootDir: options.rootDir });
 		}
 	}
 	if (
@@ -295,10 +276,7 @@ async function confirmGeminiAcpAuthentication(
 	settings: GeminiAcpProviderSettings,
 	options: GeminiAcpProviderPreflightOptions,
 ): Promise<GeminiAcpAuthProbeResult> {
-	return await (options.authProbe ?? defaultGeminiAcpAuthProbe)(
-		settings,
-		options.signal,
-	);
+	return await (options.authProbe ?? defaultGeminiAcpAuthProbe)(settings, options.signal);
 }
 
 async function defaultGeminiAcpAuthProbe(
@@ -307,10 +285,7 @@ async function defaultGeminiAcpAuthProbe(
 ): Promise<GeminiAcpAuthProbeResult> {
 	let session: AcpProcessSession | undefined;
 	try {
-		session = await AcpProcessSession.start(
-			buildGeminiAcpCommandSettings(settings),
-			signal,
-		);
+		session = await AcpProcessSession.start(buildGeminiAcpCommandSettings(settings), signal);
 		await session.initialize();
 		await session.newSession(process.cwd());
 		return { authenticated: true };
@@ -346,9 +321,7 @@ function statusReport(
 	};
 }
 
-function hasPersistedGeminiAcpSettings(
-	settings: GeminiAcpProviderSettings | undefined,
-): boolean {
+function hasPersistedGeminiAcpSettings(settings: GeminiAcpProviderSettings | undefined): boolean {
 	return settings?.enabled === true && Boolean(settings.command?.trim());
 }
 
@@ -367,12 +340,8 @@ function commandNotFoundRemediation(
 	];
 }
 
-function formatCommandForMessage(
-	settings: GeminiAcpProviderSettings | undefined,
-): string {
-	return [settings?.command, ...(settings?.args ?? [])]
-		.filter((part): part is string => Boolean(part))
-		.join(" ");
+function formatCommandForMessage(settings: GeminiAcpProviderSettings | undefined): string {
+	return [settings?.command, ...(settings?.args ?? [])].filter(Boolean).join(" ");
 }
 
 function commandShell(
@@ -381,11 +350,7 @@ function commandShell(
 	settingsPersisted: boolean,
 ): GeminiAcpCommandStatus {
 	const command = settings?.command?.trim();
-	const commandKind = command
-		? command.includes(path.sep)
-			? "path"
-			: "name"
-		: "unset";
+	const commandKind = command ? (command.includes(path.sep) ? "path" : "name") : "unset";
 	return {
 		settingsPersisted,
 		command: command ? safeCommandName(command) : undefined,
@@ -402,9 +367,7 @@ function capabilityShell(
 	const resolvedPolicy = resolvePermissionPolicy(settings?.permissionPolicy);
 	return {
 		authenticated: booleanOrUnknown(settings?.authenticated),
-		searchGroundingAvailable: booleanOrUnknown(
-			settings?.searchGroundingAvailable,
-		),
+		searchGroundingAvailable: booleanOrUnknown(settings?.searchGroundingAvailable),
 		searchGroundingRequired: settings?.requiresSearchGrounding !== false,
 		fileAnalysisAvailable: booleanOrUnknown(settings?.fileAnalysisAvailable),
 		imageInput: imageInputStatus(settings),
@@ -412,9 +375,7 @@ function capabilityShell(
 		permissionPolicy: {
 			...resolvedPolicy,
 			description: describePermissionPolicy(settings?.permissionPolicy),
-			clientCapabilities: permissionPolicyCapabilities(
-				settings?.permissionPolicy,
-			),
+			clientCapabilities: permissionPolicyCapabilities(settings?.permissionPolicy),
 		},
 	};
 }

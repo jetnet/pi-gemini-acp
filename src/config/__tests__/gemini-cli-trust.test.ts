@@ -2,10 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-	geminiCliTrustedFoldersPath,
-	trustGeminiCliFolder,
-} from "../gemini-cli-trust.js";
+import { geminiCliTrustedFoldersPath, trustGeminiCliFolder } from "../gemini-cli-trust.js";
 
 let rootDir: string;
 
@@ -20,9 +17,9 @@ afterEach(async () => {
 describe("Gemini CLI trusted folders", () => {
 	it("uses Gemini CLI trusted folders path env override", () => {
 		const trustPath = path.join(rootDir, "trustedFolders.json");
-		expect(
-			geminiCliTrustedFoldersPath({ GEMINI_CLI_TRUSTED_FOLDERS_PATH: trustPath }),
-		).toBe(trustPath);
+		expect(geminiCliTrustedFoldersPath({ GEMINI_CLI_TRUSTED_FOLDERS_PATH: trustPath })).toBe(
+			trustPath,
+		);
 	});
 
 	it("persists exact TRUST_FOLDER without broad skip-trust args", async () => {

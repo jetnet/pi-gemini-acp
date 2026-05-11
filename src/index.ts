@@ -1,18 +1,13 @@
 import type { PiCommandRegistrar } from "./commands/define.js";
 import { registerGeminiAcpCommands } from "./commands/register.js";
-import {
-	registerModelAdapter,
-	type ModelAdapterRegistrar,
-} from "./adapter/register.js";
+import { registerModelAdapter, type ModelAdapterRegistrar } from "./adapter/register.js";
 import { detectPiScraper, type PiScraperPresence } from "./research/hydrate.js";
 import { scheduleGeminiSearchPrewarm } from "./search/prewarm.js";
 import { sweepResponseCacheRetention } from "./storage/retention.js";
 import type { PiToolRegistrar } from "./tools/define.js";
 import { registerGeminiAcpTools } from "./tools/register.js";
 
-export interface GeminiAcpRegistrar
-	extends PiToolRegistrar,
-		ModelAdapterRegistrar {
+export interface GeminiAcpRegistrar extends PiToolRegistrar, ModelAdapterRegistrar {
 	getActiveTools?: () => string[];
 	getAllTools?: () => Array<{ name: string }>;
 	registerCommand?: PiCommandRegistrar["registerCommand"];

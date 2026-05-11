@@ -40,10 +40,7 @@ export function validateExtractionSchema(
 		}
 	}
 	const type = record.type;
-	if (
-		type !== undefined &&
-		(typeof type !== "string" || !SUPPORTED_TYPES.has(type))
-	) {
+	if (type !== undefined && (typeof type !== "string" || !SUPPORTED_TYPES.has(type))) {
 		return schemaError(
 			`${path}.type must be one of object, array, string, number, integer, boolean, or null.`,
 		);
@@ -59,9 +56,7 @@ export function validateExtractionSchema(
 		record.additionalProperties !== undefined &&
 		typeof record.additionalProperties !== "boolean"
 	) {
-		return schemaError(
-			`${path}.additionalProperties must be a boolean when provided.`,
-		);
+		return schemaError(`${path}.additionalProperties must be a boolean when provided.`);
 	}
 	if (record.items !== undefined) {
 		if (type !== "array") {
@@ -80,14 +75,10 @@ export function validateValueAgainstSchema(
 ): string | undefined {
 	const record = asRecord(schema);
 	if (!record) return `${path} schema is invalid.`;
-	if (
-		Array.isArray(record.enum) &&
-		!record.enum.some((entry) => Object.is(entry, value))
-	) {
+	if (Array.isArray(record.enum) && !record.enum.some((entry) => Object.is(entry, value))) {
 		return `${path} must equal one of the schema enum values.`;
 	}
-	const type =
-		typeof record.type === "string" ? record.type : inferSchemaType(record);
+	const type = typeof record.type === "string" ? record.type : inferSchemaType(record);
 	if (type && !matchesType(value, type)) return `${path} must be ${type}.`;
 	if (type === "object") return validateObject(value, record, path);
 	if (type === "array") return validateArray(value, record, path);
@@ -104,16 +95,10 @@ function validateProperties(
 	if (properties === undefined) return undefined;
 	const propertyRecord = asRecord(properties);
 	if (!propertyRecord || (type !== undefined && type !== "object")) {
-		return schemaError(
-			`${path}.properties is only supported on object schemas.`,
-		);
+		return schemaError(`${path}.properties is only supported on object schemas.`);
 	}
 	for (const [key, value] of Object.entries(propertyRecord)) {
-		const child = validateExtractionSchema(
-			value,
-			`${path}.properties.${key}`,
-			seen,
-		);
+		const child = validateExtractionSchema(value, `${path}.properties.${key}`, seen);
 		if (child) return child;
 	}
 	return undefined;
@@ -130,9 +115,7 @@ function validateRequired(
 	const propertyRecord = asRecord(record.properties) ?? {};
 	for (const key of record.required) {
 		if (!(key in propertyRecord)) {
-			return schemaError(
-				`${path}.required includes ${key}, but that property is not defined.`,
-			);
+			return schemaError(`${path}.required includes ${key}, but that property is not defined.`);
 		}
 	}
 	return undefined;
@@ -146,26 +129,19 @@ function validateObject(
 	const objectValue = asRecord(value);
 	if (!objectValue) return `${path} must be object.`;
 	const properties = asRecord(schema.properties) ?? {};
-	const required = Array.isArray(schema.required)
-		? schema.required.filter(isString)
-		: [];
+	const required = Array.isArray(schema.required) ? schema.required.filter(isString) : [];
 	for (const key of required) {
 		if (!(key in objectValue)) return `${path}${key} is required.`;
 	}
 	for (const [key, childSchema] of Object.entries(properties)) {
 		if (key in objectValue) {
-			const child = validateValueAgainstSchema(
-				objectValue[key],
-				childSchema,
-				`${path}${key}.`,
-			);
+			const child = validateValueAgainstSchema(objectValue[key], childSchema, `${path}${key}.`);
 			if (child) return child;
 		}
 	}
 	if (schema.additionalProperties === false) {
 		for (const key of Object.keys(objectValue)) {
-			if (!(key in properties))
-				return `${path}${key} is not allowed by the schema.`;
+			if (!(key in properties)) return `${path}${key} is not allowed by the schema.`;
 		}
 	}
 	return undefined;
@@ -179,11 +155,7 @@ function validateArray(
 	if (!Array.isArray(value)) return `${path} must be array.`;
 	if (schema.items === undefined) return undefined;
 	for (const [index, item] of value.entries()) {
-		const child = validateValueAgainstSchema(
-			item,
-			schema.items,
-			`${path}${index}.`,
-		);
+		const child = validateValueAgainstSchema(item, schema.items, `${path}${index}.`);
 		if (child) return child;
 	}
 	return undefined;

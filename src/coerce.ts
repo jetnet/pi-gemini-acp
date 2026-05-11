@@ -16,12 +16,8 @@ export function coerceFiniteNumber(value: unknown): number | undefined {
 }
 
 /** Returns value if it's one of the allowed literals, else undefined. */
-export function coerceEnum<T extends string>(
-	value: unknown,
-	allowed: readonly T[],
-): T | undefined {
-	return typeof value === "string" &&
-		(allowed as readonly string[]).includes(value)
+export function coerceEnum<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {
+	return typeof value === "string" && (allowed as readonly string[]).includes(value)
 		? (value as T)
 		: undefined;
 }

@@ -1,6 +1,7 @@
 /**
  * @fileoverview Aggregate Gemini ACP text task tool for prompt, extract, summarize, translate, and code review workflows.
  */
+import { inspect } from "node:util";
 import { type Static, Type } from "@earendil-works/pi-ai";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { askCodeReviewRoute } from "../ask/code-review.js";
@@ -171,10 +172,7 @@ function validateAskTaskOptions(params: Params): PiToolShell | undefined {
 			validateStringOption("url", params.url) ??
 			validateStringOption("audience", params.audience);
 		if (stringError) return stringError;
-		const numberError = validateNumberOption(
-			"maxSourceCharacters",
-			params.maxSourceCharacters,
-		);
+		const numberError = validateNumberOption("maxSourceCharacters", params.maxSourceCharacters);
 		if (numberError) return numberError;
 		const countError =
 			validateSummaryCount("sentenceCount", params.sentenceCount) ??
@@ -188,19 +186,15 @@ function validateAskTaskOptions(params: Params): PiToolShell | undefined {
 			validateStringOption("sourceLanguage", params.sourceLanguage) ??
 			validateStringOption("tone", params.tone);
 		if (stringError) return stringError;
-		const translateShapeError = validateTranslateShape(params);
-		if (translateShapeError) return translateShapeError;
+		const shapeError = validateTranslateShape(params);
+		if (shapeError) return shapeError;
 	}
 	if (
 		params.task === "code_review" &&
 		params.severityThreshold &&
 		!isAllowedValue(params.severityThreshold, SEVERITY_VALUES)
 	) {
-		return invalidAskValue(
-			"severityThreshold",
-			params.severityThreshold,
-			SEVERITY_VALUES,
-		);
+		return invalidAskValue("severityThreshold", params.severityThreshold, SEVERITY_VALUES);
 	}
 	if (params.task === "code_review") {
 		const stringError =
@@ -220,8 +214,7 @@ function validateAskTaskOptions(params: Params): PiToolShell | undefined {
 		const invalidFocus = params.focus.find(
 			(value: unknown) => !isAllowedValue(value, FOCUS_VALUES),
 		);
-		if (invalidFocus)
-			return invalidAskValue("focus", invalidFocus, FOCUS_VALUES);
+		if (invalidFocus) return invalidAskValue("focus", invalidFocus, FOCUS_VALUES);
 	}
 	return undefined;
 }
@@ -235,7 +228,7 @@ function validateSummaryCount(
 	return errorResult({
 		code: "GEMINI_ASK_INVALID_PARAMETER",
 		phase: "input_validation",
-		message: `Invalid ${name} for gemini_ask: ${value}. Allowed range: 1 to 20.`,
+		message: `Invalid ${name} for gemini_ask: ${inspectValue(value)}. Allowed range: 1 to 20.`,
 		retryable: false,
 		provider: "gemini-acp",
 	});
@@ -249,7 +242,7 @@ function validateNumberOption(
 	return errorResult({
 		code: "GEMINI_ASK_INVALID_PARAMETER",
 		phase: "input_validation",
-		message: `Invalid ${name} for gemini_ask: ${value}. Expected a number.`,
+		message: `Invalid ${name} for gemini_ask: ${inspectValue(value)}. Expected a number.`,
 		retryable: false,
 		provider: "gemini-acp",
 	});
@@ -276,7 +269,7 @@ function validateStringOption(
 	return errorResult({
 		code: "GEMINI_ASK_INVALID_PARAMETER",
 		phase: "input_validation",
-		message: `Invalid ${name} for gemini_ask: ${value}. Expected text.`,
+		message: `Invalid ${name} for gemini_ask: ${inspectValue(value)}. Expected text.`,
 		retryable: false,
 		provider: "gemini-acp",
 	});
@@ -290,7 +283,7 @@ function validateBooleanOption(
 	return errorResult({
 		code: "GEMINI_ASK_INVALID_PARAMETER",
 		phase: "input_validation",
-		message: `Invalid ${name} for gemini_ask: ${value}. Expected a boolean.`,
+		message: `Invalid ${name} for gemini_ask: ${inspectValue(value)}. Expected a boolean.`,
 		retryable: false,
 		provider: "gemini-acp",
 	});
@@ -300,11 +293,7 @@ function validateTranslateShape(params: Params): PiToolShell | undefined {
 	if (params.batch !== undefined && !Array.isArray(params.batch)) {
 		return translateShapeError("Batch must be an array.");
 	}
-	if (
-		params.batch?.some(
-			(item: unknown) => !isRecord(item) || !isNonEmptyString(item.text),
-		)
-	) {
+	if (params.batch?.some((item: unknown) => !isRecord(item) || !isNonEmptyString(item.text))) {
 		return translateShapeError("Every batch item must include non-empty text.");
 	}
 	if (params.glossary !== undefined && !Array.isArray(params.glossary)) {
@@ -313,14 +302,10 @@ function validateTranslateShape(params: Params): PiToolShell | undefined {
 	if (
 		params.glossary?.some(
 			(entry: unknown) =>
-				!isRecord(entry) ||
-				!isNonEmptyString(entry.source) ||
-				!isNonEmptyString(entry.target),
+				!isRecord(entry) || !isNonEmptyString(entry.source) || !isNonEmptyString(entry.target),
 		)
 	) {
-		return translateShapeError(
-			"Every glossary entry must include source and target text.",
-		);
+		return translateShapeError("Every glossary entry must include source and target text.");
 	}
 	if (params.preserve !== undefined && !Array.isArray(params.preserve)) {
 		return translateShapeError("Preserve must be an array.");
@@ -328,17 +313,10 @@ function validateTranslateShape(params: Params): PiToolShell | undefined {
 	if (params.preserve?.some((value: unknown) => typeof value !== "string")) {
 		return translateShapeError("Every preserve item must be text.");
 	}
-	if (
-		params.preservationRules !== undefined &&
-		!Array.isArray(params.preservationRules)
-	) {
+	if (params.preservationRules !== undefined && !Array.isArray(params.preservationRules)) {
 		return translateShapeError("Preservation rules must be an array.");
 	}
-	if (
-		params.preservationRules?.some(
-			(value: unknown) => typeof value !== "string",
-		)
-	) {
+	if (params.preservationRules?.some((value: unknown) => typeof value !== "string")) {
 		return translateShapeError("Every preservation rule must be text.");
 	}
 	return undefined;
@@ -362,10 +340,7 @@ function translateShapeError(message: string): PiToolShell {
 	});
 }
 
-function isAllowedValue(
-	value: unknown,
-	allowed: Record<string, string>,
-): boolean {
+function isAllowedValue(value: unknown, allowed: Record<string, string>): boolean {
 	return typeof value === "string" && Object.values(allowed).includes(value);
 }
 
@@ -388,7 +363,7 @@ function invalidAskValue(
 	return errorResult({
 		code: "GEMINI_ASK_INVALID_PARAMETER",
 		phase: "input_validation",
-		message: `Invalid ${name} for gemini_ask: ${value}. Allowed: ${allowedValues}.`,
+		message: `Invalid ${name} for gemini_ask: ${inspectValue(value)}. Allowed: ${allowedValues}.`,
 		retryable: false,
 		provider: "gemini-acp",
 	});
@@ -398,13 +373,14 @@ function askRenderTarget(result: PiToolShell) {
 	const data = (result.details as Partial<ResultEnvelope<unknown>>).data;
 	const record = data && typeof data === "object" ? data : {};
 	if ("findings" in record || "sections" in record) return askCodeReviewRoute;
-	if (
-		"targetLanguage" in record ||
-		"translations" in record ||
-		"items" in record
-	)
+	if ("targetLanguage" in record || "translations" in record || "items" in record)
 		return askTranslateRoute;
 	if ("source" in record && "summary" in record) return askSummarizeRoute;
 	if ("extracted" in record) return askExtractRoute;
 	return askPromptRoute;
+}
+
+/** Renders unknown AI-supplied values for error messages; handles objects/circular refs that String() and JSON.stringify mangle. */
+function inspectValue(value: unknown): string {
+	return inspect(value, { depth: 2, breakLength: 80 });
 }

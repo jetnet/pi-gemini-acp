@@ -1,11 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import {
-	ensureDir,
-	resolveStoragePaths,
-	type StorageOptions,
-} from "./paths.js";
+import { ensureDir, resolveStoragePaths, type StorageOptions } from "./paths.js";
 
 export interface StoredResultMetadata {
 	responseId: string;
@@ -24,11 +20,7 @@ export async function storeResult(
 	try {
 		await writeFile(
 			tmpPath,
-			JSON.stringify(
-				{ responseId, value, createdAt: new Date().toISOString() },
-				null,
-				2,
-			),
+			JSON.stringify({ responseId, value, createdAt: new Date().toISOString() }, null, 2),
 			{ mode: 0o600 },
 		);
 		await rename(tmpPath, filePath);
@@ -39,6 +31,7 @@ export async function storeResult(
 	return { responseId, path: filePath };
 }
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- T is a typed-cast convenience for callers; runtime shape is not validated (would need zod/valibot)
 export async function getStoredResult<T = unknown>(
 	responseId: string,
 	options: StorageOptions = {},

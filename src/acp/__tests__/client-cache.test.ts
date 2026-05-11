@@ -11,10 +11,7 @@ import {
 	defaultGeminiAcpIdleTtlMs,
 	GeminiAcpClientCache,
 } from "../client-cache.js";
-import type {
-	GeminiAcpProcessSession,
-	GeminiAcpPromptOptions,
-} from "../session.js";
+import type { GeminiAcpProcessSession, GeminiAcpPromptOptions } from "../session.js";
 
 const originalCwd = process.cwd();
 
@@ -44,12 +41,8 @@ describe("GeminiAcpClientCache", () => {
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 
-		await cache
-			.get(settings("gemini-a"))
-			.search({ query: "one", maxResults: 5 });
-		await cache
-			.get(settings("gemini-b"))
-			.search({ query: "two", maxResults: 5 });
+		await cache.get(settings("gemini-a")).search({ query: "one", maxResults: 5 });
+		await cache.get(settings("gemini-b")).search({ query: "two", maxResults: 5 });
 
 		expect(factory.sessions).toHaveLength(2);
 		await cache.close();
@@ -127,8 +120,7 @@ describe("GeminiAcpClientCache", () => {
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const client = cache.get(settings("gemini"));
 		const messages: string[] = [];
-		const onProgress = (_phase: string, message: string) =>
-			messages.push(message);
+		const onProgress = (_phase: string, message: string) => messages.push(message);
 
 		await client.search({ query: "one", maxResults: 4, onProgress });
 		await client.search({ query: "two", maxResults: 4, onProgress });
@@ -191,9 +183,7 @@ describe("GeminiAcpClientCache", () => {
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 
-		await cache
-			.get(settings("gemini"), "search")
-			.search({ query: "one", maxResults: 5 });
+		await cache.get(settings("gemini"), "search").search({ query: "one", maxResults: 5 });
 		await cache.get(settings("gemini"), "prompt").prompt({ prompt: "two" });
 
 		expect(factory.sessions).toHaveLength(2);
@@ -238,12 +228,10 @@ describe("GeminiAcpClientCache", () => {
 	});
 
 	it("falls back to the default idle TTL for invalid env overrides", () => {
-		expect(
-			defaultGeminiAcpIdleTtlMs({ PI_GEMINI_ACP_IDLE_TTL_MS: "abc" }),
-		).toBe(DEFAULT_IDLE_TTL_MS);
-		expect(defaultGeminiAcpIdleTtlMs({ PI_GEMINI_ACP_IDLE_TTL_MS: "0" })).toBe(
+		expect(defaultGeminiAcpIdleTtlMs({ PI_GEMINI_ACP_IDLE_TTL_MS: "abc" })).toBe(
 			DEFAULT_IDLE_TTL_MS,
 		);
+		expect(defaultGeminiAcpIdleTtlMs({ PI_GEMINI_ACP_IDLE_TTL_MS: "0" })).toBe(DEFAULT_IDLE_TTL_MS);
 		expect(defaultGeminiAcpIdleTtlMs({ PI_GEMINI_ACP_IDLE_TTL_MS: "-1" })).toBe(
 			DEFAULT_IDLE_TTL_MS,
 		);
@@ -270,9 +258,9 @@ describe("GeminiAcpClientCache", () => {
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const client = cache.get(settings("gemini"));
 
-		await expect(
-			client.search({ query: "fail", maxResults: 5 }),
-		).rejects.toThrow("planned failure");
+		await expect(client.search({ query: "fail", maxResults: 5 })).rejects.toThrow(
+			"planned failure",
+		);
 		await cache.get(settings("gemini")).search({ query: "ok", maxResults: 5 });
 
 		expect(factory.sessions).toHaveLength(2);
@@ -287,10 +275,7 @@ describe("GeminiAcpClientCache", () => {
 		const controller = new AbortController();
 		const client = cache.get(settings("gemini"));
 
-		const aborted = client.search(
-			{ query: "slow", maxResults: 5 },
-			controller.signal,
-		);
+		const aborted = client.search({ query: "slow", maxResults: 5 }, controller.signal);
 		await factory.waitForPromptStart();
 		controller.abort();
 
@@ -450,10 +435,7 @@ class FakeSession implements GeminiAcpProcessSession {
 		this.promptCalls += 1;
 		if (this.factory.shouldFailPrompt()) throw new Error("planned failure");
 		this.activePrompts += 1;
-		this.maxConcurrentPrompts = Math.max(
-			this.maxConcurrentPrompts,
-			this.activePrompts,
-		);
+		this.maxConcurrentPrompts = Math.max(this.maxConcurrentPrompts, this.activePrompts);
 		try {
 			if (this.factory.shouldDelayPrompt()) await Promise.resolve();
 			if (this.factory.shouldWaitForClosePrompt()) {

@@ -3,11 +3,7 @@ import type { GeminiAcpConfig, StructuredError } from "../types.js";
 import { directFetcher, type Fetcher } from "../url/fetcher.js";
 import { assertPublicHttpUrl } from "../url/public-http.js";
 import { providerError } from "./provider-result.js";
-import {
-	type PromptDeps,
-	type PromptWorkflowUpdate,
-	runPrompt,
-} from "./run.js";
+import { type PromptDeps, type PromptWorkflowUpdate, runPrompt } from "./run.js";
 
 export const SUMMARY_SOURCE_DEFAULT_LIMIT = 20_000;
 export const SUMMARY_SOURCE_MIN_LIMIT = 1_000;
@@ -61,9 +57,7 @@ export interface SummarizeRunResult {
 	error?: StructuredError;
 }
 
-export type SummarizeUpdateHandler = (
-	update: PromptWorkflowUpdate,
-) => void | Promise<void>;
+export type SummarizeUpdateHandler = (update: PromptWorkflowUpdate) => void | Promise<void>;
 
 /** Summarizes exactly one supplied content item or public HTTP(S) URL through Gemini ACP. */
 export async function runSummarize(
@@ -103,8 +97,7 @@ export async function runSummarize(
 		signal,
 		onUpdate,
 	);
-	if (promptResult.error)
-		return emptySummaryResult(promptResult.error, prepared.source);
+	if (promptResult.error) return emptySummaryResult(promptResult.error, prepared.source);
 
 	let responseId = promptResult.responseId;
 	let fullOutputPath = promptResult.fullOutputPath;
@@ -145,9 +138,7 @@ export async function runSummarize(
 	};
 }
 
-function validateSummaryInput(
-	options: SummarizeOptions,
-): StructuredError | undefined {
+function validateSummaryInput(options: SummarizeOptions): StructuredError | undefined {
 	const hasContent = Boolean(options.content?.trim());
 	const hasUrl = Boolean(options.url?.trim());
 	if (!hasContent && !hasUrl) {
@@ -240,10 +231,7 @@ function prepareSummarySource(
 	};
 }
 
-function summaryRequestSummary(
-	options: SummarizeOptions,
-	source: PreparedSummarySource,
-) {
+function summaryRequestSummary(options: SummarizeOptions, source: PreparedSummarySource) {
 	return {
 		toolName: "gemini_summarize" as const,
 		action: "Sending summarize prompt",
@@ -302,10 +290,10 @@ function summaryStyle(options: SummarizeOptions): SummaryStyle {
 
 function normalizeSourceText(text: string): string {
 	return text
-		.replace(/<script[\s\S]*?<\/script>/giu, " ")
-		.replace(/<style[\s\S]*?<\/style>/giu, " ")
-		.replace(/<[^>]+>/gu, " ")
-		.replace(/\s+/gu, " ")
+		.replaceAll(/<script[\s\S]*?<\/script>/giu, " ")
+		.replaceAll(/<style[\s\S]*?<\/style>/giu, " ")
+		.replaceAll(/<[^>]+>/gu, " ")
+		.replaceAll(/\s+/gu, " ")
 		.trim();
 }
 
@@ -337,11 +325,7 @@ function emptySummaryResult(
 	};
 }
 
-function summaryError(
-	code: string,
-	phase: string,
-	message: string,
-): StructuredError {
+function summaryError(code: string, phase: string, message: string): StructuredError {
 	return providerError(code, phase, message, {
 		retryable: false,
 		provider: false,

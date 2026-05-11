@@ -2,10 +2,7 @@ import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { lstat, readFile } from "node:fs/promises";
 import path from "node:path";
 import { coerceString } from "../coerce.js";
-import {
-	resolveGeminiAcpCommand,
-	spawnCommandForGeminiAcpResolution,
-} from "../config/command.js";
+import { resolveGeminiAcpCommand, spawnCommandForGeminiAcpResolution } from "../config/command.js";
 import {
 	permissionPolicyCapabilities,
 	requirePermissionCapability,
@@ -76,9 +73,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		private readonly permissionPolicy?: GeminiAcpPermissionPolicy,
 		allowedReadPaths: readonly string[] = [],
 	) {
-		this.allowedReadPaths = new Set(
-			allowedReadPaths.map((filePath) => path.resolve(filePath)),
-		);
+		this.allowedReadPaths = new Set(allowedReadPaths.map((filePath) => path.resolve(filePath)));
 		this.rpc = new JsonRpcStdioClient(child, {
 			onRequest: (message) => this.handleAgentRequest(message),
 			onNotification: (message) => this.handleNotification(message),
@@ -96,10 +91,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		signal?: AbortSignal,
 	): Promise<AcpProcessSession> {
 		const resolution = await resolveGeminiAcpCommand(settings.command);
-		const command = spawnCommandForGeminiAcpResolution(
-			resolution,
-			settings.args ?? [],
-		);
+		const command = spawnCommandForGeminiAcpResolution(resolution, settings.args ?? []);
 		const child = spawn(command.command, command.args, {
 			stdio: "pipe",
 			env: process.env,
@@ -114,9 +106,13 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 			child.kill("SIGTERM");
 			throw abortError();
 		}
-		const abort = () => child.kill("SIGTERM");
+		const abort = () => {
+			child.kill("SIGTERM");
+		};
 		signal?.addEventListener("abort", abort, { once: true });
-		child.once("exit", () => signal?.removeEventListener("abort", abort));
+		child.once("exit", () => {
+			signal?.removeEventListener("abort", abort);
+		});
 		return session;
 	}
 
@@ -137,7 +133,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		});
 		const sessionId = asRecord(result)?.sessionId;
 		if (typeof sessionId !== "string") {
-			throw new Error("Gemini ACP did not return a sessionId");
+			throw new TypeError("Gemini ACP did not return a sessionId");
 		}
 		return sessionId;
 	}
@@ -155,10 +151,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 				"session/prompt",
 				{
 					sessionId,
-					prompt:
-						typeof prompt === "string"
-							? [{ type: "text", text: prompt }]
-							: prompt,
+					prompt: typeof prompt === "string" ? [{ type: "text", text: prompt }] : prompt,
 				},
 				{
 					signal: options.signal,
@@ -178,32 +171,20 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 
 	private async handleAgentRequest(message: JsonRpcRequest): Promise<unknown> {
 		if (message.method === "session/request_permission") {
-			const optionId = permissionOptionId(
-				message.params,
-				this.permissionPolicy,
-			);
+			const optionId = permissionOptionId(message.params, this.permissionPolicy);
 			return {
-				outcome: optionId
-					? { outcome: "selected", optionId }
-					: { outcome: "cancelled" },
+				outcome: optionId ? { outcome: "selected", optionId } : { outcome: "cancelled" },
 			};
 		}
 		if (message.method === "fs/read_text_file") {
 			return await this.handleReadTextFileRequest(message);
 		}
-		throw new JsonRpcResponseError(
-			-32601,
-			`Method not found: ${message.method}`,
-		);
+		throw new JsonRpcResponseError(-32601, `Method not found: ${message.method}`);
 	}
 
-	private async handleReadTextFileRequest(
-		message: JsonRpcRequest,
-	): Promise<unknown> {
+	private async handleReadTextFileRequest(message: JsonRpcRequest): Promise<unknown> {
 		const requestedPath = coerceString(asRecord(message.params)?.path);
-		const normalizedPath = requestedPath
-			? normalizeRequestedFilePath(requestedPath)
-			: undefined;
+		const normalizedPath = requestedPath ? normalizeRequestedFilePath(requestedPath) : undefined;
 		const resolvedPath = normalizedPath
 			? this.allowedReadPathForRequest(normalizedPath)
 			: undefined;
@@ -240,10 +221,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 	private allowedReadPathForRequest(requestedPath: string): string | undefined {
 		const candidates = path.isAbsolute(requestedPath)
 			? [path.resolve(requestedPath)]
-			: [
-					path.resolve(this.sessionCwd, requestedPath),
-					path.resolve(requestedPath),
-				];
+			: [path.resolve(this.sessionCwd, requestedPath), path.resolve(requestedPath)];
 		return candidates.find((candidate) => this.allowedReadPaths.has(candidate));
 	}
 
@@ -267,8 +245,7 @@ export class AcpProcessSession implements GeminiAcpProcessSession {
 		record: Record<string, unknown> | undefined,
 		update: Record<string, unknown>,
 	): PromptState | undefined {
-		const sessionId =
-			coerceString(record?.sessionId) ?? coerceString(update.sessionId);
+		const sessionId = coerceString(record?.sessionId) ?? coerceString(update.sessionId);
 		if (sessionId) return this.promptStates.get(sessionId);
 		if (this.promptStates.size !== 1) return undefined;
 		return this.promptStates.values().next().value;
@@ -300,8 +277,9 @@ export function permissionOptionId(
 	}
 	const options = asRecord(params)?.options;
 	if (!Array.isArray(options)) return undefined;
-	return options.find((option) => asRecord(option)?.kind === "allow_once")
-		?.optionId as string | undefined;
+	return options.find((option) => asRecord(option)?.kind === "allow_once")?.optionId as
+		| string
+		| undefined;
 }
 
 function permissionCapabilityForRequest(
@@ -311,11 +289,7 @@ function permissionCapabilityForRequest(
 	if (/(^|[^a-z])(terminal|shell|command|execute|exec)([^a-z]|$)/u.test(text)) {
 		return "terminal";
 	}
-	if (
-		/(^|[^a-z])(write|modify|delete|create|overwrite|edit)([^a-z]|$)/u.test(
-			text,
-		)
-	) {
+	if (/(^|[^a-z])(write|modify|delete|create|overwrite|edit)([^a-z]|$)/u.test(text)) {
 		return "filesystemWrite";
 	}
 	if (/(^|[^a-z])(file|path|read|open|workspace)([^a-z]|$)/u.test(text)) {

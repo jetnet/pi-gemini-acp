@@ -194,7 +194,11 @@ describe("Gemini search prewarm", () => {
 			{
 				schedule: (callback) => {
 					scheduled = callback;
-					return { unref: () => (unrefCalls += 1) };
+					return {
+						unref: () => {
+							unrefCalls += 1;
+						},
+					};
 				},
 			},
 		);

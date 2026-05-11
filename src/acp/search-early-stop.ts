@@ -15,9 +15,7 @@ export interface GeminiAcpSearchEarlyStop {
 }
 
 /** Returns whether Gemini ACP search stream early-stop is enabled for this process. */
-export function geminiAcpSearchEarlyStopEnabled(
-	env: NodeJS.ProcessEnv = process.env,
-): boolean {
+export function geminiAcpSearchEarlyStopEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
 	return TRUE_ENV_RE.test(env[SEARCH_EARLY_STOP_ENV] ?? "");
 }
 
@@ -42,10 +40,7 @@ export function createGeminiAcpSearchEarlyStop(
 		onUpdate: async (chunk) => {
 			await onUpdate?.(chunk);
 			if (stopped) return;
-			const detected = completeJsonArrayPayload(
-				chunk.accumulatedText,
-				scanStart,
-			);
+			const detected = completeJsonArrayPayload(chunk.accumulatedText, scanStart);
 			if (!detected.found) {
 				scanStart = detected.retryFrom;
 				return;
@@ -64,10 +59,7 @@ export type GeminiAcpSearchJsonScanResult =
 	| { found: false; retryFrom: number };
 
 /** Finds and parses the first complete JSON array in streamed assistant text. */
-export function completeJsonArrayPayload(
-	text: string,
-	startAt = 0,
-): GeminiAcpSearchJsonScanResult {
+export function completeJsonArrayPayload(text: string, startAt = 0): GeminiAcpSearchJsonScanResult {
 	const initialStart = Math.max(0, Math.min(startAt, text.length));
 	for (
 		let start = text.indexOf("[", initialStart);

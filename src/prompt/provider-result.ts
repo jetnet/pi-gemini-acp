@@ -43,9 +43,7 @@ export function providerError(
 		phase,
 		message,
 		retryable: opts.retryable ?? code === "GEMINI_ACP_ABORTED",
-		...(opts.provider === false
-			? {}
-			: { provider: opts.provider ?? "gemini-acp" }),
+		...(opts.provider === false ? {} : { provider: opts.provider ?? "gemini-acp" }),
 		...(opts.cause === undefined ? {} : { cause: opts.cause }),
 	};
 }

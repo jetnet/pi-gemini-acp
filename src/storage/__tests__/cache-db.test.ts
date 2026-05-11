@@ -66,9 +66,7 @@ describe("ResponseCacheDatabase", () => {
 				tool: "gemini_extract",
 				recallText: "tool: gemini_extract",
 				model: "fake-embedding",
-				embedding: Array.from({ length: 768 }, (_, index) =>
-					index === 0 ? 1 : 0,
-				),
+				embedding: Array.from({ length: 768 }, (_, index) => (index === 0 ? 1 : 0)),
 			});
 			expect(db.embeddingSummary("fake-embedding").rowCount).toBe(1);
 

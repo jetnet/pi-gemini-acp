@@ -2,10 +2,7 @@
  * @fileoverview Unit tests for the pi:model-adapter protocol registration.
  */
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import {
-	registerModelAdapter,
-	type ModelAdapterRegistrar,
-} from "../register.js";
+import { registerModelAdapter, type ModelAdapterRegistrar } from "../register.js";
 import { getModelAdapterStatus, resetModelAdapterEmitted } from "../status.js";
 
 interface MockRegistrar {
@@ -52,10 +49,7 @@ describe("registerModelAdapter", () => {
 		const pi = createMockRegistrar();
 		registerModelAdapter(pi);
 		expect(pi.events.on).toHaveBeenCalledOnce();
-		expect(pi.events.on).toHaveBeenCalledWith(
-			"pi:model-adapter/discover",
-			expect.any(Function),
-		);
+		expect(pi.events.on).toHaveBeenCalledWith("pi:model-adapter/discover", expect.any(Function));
 		const handler = pi.events.on.mock.calls[0][1] as (payload: unknown) => void;
 		// Clear the initial emit to count only the re-emit
 		pi.events.emit.mockClear();

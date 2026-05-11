@@ -10,10 +10,7 @@ import {
 import type { PromptWorkflowUpdate } from "../prompt/run.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import type { ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
-import {
-	isPromptWorkflowUpdate,
-	isRecord,
-} from "../tools/gemini-prompt-rendering.js";
+import { isPromptWorkflowUpdate, isRecord } from "../tools/gemini-prompt-rendering.js";
 import {
 	boxedToolText,
 	dimToolText,
@@ -47,16 +44,10 @@ const askCodeReviewParamsSchema = Type.Object({
 			description: "Unified diff/patch text; paths are not read.",
 		}),
 	),
-	code: Type.Optional(
-		Type.String({ description: "Code/excerpt text; no fixes applied." }),
-	),
-	context: Type.Optional(
-		Type.String({ description: "Extra review context; avoid secrets." }),
-	),
+	code: Type.Optional(Type.String({ description: "Code/excerpt text; no fixes applied." })),
+	context: Type.Optional(Type.String({ description: "Extra review context; avoid secrets." })),
 	language: Type.Optional(Type.String({ description: "Language hint." })),
-	filename: Type.Optional(
-		Type.String({ description: "Display filename/label." }),
-	),
+	filename: Type.Optional(Type.String({ description: "Display filename/label." })),
 	focus: Type.Optional(
 		Type.Array(focusSchema, {
 			description: "Review focus; defaults to correctness.",
@@ -70,9 +61,7 @@ const askCodeReviewParamsSchema = Type.Object({
 			description: "Max findings.",
 		}),
 	),
-	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response cache." }),
-	),
+	bypassCache: Type.Optional(Type.Boolean({ description: "Skip response cache." })),
 });
 
 type Params = Static<typeof askCodeReviewParamsSchema>;
@@ -80,13 +69,8 @@ type Params = Static<typeof askCodeReviewParamsSchema>;
 type CodeReviewProgressData = { progress: PromptWorkflowUpdate };
 
 export const askCodeReviewRoute = {
-	async execute(
-		toolCallId: string,
-		params: Params,
-		signal: AbortSignal,
-		onUpdate?: ToolUpdate,
-	) {
-		return withToolResponseCache({
+	async execute(toolCallId: string, params: Params, signal: AbortSignal, onUpdate?: ToolUpdate) {
+		return await withToolResponseCache({
 			toolName: "gemini_code_review",
 			inputs: params,
 			bypassCache: params.bypassCache,
@@ -98,11 +82,7 @@ export const askCodeReviewRoute = {
 					codeReviewToolUpdate(onUpdate),
 				);
 				if (result.error) return errorResult(result.error);
-				const inputText = [
-					params.diff ?? "",
-					params.code ?? "",
-					params.context ?? "",
-				].join("\n");
+				const inputText = [params.diff ?? "", params.code ?? "", params.context ?? ""].join("\n");
 				return toolResultWithCost(
 					toolCallId,
 					"gemini_ask",
@@ -119,20 +99,14 @@ export const askCodeReviewRoute = {
 			},
 		});
 	},
-	renderResult(
-		result: PiToolShell,
-		options: ToolRenderResultOptions,
-		theme: unknown,
-	) {
-		return boxedToolText(
-			dimToolText(formatCodeReviewToolDisplay(result, options), theme),
-		);
+	renderResult(result: PiToolShell, options: ToolRenderResultOptions, theme: unknown) {
+		return boxedToolText(dimToolText(formatCodeReviewToolDisplay(result, options), theme));
 	},
 };
 
 function resultText(result: CodeReviewResult): string {
 	if (result.truncated) {
-		return `Gemini ACP code review stored as responseId ${result.responseId}. Analysis-only preview:\n${result.text}`;
+		return `Gemini ACP code review stored as responseId ${result.responseId ?? "(none)"}. Analysis-only preview:\n${result.text}`;
 	}
 	return `Gemini ACP code review (analysis only):\n${result.text}`;
 }
@@ -169,23 +143,17 @@ function formatCodeReviewToolDisplay(
 			expanded: formatCodeReviewExpandedDisplay,
 		});
 	}
-	return (
-		result.content[0]?.text ?? details.error?.message ?? "gemini_code_review"
-	);
+	return result.content[0]?.text ?? details.error?.message ?? "gemini_code_review";
 }
 
-function formatCodeReviewProgressCollapsed(
-	update: PromptWorkflowUpdate,
-): string {
+function formatCodeReviewProgressCollapsed(update: PromptWorkflowUpdate): string {
 	if (update.type === "chunk") {
 		return `Reviewing: ${truncateToolText(update.text.trim(), 220)}`;
 	}
 	return update.text;
 }
 
-function formatCodeReviewProgressExpanded(
-	update: PromptWorkflowUpdate,
-): string {
+function formatCodeReviewProgressExpanded(update: PromptWorkflowUpdate): string {
 	if (update.type === "chunk") {
 		return [
 			"gemini_code_review streaming",
@@ -195,11 +163,9 @@ function formatCodeReviewProgressExpanded(
 			truncateToolText(update.accumulatedText, 1_200),
 		].join("\n");
 	}
-	return [
-		"gemini_code_review progress",
-		`phase: ${update.phase}`,
-		`message: ${update.text}`,
-	].join("\n");
+	return ["gemini_code_review progress", `phase: ${update.phase}`, `message: ${update.text}`].join(
+		"\n",
+	);
 }
 
 function formatCodeReviewCollapsedDisplay(result: CodeReviewResult): string {
@@ -217,14 +183,17 @@ function formatCodeReviewCollapsedDisplay(result: CodeReviewResult): string {
 }
 
 function formatCodeReviewExpandedDisplay(result: CodeReviewResult): string {
-	const lines = [resultText(result), "", "Details:"];
-	lines.push(`provider: ${result.provider}`);
-	lines.push(`responseLength: ${result.responseLength}`);
-	lines.push(`truncated: ${result.truncated}`);
-	lines.push(`sections: ${result.sections.join(", ")}`);
-	if (result.responseId) lines.push(`responseId: ${result.responseId}`);
-	if (result.fullOutputPath)
-		lines.push(`fullOutputPath: ${result.fullOutputPath}`);
+	const lines = [
+		resultText(result),
+		"",
+		"Details:",
+		`provider: ${result.provider}`,
+		`responseLength: ${result.responseLength}`,
+		`truncated: ${result.truncated}`,
+		`sections: ${result.sections.join(", ")}`,
+		...(result.responseId ? [`responseId: ${result.responseId}`] : []),
+		...(result.fullOutputPath ? [`fullOutputPath: ${result.fullOutputPath}`] : []),
+	];
 	return lines.join("\n");
 }
 
@@ -249,22 +218,20 @@ function countSectionFindings(text: string, section: string): number {
 	let inSection = false;
 	let count = 0;
 	for (const line of text.split("\n")) {
-		const heading = line.match(/^##\s+(.+?)\s*$/);
+		const heading = line.match(/^##\s+(.+?)\s*$/u);
 		if (heading) {
 			if (inSection) break;
 			inSection = heading[1] === section;
 			continue;
 		}
-		if (inSection && /^\s*-\s+/.test(line) && !/none found\.?/i.test(line)) {
+		if (inSection && /^\s*-\s+/u.test(line) && !/none found\.?/iu.test(line)) {
 			count += 1;
 		}
 	}
 	return count;
 }
 
-function isCodeReviewProgressData(
-	value: unknown,
-): value is CodeReviewProgressData {
+function isCodeReviewProgressData(value: unknown): value is CodeReviewProgressData {
 	return isRecord(value) && isPromptWorkflowUpdate(value.progress);
 }
 

@@ -15,18 +15,9 @@ import {
 	type SummaryStyle,
 } from "../prompt/summarize.js";
 import { estimateCost } from "../tools/cost-estimate.js";
-import type {
-	ModelAdapter,
-	ModelRequest,
-	ModelResponse,
-	ModelUsage,
-} from "./types.js";
+import type { ModelAdapter, ModelRequest, ModelResponse, ModelUsage } from "./types.js";
 
-const SUMMARY_STYLES: readonly SummaryStyle[] = [
-	"paragraph",
-	"bullets",
-	"executive",
-];
+const SUMMARY_STYLES: readonly SummaryStyle[] = ["paragraph", "bullets", "executive"];
 
 const DEFAULT_MODEL = "gemini-1.5-flash";
 
@@ -40,10 +31,7 @@ export function createGeminiSummarizeAdapter(
 	const executor = run ?? runSummarize;
 
 	return {
-		async run<T>(
-			request: ModelRequest,
-			signal?: AbortSignal,
-		): Promise<ModelResponse<T>> {
+		async run<T>(request: ModelRequest, signal?: AbortSignal): Promise<ModelResponse<T>> {
 			if (request.task !== "summarize") {
 				throw new Error(
 					`gemini-acp adapter does not support task "${request.task}" (only summarize)`,

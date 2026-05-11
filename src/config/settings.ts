@@ -1,10 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import {
-	ensureDir,
-	resolveStoragePaths,
-	type StorageOptions,
-} from "../storage/paths.js";
+import { ensureDir, resolveStoragePaths, type StorageOptions } from "../storage/paths.js";
 import type { GeminiAcpConfig, GeminiAcpProviderSettings } from "../types.js";
 
 const CONFIG_FILE = "settings.json";
@@ -17,9 +13,7 @@ export const DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS = {
 	searchGroundingAvailable: true,
 } satisfies GeminiAcpProviderSettings;
 
-export async function loadConfig(
-	options: StorageOptions = {},
-): Promise<GeminiAcpConfig> {
+export async function loadConfig(options: StorageOptions = {}): Promise<GeminiAcpConfig> {
 	const filePath = path.join(resolveStoragePaths(options).config, CONFIG_FILE);
 	try {
 		return JSON.parse(await readFile(filePath, "utf8")) as GeminiAcpConfig;
@@ -45,11 +39,9 @@ export async function saveGeminiAcpSettings(
 			},
 		},
 	};
-	await writeFile(
-		path.join(paths.config, CONFIG_FILE),
-		JSON.stringify(config, null, 2),
-		{ mode: 0o600 },
-	);
+	await writeFile(path.join(paths.config, CONFIG_FILE), JSON.stringify(config, null, 2), {
+		mode: 0o600,
+	});
 	return config;
 }
 
@@ -64,11 +56,9 @@ export async function saveRecallEnabled(
 		...(await loadConfig(options)),
 		recallEnabled,
 	};
-	await writeFile(
-		path.join(paths.config, CONFIG_FILE),
-		JSON.stringify(config, null, 2),
-		{ mode: 0o600 },
-	);
+	await writeFile(path.join(paths.config, CONFIG_FILE), JSON.stringify(config, null, 2), {
+		mode: 0o600,
+	});
 	return config;
 }
 
@@ -82,7 +72,7 @@ export function configFromEnv(config: GeminiAcpConfig): GeminiAcpConfig {
 	const command = process.env.PI_GEMINI_ACP_COMMAND;
 	const args = process.env.PI_GEMINI_ACP_ARGS?.split(" ").filter(Boolean);
 	const apiKey = process.env.GEMINI_API_KEY?.trim();
-	const hasEnvOverrides = command || args || apiKey;
+	const hasEnvOverrides = command ?? args ?? apiKey;
 	if (!hasEnvOverrides) return config;
 	return {
 		...config,
@@ -93,15 +83,13 @@ export function configFromEnv(config: GeminiAcpConfig): GeminiAcpConfig {
 				enabled: true,
 				command: command ?? config.providers?.["gemini-acp"]?.command,
 				args: args ?? config.providers?.["gemini-acp"]?.args,
-				apiKey: apiKey || config.providers?.["gemini-acp"]?.apiKey,
+				apiKey: apiKey ?? config.providers?.["gemini-acp"]?.apiKey,
 			},
 		},
 	};
 }
 
-export function withDefaultGeminiAcpConfig(
-	config: GeminiAcpConfig,
-): GeminiAcpConfig {
+export function withDefaultGeminiAcpConfig(config: GeminiAcpConfig): GeminiAcpConfig {
 	const configured = config.providers?.["gemini-acp"];
 	if (configured?.enabled === false) return config;
 	return {

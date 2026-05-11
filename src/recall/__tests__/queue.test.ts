@@ -57,6 +57,7 @@ describe("embedding queue", () => {
 		const db = await openResponseCacheDb({ rootDir });
 		try {
 			expect(db.embeddingSummary("fake-embedding").queueDepth).toBe(0);
+			// oxlint-disable-next-line typescript/unbound-method -- vitest's expect() reads the mock's tracked invocations; this binding is irrelevant
 			expect(embedder.embed).not.toHaveBeenCalled();
 		} finally {
 			db.close();

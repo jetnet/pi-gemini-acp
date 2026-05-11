@@ -8,10 +8,7 @@ import type {
 	GeminiAcpPromptUpdateHandler,
 } from "../client.js";
 import { GeminiAcpClientCache } from "../client-cache.js";
-import type {
-	GeminiAcpProcessSession,
-	GeminiAcpPromptOptions,
-} from "../session.js";
+import type { GeminiAcpProcessSession, GeminiAcpPromptOptions } from "../session.js";
 
 afterEach(() => {
 	vi.unstubAllEnvs();
@@ -27,9 +24,7 @@ describe("Gemini ACP search early stop", () => {
 		});
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 
-		const results = await cache
-			.get(settings())
-			.search({ query: "early", maxResults: 5 });
+		const results = await cache.get(settings()).search({ query: "early", maxResults: 5 });
 
 		expect(results[0]?.title).toBe("Early");
 		expect(factory.session?.emittedChunks).toBe(2);
@@ -41,14 +36,11 @@ describe("Gemini ACP search early stop", () => {
 	it("waits for turn end when streamed search JSON is incomplete", async () => {
 		const factory = new FakeSessionFactory({
 			chunks: ['[{"title":"Late","url":"https://example.com/late"'],
-			naturalText:
-				'[{"title":"Late","url":"https://example.com/late","snippet":"done"}]',
+			naturalText: '[{"title":"Late","url":"https://example.com/late","snippet":"done"}]',
 		});
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 
-		const results = await cache
-			.get(settings())
-			.search({ query: "late", maxResults: 5 });
+		const results = await cache.get(settings()).search({ query: "late", maxResults: 5 });
 
 		expect(results[0]?.title).toBe("Late");
 		expect(factory.session?.emittedChunks).toBe(1);
@@ -89,9 +81,7 @@ describe("Gemini ACP search early stop", () => {
 		});
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 
-		const results = await cache
-			.get(settings())
-			.search({ query: "string", maxResults: 5 });
+		const results = await cache.get(settings()).search({ query: "string", maxResults: 5 });
 
 		expect(results[0]?.title).toBe("Bracket ] still string");
 		expect(factory.session?.emittedChunks).toBe(2);
@@ -123,9 +113,7 @@ describe("Gemini ACP search early stop", () => {
 		});
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 
-		const results = await cache
-			.get(settings())
-			.search({ query: "baseline", maxResults: 5 });
+		const results = await cache.get(settings()).search({ query: "baseline", maxResults: 5 });
 
 		expect(results[0]?.title).toBe("Baseline");
 		expect(factory.session?.emittedChunks).toBe(1);

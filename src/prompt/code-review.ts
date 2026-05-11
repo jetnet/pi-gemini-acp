@@ -1,20 +1,11 @@
-import type { GeminiAcpConfig, StructuredError } from "../types.js";
+import type { GeminiAcpConfig } from "../types.js";
 import { providerError } from "./provider-result.js";
-import type {
-	PromptDeps,
-	PromptRunResult,
-	PromptUpdateHandler,
-} from "./run.js";
+import type { PromptDeps, PromptRunResult, PromptUpdateHandler } from "./run.js";
 import { runPrompt } from "./run.js";
 
 const DEFAULT_MAX_FINDINGS = 12;
 
-export const CODE_REVIEW_SECTIONS = [
-	"Blockers",
-	"Important",
-	"Optional",
-	"Validation",
-] as const;
+export const CODE_REVIEW_SECTIONS = ["Blockers", "Important", "Optional", "Validation"] as const;
 
 export const CODE_REVIEW_FOCUS_AREAS = [
 	"correctness",
@@ -26,15 +17,10 @@ export const CODE_REVIEW_FOCUS_AREAS = [
 	"documentation",
 ] as const;
 
-export const CODE_REVIEW_SEVERITY_THRESHOLDS = [
-	"all",
-	"important",
-	"blockers",
-] as const;
+export const CODE_REVIEW_SEVERITY_THRESHOLDS = ["all", "important", "blockers"] as const;
 
 export type CodeReviewFocusArea = (typeof CODE_REVIEW_FOCUS_AREAS)[number];
-export type CodeReviewSeverityThreshold =
-	(typeof CODE_REVIEW_SEVERITY_THRESHOLDS)[number];
+export type CodeReviewSeverityThreshold = (typeof CODE_REVIEW_SEVERITY_THRESHOLDS)[number];
 
 /** Inputs for Gemini-backed analysis-only code review over supplied text. */
 export interface CodeReviewOptions {
@@ -66,12 +52,8 @@ export function buildCodeReviewPrompt(options: CodeReviewOptions): string {
 	const severityThreshold = options.severityThreshold ?? "all";
 	const maxFindings = normalizeMaxFindings(options.maxFindings);
 	const metadata = [
-		options.filename?.trim()
-			? `Filename: ${options.filename.trim()}`
-			: undefined,
-		options.language?.trim()
-			? `Language: ${options.language.trim()}`
-			: undefined,
+		options.filename?.trim() ? `Filename: ${options.filename.trim()}` : undefined,
+		options.language?.trim() ? `Language: ${options.language.trim()}` : undefined,
 	]
 		.filter(Boolean)
 		.join("\n");
@@ -136,11 +118,10 @@ function codeReviewRequestSummary(options: CodeReviewOptions) {
 	return {
 		toolName: "gemini_code_review" as const,
 		action: "Sending code review prompt",
-		subject:
-			options.filename?.trim() || options.language?.trim() || "provided text",
+		subject: options.filename?.trim() ?? options.language?.trim() ?? "provided text",
 		arguments: {
-			language: options.language?.trim() || undefined,
-			filename: options.filename?.trim() || undefined,
+			language: options.language?.trim() ?? undefined,
+			filename: options.filename?.trim() ?? undefined,
 			focus: focus.join("/"),
 			severity: options.severityThreshold ?? "all",
 			maxFindings: normalizeMaxFindings(options.maxFindings),
@@ -152,12 +133,10 @@ function codeReviewRequestSummary(options: CodeReviewOptions) {
 }
 
 function hasReviewInput(options: CodeReviewOptions): boolean {
-	return Boolean(options.diff?.trim() || options.code?.trim());
+	return Boolean(options.diff?.trim() ?? options.code?.trim());
 }
 
-function normalizeFocus(
-	focus: CodeReviewFocusArea[] | undefined,
-): CodeReviewFocusArea[] {
+function normalizeFocus(focus: CodeReviewFocusArea[] | undefined): CodeReviewFocusArea[] {
 	return focus && focus.length > 0 ? [...new Set(focus)] : ["correctness"];
 }
 
@@ -168,11 +147,7 @@ function normalizeMaxFindings(value: number | undefined): number {
 	return Math.min(50, Math.max(1, Math.trunc(value)));
 }
 
-function codeReviewError(
-	code: string,
-	phase: string,
-	message: string,
-): CodeReviewResult {
+function codeReviewError(code: string, phase: string, message: string): CodeReviewResult {
 	return {
 		provider: "gemini-acp",
 		text: "",

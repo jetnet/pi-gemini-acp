@@ -8,11 +8,7 @@ import type {
 	ResearchSource,
 	ResultEnvelope,
 } from "../types.js";
-import {
-	defineGeminiTool,
-	type ToolRenderResultOptions,
-	type ToolUpdate,
-} from "./define.js";
+import { defineGeminiTool, type ToolRenderResultOptions, type ToolUpdate } from "./define.js";
 import {
 	boxedToolText,
 	dimToolText,
@@ -22,11 +18,7 @@ import {
 	truncateToolText,
 } from "./gemini-rendering.js";
 import { withToolResponseCache } from "./cache.js";
-import {
-	cacheToolTitle,
-	costToolTitle,
-	estimateCost,
-} from "./cost-estimate.js";
+import { cacheToolTitle, costToolTitle, estimateCost } from "./cost-estimate.js";
 import { toolResult } from "./result.js";
 
 const hydrationModeSchema = Type.Enum({ none: "none", fetch: "fetch" });
@@ -41,12 +33,7 @@ export const geminiAcpResearchSchema = Type.Object({
 	useRecall: Type.Optional(Type.Boolean()),
 	bypassRecall: Type.Optional(Type.Boolean()),
 	sources: Type.Optional(
-		Type.Array(
-			Type.Object(
-				{ url: Type.String() },
-				{ description: "opt:title,text,snippet" },
-			),
-		),
+		Type.Array(Type.Object({ url: Type.String() }, { description: "opt:title,text,snippet" })),
 	),
 });
 
@@ -59,11 +46,10 @@ const RESEARCH_TITLE_STATE_KEY = "geminiResearchTitle";
 export const geminiAcpResearchTool = defineGeminiTool({
 	name: "gemini_research",
 	label: "Gemini ACP Research",
-	description:
-		"Sources/cites;safeFetch;cache/recall;bypassCache fresh/news/current",
+	description: "Sources/cites;safeFetch;cache/recall;bypassCache fresh/news/current",
 	parameters: geminiAcpResearchSchema,
 	async execute(toolCallId, params: Params, signal, onUpdate) {
-		return withToolResponseCache({
+		return await withToolResponseCache({
 			toolName: "gemini_research",
 			inputs: params,
 			enabledByDefault: false,
@@ -82,19 +68,17 @@ export const geminiAcpResearchTool = defineGeminiTool({
 					{
 						...params,
 						hydrationMode: params.hydrationMode as "none" | "fetch" | undefined,
-						hydrateSources:
-							params.hydrationMode === "fetch" ? true : params.hydrateSources,
+						hydrateSources: params.hydrationMode === "fetch" ? true : params.hydrateSources,
 					},
 					{
 						onProgress: (update) => emitResearchProgress(update, onUpdate),
 					},
 					signal,
 				);
-				const cost = estimateCost(
-					params.query,
-					formatResearchToolText(result),
-					{ model: result.model, searchCount: 1 },
-				);
+				const cost = estimateCost(params.query, formatResearchToolText(result), {
+					model: result.model,
+					searchCount: 1,
+				});
 				const title = costToolTitle("gemini_research", cost);
 				cacheToolTitle(toolCallId, title);
 				return toolResult({
@@ -114,9 +98,7 @@ export const geminiAcpResearchTool = defineGeminiTool({
 		});
 	},
 	renderResult(result, options, theme) {
-		return boxedToolText(
-			dimToolText(formatResearchToolDisplay(result, options), theme),
-		);
+		return boxedToolText(dimToolText(formatResearchToolDisplay(result, options), theme));
 	},
 });
 
@@ -143,23 +125,16 @@ export function formatResearchToolText(result: ResearchResult): string {
 	];
 	const sourceQuality = formatResearchSourceQuality(result);
 	if (sourceQuality) lines.push(`Source quality signal: ${sourceQuality}`);
-	lines.push(
-		"",
-		"Collected source notes:",
-		...formatResearchSourceNotes(result),
-	);
+	lines.push("", "Collected source notes:", ...formatResearchSourceNotes(result));
 	lines.push("", formatResearchAssistantGuidance());
 	if (result.responseId) lines.push("", `responseId: ${result.responseId}`);
-	if (result.fullOutputPath)
-		lines.push(`fullOutputPath: ${result.fullOutputPath}`);
+	if (result.fullOutputPath) lines.push(`fullOutputPath: ${result.fullOutputPath}`);
 	return lines.join("\n");
 }
 
 function formatResearchProviderLine(result: ResearchResult): string {
 	const provider = result.provider ?? result.mode;
-	return result.model
-		? `Used: ${provider} via ${result.model}.`
-		: `Used: ${provider}.`;
+	return result.model ? `Used: ${provider} via ${result.model}.` : `Used: ${provider}.`;
 }
 
 function formatResearchSourceNotes(result: ResearchResult): string[] {
@@ -170,15 +145,10 @@ function formatResearchSourceNotes(result: ResearchResult): string[] {
 		.map((source) => formatSourceTakeaway(source, findings.get(source.id)))
 		.filter((note) => note.length > 0)
 		.slice(0, 5);
-	return notes.length > 0
-		? notes
-		: ["- No source snippets or findings were assembled."];
+	return notes.length > 0 ? notes : ["- No source snippets or findings were assembled."];
 }
 
-function formatSourceTakeaway(
-	source: ResearchSource,
-	findingText: string | undefined,
-): string {
+function formatSourceTakeaway(source: ResearchSource, findingText: string | undefined): string {
 	const text = cleanResearchTakeaway(source.snippet ?? findingText ?? "");
 	if (!text) return "";
 	const prefix = source.title ? `${source.title}: ` : "";
@@ -187,14 +157,12 @@ function formatSourceTakeaway(
 
 function cleanResearchTakeaway(text: string): string {
 	return text
-		.replace(/\s+/gu, " ")
-		.replace(/\[\d+\]/gu, "")
+		.replaceAll(/\s+/gu, " ")
+		.replaceAll(/\[\d+\]/gu, "")
 		.trim();
 }
 
-function formatResearchSourceQuality(
-	result: ResearchResult,
-): string | undefined {
+function formatResearchSourceQuality(result: ResearchResult): string | undefined {
 	let missingText = 0;
 	let blockedText = 0;
 	for (const source of result.sources) {
@@ -207,9 +175,8 @@ function formatResearchSourceQuality(
 	}
 	const notes: string[] = [];
 	if (missingText) notes.push(`${missingText} source(s) had no hydrated text`);
-	if (blockedText)
-		notes.push(`${blockedText} hydrated page(s) looked blocked/noisy`);
-	return notes.length
+	if (blockedText) notes.push(`${blockedText} hydrated page(s) looked blocked/noisy`);
+	return notes.length > 0
 		? `${notes.join("; ")}; rely on snippets where full page text was unavailable.`
 		: undefined;
 }
@@ -218,10 +185,7 @@ function formatResearchAssistantGuidance(): string {
 	return "Assistant response guidance: Synthesize a response in the structure that best fits the query and source notes; decide whether to include a summary, caveats, examples, comparison, table, recommendations, or next steps, then ask one concise contextual follow-up question.";
 }
 
-function formatResearchToolDisplay(
-	result: PiToolShell,
-	options: ToolRenderResultOptions,
-): string {
+function formatResearchToolDisplay(result: PiToolShell, options: ToolRenderResultOptions): string {
 	const details = result.details as Partial<ResultEnvelope<unknown>>;
 	if (isProgressData(details.data)) {
 		return formatCollapsedOrExpanded(details.data.progress, options, {
@@ -238,15 +202,11 @@ function formatResearchToolDisplay(
 	return result.content[0]?.text ?? details.error?.message ?? "gemini_research";
 }
 
-function formatResearchProgressCollapsed(
-	update: ResearchProgressUpdate,
-): string {
+function formatResearchProgressCollapsed(update: ResearchProgressUpdate): string {
 	return `${researchPhaseLabel(update.phase)}: ${progressMessageWithCounts(update)}`;
 }
 
-function formatResearchProgressExpanded(
-	update: ResearchProgressUpdate,
-): string {
+function formatResearchProgressExpanded(update: ResearchProgressUpdate): string {
 	const lines = [
 		`gemini_research ${update.phase}`,
 		`phase: ${researchPhaseLabel(update.phase)}`,
@@ -256,12 +216,9 @@ function formatResearchProgressExpanded(
 	if (update.mode) lines.push(`mode: ${update.mode}`);
 	if (update.provider) lines.push(`provider: ${update.provider}`);
 	if (update.model) lines.push(`model: ${update.model}`);
-	if (update.maxResults !== undefined)
-		lines.push(`maxResults: ${update.maxResults}`);
-	if (update.hydrateSources !== undefined)
-		lines.push(`hydrateSources: ${update.hydrateSources}`);
-	if (update.hydrationMode)
-		lines.push(`hydrationMode: ${update.hydrationMode}`);
+	if (update.maxResults !== undefined) lines.push(`maxResults: ${update.maxResults}`);
+	if (update.hydrateSources !== undefined) lines.push(`hydrateSources: ${update.hydrateSources}`);
+	if (update.hydrationMode) lines.push(`hydrationMode: ${update.hydrationMode}`);
 	const counts = progressCounts(update);
 	if (counts) lines.push(`sources: ${counts}`);
 	if (update.responseId) lines.push(`responseId: ${update.responseId}`);
@@ -274,10 +231,7 @@ function progressMessageWithCounts(update: ResearchProgressUpdate): string {
 }
 
 function progressCounts(update: ResearchProgressUpdate): string | undefined {
-	if (
-		update.completedSources !== undefined &&
-		update.totalSources !== undefined
-	) {
+	if (update.completedSources !== undefined && update.totalSources !== undefined) {
 		return `${update.completedSources}/${update.totalSources}`;
 	}
 	return undefined;
@@ -302,18 +256,12 @@ function formatResearchCollapsedDisplay(result: ResearchResult): string {
 	return [
 		result.summary,
 		`sources: ${result.sources.length}; findings: ${result.findings.length}; citations: ${result.citations.length}`,
-		expandedToolOutputHint(
-			"sources, findings, citations, response ID, and storage details",
-		),
+		expandedToolOutputHint("sources, findings, citations, response ID, and storage details"),
 	].join("\n");
 }
 
 function formatResearchExpandedDisplay(result: ResearchResult): string {
-	const lines = [
-		result.summary,
-		`query: ${result.query}`,
-		`mode: ${result.mode}`,
-	];
+	const lines = [result.summary, `query: ${result.query}`, `mode: ${result.mode}`];
 	if (result.provider) lines.push(`provider: ${result.provider}`);
 	if (result.model) lines.push(`model: ${result.model}`);
 	lines.push(
@@ -323,8 +271,7 @@ function formatResearchExpandedDisplay(result: ResearchResult): string {
 		formatHydrationNotes(result.sources),
 	);
 	if (result.responseId) lines.push(`responseId: ${result.responseId}`);
-	if (result.fullOutputPath)
-		lines.push(`fullOutputPath: ${result.fullOutputPath}`);
+	if (result.fullOutputPath) lines.push(`fullOutputPath: ${result.fullOutputPath}`);
 	lines.push(
 		"",
 		"Sources:",
@@ -358,10 +305,8 @@ function formatResearchSource(source: ResearchSource): string[] {
 		`   text: ${source.text?.trim() ? "present" : "missing"}`,
 	];
 	if (source.provider) lines.push(`   provider: ${source.provider}`);
-	if (source.hydrated !== undefined)
-		lines.push(`   hydrated: ${source.hydrated}`);
-	if (source.snippet)
-		lines.push(`   snippet: ${truncateToolText(source.snippet, 500)}`);
+	if (source.hydrated !== undefined) lines.push(`   hydrated: ${source.hydrated}`);
+	if (source.snippet) lines.push(`   snippet: ${truncateToolText(source.snippet, 500)}`);
 	if (source.providerMetadata) lines.push("   providerMetadata: present");
 	return lines;
 }
@@ -376,28 +321,20 @@ function formatResearchFindings(findings: ResearchFinding[]): string[] {
 
 function formatResearchCitations(citations: ResearchCitation[]): string[] {
 	if (citations.length === 0) return ["No citations assembled."];
+	// oxlint-disable-next-line unicorn/no-array-callback-reference -- formatResearchCitation intentionally consumes (citation, index)
 	return citations.map(formatResearchCitation);
 }
 
-function formatResearchCitation(
-	citation: ResearchCitation,
-	index: number,
-): string {
-	const lines = [
-		`${index + 1}. sourceId: ${citation.sourceId}`,
-		`   url: ${citation.url}`,
-	];
+function formatResearchCitation(citation: ResearchCitation, index: number): string {
+	const lines = [`${index + 1}. sourceId: ${citation.sourceId}`, `   url: ${citation.url}`];
 	if (citation.marker) lines.push(`   marker: ${citation.marker}`);
 	if (citation.startByte !== undefined || citation.endByte !== undefined) {
-		lines.push(
-			`   byteRange: ${citation.startByte ?? "?"}-${citation.endByte ?? "?"}`,
-		);
+		lines.push(`   byteRange: ${citation.startByte ?? "?"}-${citation.endByte ?? "?"}`);
 	}
 	if (citation.providerSources?.length) {
 		lines.push(`   providerSources: ${citation.providerSources.length}`);
 	}
-	if (citation.text)
-		lines.push(`   text: ${truncateToolText(citation.text, 500)}`);
+	if (citation.text) lines.push(`   text: ${truncateToolText(citation.text, 500)}`);
 	return lines.join("\n");
 }
 
@@ -405,19 +342,13 @@ function isProgressData(value: unknown): value is ProgressData {
 	return isRecord(value) && isResearchProgressUpdate(value.progress);
 }
 
-function isResearchProgressUpdate(
-	value: unknown,
-): value is ResearchProgressUpdate {
+function isResearchProgressUpdate(value: unknown): value is ResearchProgressUpdate {
 	return (
-		isRecord(value) &&
-		isResearchProgressPhase(value.phase) &&
-		typeof value.message === "string"
+		isRecord(value) && isResearchProgressPhase(value.phase) && typeof value.message === "string"
 	);
 }
 
-function isResearchProgressPhase(
-	value: unknown,
-): value is ResearchProgressUpdate["phase"] {
+function isResearchProgressPhase(value: unknown): value is ResearchProgressUpdate["phase"] {
 	return (
 		value === "search" ||
 		value === "hydrate" ||

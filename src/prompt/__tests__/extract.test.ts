@@ -25,8 +25,7 @@ afterEach(async () => {
 describe("runExtract", () => {
 	it("returns structured data from supplied content", async () => {
 		const client = new FakeGeminiClient('{"name":"Ada","age":37}');
-		const updates: Array<{ phase?: string; text: string; request?: unknown }> =
-			[];
+		const updates: Array<{ phase?: string; text: string; request?: unknown }> = [];
 		const result = await runExtract(
 			{
 				content: "Name: Ada. Age: 37.",
@@ -50,12 +49,8 @@ describe("runExtract", () => {
 		expect(result.extracted).toEqual({ name: "Ada", age: 37 });
 		expect(client.promptText).toContain("Name: Ada. Age: 37.");
 		expect(client.promptText).toContain("Extract a person record.");
-		const providerPrompt = updates.find(
-			(update) => update.phase === "provider_prompt",
-		);
-		expect(providerPrompt?.text).toContain(
-			'Sending extraction prompt: "Extract a person record."',
-		);
+		const providerPrompt = updates.find((update) => update.phase === "provider_prompt");
+		expect(providerPrompt?.text).toContain('Sending extraction prompt: "Extract a person record."');
 		expect(providerPrompt?.text).toContain("contentLength 19");
 		expect(providerPrompt?.text).toContain("schema object");
 		expect(providerPrompt?.text).not.toContain("Name: Ada");
@@ -76,9 +71,7 @@ describe("runExtract", () => {
 			},
 			{
 				commandExists: async () => true,
-				geminiAcpClient: new FakeGeminiClient(
-					'```json\n{"name":"Ada","age":37}\n```',
-				),
+				geminiAcpClient: new FakeGeminiClient('```json\n{"name":"Ada","age":37}\n```'),
 			},
 		);
 

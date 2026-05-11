@@ -40,11 +40,11 @@ The default Gemini ACP provider config is:
 
 ```json
 {
-  "enabled": true,
-  "command": "gemini",
-  "args": ["--acp"],
-  "authenticated": true,
-  "searchGroundingAvailable": true
+	"enabled": true,
+	"command": "gemini",
+	"args": ["--acp"],
+	"authenticated": true,
+	"searchGroundingAvailable": true
 }
 ```
 
@@ -90,11 +90,11 @@ Or persist the API key in `~/.pi/gemini-acp/config/settings.json`:
 
 ```json
 {
-  "providers": {
-    "gemini-acp": {
-      "apiKey": "your_api_key_here"
-    }
-  }
+	"providers": {
+		"gemini-acp": {
+			"apiKey": "your_api_key_here"
+		}
+	}
 }
 ```
 
@@ -124,9 +124,9 @@ Environment variables take precedence over `settings.json` values. The model use
 
 ```json
 {
-  "imagePath": "/path/to/screenshot.png",
-  "mode": "detailed",
-  "instructions": "Describe this screenshot briefly, including visible text."
+	"imagePath": "/path/to/screenshot.png",
+	"mode": "detailed",
+	"instructions": "Describe this screenshot briefly, including visible text."
 }
 ```
 
@@ -153,22 +153,22 @@ This works through pi-scraper's `pi:model-adapter/*` event protocol: at extensio
 
 ### Behavior by install state
 
-| Installed                  | What happens to `web_summarize`                             |
-| -------------------------- | ----------------------------------------------------------- |
-| `pi-gemini-acp` only       | Nothing — `web_summarize` is a pi-scraper tool              |
-| `pi-scraper` only          | Returns `MODEL_ADAPTER_MISSING`; LLM falls back to `web_scrape` then summarizes itself |
-| Both                       | Gemini-backed summary, automatically                        |
+| Installed            | What happens to `web_summarize`                                                        |
+| -------------------- | -------------------------------------------------------------------------------------- |
+| `pi-gemini-acp` only | Nothing — `web_summarize` is a pi-scraper tool                                         |
+| `pi-scraper` only    | Returns `MODEL_ADAPTER_MISSING`; LLM falls back to `web_scrape` then summarizes itself |
+| Both                 | Gemini-backed summary, automatically                                                   |
 
 ### Adapter properties
 
-| Property     | Value                                                             |
-| ------------ | ----------------------------------------------------------------- |
-| ID           | `gemini-acp` — what to pass to `web_summarize({ provider: "..." })` if you want to pin it explicitly |
-| Label        | `Gemini (via ACP)` — what shows in pi-scraper diagnostics         |
-| Capabilities | `summarize` only (extract/analyze/chat reserved; not a good fit for Gemini ACP's prose-oriented surface) |
+| Property     | Value                                                                                                                                                                  |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ID           | `gemini-acp` — what to pass to `web_summarize({ provider: "..." })` if you want to pin it explicitly                                                                   |
+| Label        | `Gemini (via ACP)` — what shows in pi-scraper diagnostics                                                                                                              |
+| Capabilities | `summarize` only (extract/analyze/chat reserved; not a good fit for Gemini ACP's prose-oriented surface)                                                               |
 | Priority     | `50` — pi-scraper's `auto` picks the highest-priority registered adapter; 50 sits in the middle band (cloud paid ≈ 90+, free/self-hosted ≈ 50, local fallback ≈ 10–30) |
-| Backend      | Shares the same authenticated Gemini ACP client as `gemini_ask`; no new auth, no new subprocess |
-| Cold start   | The ACP session does **not** open at registration. First `web_summarize` call after install pays the connection cost; subsequent calls reuse the warm session |
+| Backend      | Shares the same authenticated Gemini ACP client as `gemini_ask`; no new auth, no new subprocess                                                                        |
+| Cold start   | The ACP session does **not** open at registration. First `web_summarize` call after install pays the connection cost; subsequent calls reuse the warm session          |
 
 ### Pinning explicitly from `web_summarize`
 
@@ -198,11 +198,11 @@ Skips the registration entirely. Use this when:
 
 ```json
 {
-  "modelAdapter": {
-    "offered": true,
-    "capabilities": ["summarize"],
-    "priority": 50
-  }
+	"modelAdapter": {
+		"offered": true,
+		"capabilities": ["summarize"],
+		"priority": 50
+	}
 }
 ```
 

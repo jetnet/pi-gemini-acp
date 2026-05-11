@@ -31,9 +31,7 @@ interface StoredCacheValue {
 let scheduled = false;
 
 /** Enqueues a response for background embedding when recall and an embedder are enabled. */
-export async function enqueueEmbeddingJob(
-	options: EnqueueEmbeddingOptions,
-): Promise<boolean> {
+export async function enqueueEmbeddingJob(options: EnqueueEmbeddingOptions): Promise<boolean> {
 	if (!(await shouldRunRecall(options))) return false;
 	const db = await openResponseCacheDb({ rootDir: options.rootDir });
 	try {
@@ -45,9 +43,7 @@ export async function enqueueEmbeddingJob(
 }
 
 /** Schedules a best-effort queue drain without blocking the caller's tool response. */
-export function scheduleEmbeddingQueueDrain(
-	options: DrainEmbeddingOptions = {},
-): void {
+export function scheduleEmbeddingQueueDrain(options: DrainEmbeddingOptions = {}): void {
 	if (scheduled) return;
 	scheduled = true;
 	const timer = setTimeout(() => {
@@ -58,9 +54,7 @@ export function scheduleEmbeddingQueueDrain(
 }
 
 /** Drains pending embedding jobs with bounded concurrency and retry bookkeeping. */
-export async function drainEmbeddingQueue(
-	options: DrainEmbeddingOptions = {},
-): Promise<number> {
+export async function drainEmbeddingQueue(options: DrainEmbeddingOptions = {}): Promise<number> {
 	if (!(await shouldRunRecall(options))) return 0;
 	const concurrency = Math.max(1, Math.min(options.concurrency ?? 2, 8));
 	const db = await openResponseCacheDb({ rootDir: options.rootDir });
@@ -139,9 +133,7 @@ async function recallPayloadForResponse(
 	};
 }
 
-async function shouldRunRecall(
-	options: StorageOptions & { embedder?: Embedder },
-) {
+async function shouldRunRecall(options: StorageOptions & { embedder?: Embedder }) {
 	if (!recallEnabledFromConfig(await loadConfig(options))) return false;
 	const status = await (options.embedder ?? defaultEmbedder()).status(options);
 	return status.available;

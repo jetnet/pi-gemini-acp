@@ -77,9 +77,9 @@ function extractErrorText(error: unknown): string {
 
 function parseDurationMs(text: string): number | undefined {
 	let total = 0;
-	const hMatch = /(\d+)h/i.exec(text);
-	const mMatch = /(\d+)m/i.exec(text);
-	const sMatch = /(\d+)s/i.exec(text);
+	const hMatch = /(\d+)h/iu.exec(text);
+	const mMatch = /(\d+)m/iu.exec(text);
+	const sMatch = /(\d+)s/iu.exec(text);
 	if (hMatch) total += parseInt(hMatch[1], 10) * 60 * 60 * 1000;
 	if (mMatch) total += parseInt(mMatch[1], 10) * 60 * 1000;
 	if (sMatch) total += parseInt(sMatch[1], 10) * 1000;

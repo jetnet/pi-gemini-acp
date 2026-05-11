@@ -3,11 +3,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
-export const GEMINI_CLI_TRUST_LEVELS = [
-	"TRUST_FOLDER",
-	"TRUST_PARENT",
-	"DO_NOT_TRUST",
-] as const;
+export const GEMINI_CLI_TRUST_LEVELS = ["TRUST_FOLDER", "TRUST_PARENT", "DO_NOT_TRUST"] as const;
 
 /** Gemini CLI folder-trust level persisted in trustedFolders.json. */
 export type GeminiCliTrustLevel = (typeof GEMINI_CLI_TRUST_LEVELS)[number];
@@ -20,16 +16,10 @@ export interface GeminiCliTrustResult {
 }
 
 /** Resolves Gemini CLI's trusted-folder file path using its documented env override. */
-export function geminiCliTrustedFoldersPath(
-	env: NodeJS.ProcessEnv = process.env,
-): string {
+export function geminiCliTrustedFoldersPath(env: NodeJS.ProcessEnv = process.env): string {
 	const configured = env.GEMINI_CLI_TRUSTED_FOLDERS_PATH?.trim();
 	if (configured) return path.resolve(configured);
-	return path.join(
-		homedir() || process.cwd(),
-		".gemini",
-		"trustedFolders.json",
-	);
+	return path.join(homedir() || process.cwd(), ".gemini", "trustedFolders.json");
 }
 
 /** Persists exact-folder TRUST_FOLDER for Gemini CLI after explicit user consent. */
@@ -56,9 +46,8 @@ async function readTrustedFoldersFile(
 		const parsed = JSON.parse(await readFile(trustedFoldersPath, "utf8"));
 		if (!isRecord(parsed)) return {};
 		return Object.fromEntries(
-			Object.entries(parsed).filter(
-				(entry): entry is [string, GeminiCliTrustLevel] =>
-					isGeminiCliTrustLevel(entry[1]),
+			Object.entries(parsed).filter((entry): entry is [string, GeminiCliTrustLevel] =>
+				isGeminiCliTrustLevel(entry[1]),
 			),
 		);
 	} catch (cause) {
@@ -85,8 +74,7 @@ async function writeTrustedFoldersFile(
 
 function isGeminiCliTrustLevel(value: unknown): value is GeminiCliTrustLevel {
 	return (
-		typeof value === "string" &&
-		(GEMINI_CLI_TRUST_LEVELS as readonly string[]).includes(value)
+		typeof value === "string" && (GEMINI_CLI_TRUST_LEVELS as readonly string[]).includes(value)
 	);
 }
 

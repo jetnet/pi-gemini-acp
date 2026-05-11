@@ -14,8 +14,7 @@ export function loadGeminiApiKeyConfig(config?: {
 	providers?: { "gemini-acp"?: { apiKey?: string } };
 }): GeminiApiKeyConfig | undefined {
 	const apiKey =
-		config?.providers?.["gemini-acp"]?.apiKey?.trim() ??
-		process.env[API_KEY_ENV]?.trim();
+		config?.providers?.["gemini-acp"]?.apiKey?.trim() ?? process.env[API_KEY_ENV]?.trim();
 	if (!apiKey) return undefined;
 	return { apiKey };
 }
@@ -25,7 +24,6 @@ export function geminiApiKeyConfigured(config?: {
 	providers?: { "gemini-acp"?: { apiKey?: string } };
 }): boolean {
 	return Boolean(
-		config?.providers?.["gemini-acp"]?.apiKey?.trim() ??
-			process.env[API_KEY_ENV]?.trim(),
+		config?.providers?.["gemini-acp"]?.apiKey?.trim() ?? process.env[API_KEY_ENV]?.trim(),
 	);
 }

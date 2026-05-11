@@ -10,11 +10,7 @@ import {
 	runFileAnalyze,
 } from "../prompt/file-analyze.js";
 import type { PiToolShell, ResultEnvelope, StructuredError } from "../types.js";
-import type {
-	ToolExecutionContext,
-	ToolRenderResultOptions,
-	ToolUpdate,
-} from "../tools/define.js";
+import type { ToolExecutionContext, ToolRenderResultOptions, ToolUpdate } from "../tools/define.js";
 import {
 	boxedToolText,
 	dimToolText,
@@ -29,8 +25,7 @@ const analyzeFileParamsSchema = Type.Object({
 	paths: Type.Array(
 		Type.String({
 			minLength: 1,
-			description:
-				"Explicit local file path; hidden/symlink/secret paths refused.",
+			description: "Explicit local file path; hidden/symlink/secret paths refused.",
 		}),
 		{
 			minItems: 1,
@@ -42,12 +37,8 @@ const analyzeFileParamsSchema = Type.Object({
 		minLength: 1,
 		description: "Analysis instructions for the files.",
 	}),
-	cwd: Type.Optional(
-		Type.String({ description: "Base dir for resolving paths; no scanning." }),
-	),
-	bypassCache: Type.Optional(
-		Type.Boolean({ description: "Skip response cache." }),
-	),
+	cwd: Type.Optional(Type.String({ description: "Base dir for resolving paths; no scanning." })),
+	bypassCache: Type.Optional(Type.Boolean({ description: "Skip response cache." })),
 });
 
 type Params = Static<typeof analyzeFileParamsSchema>;
@@ -90,9 +81,7 @@ export const analyzeFileRoute = {
 		theme: unknown,
 		_context?: unknown,
 	) {
-		return boxedToolText(
-			dimToolText(formatFileAnalyzeToolDisplay(result, options), theme),
-		);
+		return boxedToolText(dimToolText(formatFileAnalyzeToolDisplay(result, options), theme));
 	},
 };
 
@@ -167,15 +156,11 @@ function formatFileAnalyzeToolDisplay(
 	return result.content[0]?.text ?? "gemini_file_analyze";
 }
 
-function formatFileAnalyzeProgressCollapsed(
-	value: FileAnalyzeProgressData,
-): string {
+function formatFileAnalyzeProgressCollapsed(value: FileAnalyzeProgressData): string {
 	return `Analyzing ${value.progress.paths.length} file${value.progress.paths.length === 1 ? "" : "s"}: ${truncateToolText(value.progress.paths.join(", "), 180)}`;
 }
 
-function formatFileAnalyzeProgressExpanded(
-	value: FileAnalyzeProgressData,
-): string {
+function formatFileAnalyzeProgressExpanded(value: FileAnalyzeProgressData): string {
 	return [
 		"gemini_file_analyze progress",
 		`phase: ${value.progress.type}`,
@@ -201,31 +186,21 @@ function formatFileAnalyzeResultCollapsed(value: FileAnalyzeResult): string {
 		.join("\n");
 }
 
-function formatFileAnalyzeResultExpanded(
-	value: FileAnalyzeResult,
-	result: PiToolShell,
-): string {
+function formatFileAnalyzeResultExpanded(value: FileAnalyzeResult, result: PiToolShell): string {
 	const details = result.details as Partial<ResultEnvelope<unknown>>;
 	const lines = [
 		resultText(value),
 		`transport: ${value.transport}`,
 		`supported: ${value.supported}`,
-		value.responseLength !== undefined
-			? `responseLength: ${value.responseLength}`
-			: undefined,
+		value.responseLength !== undefined ? `responseLength: ${value.responseLength}` : undefined,
 		value.responseId ? `responseId: ${value.responseId}` : undefined,
-		value.fullOutputPath
-			? `fullOutputPath: ${value.fullOutputPath}`
-			: undefined,
+		value.fullOutputPath ? `fullOutputPath: ${value.fullOutputPath}` : undefined,
 		details.error ? formatStructuredError(details.error) : undefined,
 	];
 	return lines.filter(Boolean).join("\n");
 }
 
-function formatError(
-	error: StructuredError,
-	options: ToolRenderResultOptions,
-): string {
+function formatError(error: StructuredError, options: ToolRenderResultOptions): string {
 	return formatCollapsedOrExpanded(error, options, {
 		collapsed: (value) => value.message,
 		expanded: formatStructuredError,
@@ -243,14 +218,9 @@ function formatStructuredError(error: StructuredError): string {
 		.join("\n");
 }
 
-function isFileAnalyzeProgressData(
-	value: unknown,
-): value is FileAnalyzeProgressData {
+function isFileAnalyzeProgressData(value: unknown): value is FileAnalyzeProgressData {
 	if (!isRecord(value) || !isRecord(value.progress)) return false;
-	return (
-		value.progress.type === "file-analyze-start" &&
-		Array.isArray(value.progress.paths)
-	);
+	return value.progress.type === "file-analyze-start" && Array.isArray(value.progress.paths);
 }
 
 function isFileAnalyzeResult(value: unknown): value is FileAnalyzeResult {
@@ -275,19 +245,14 @@ function resultText(result: FileAnalyzeResult): string {
 			: "";
 		return `${result.error.message}${suffix}`;
 	}
-	const files = result.files
-		.map((file) => `${file.path} (${file.sizeBytes} bytes)`)
-		.join(", ");
+	const files = result.files.map((file) => `${file.path} (${file.sizeBytes} bytes)`).join(", ");
 	const stored = result.truncated
-		? `\nFull output stored as responseId ${result.responseId}.`
+		? `\nFull output stored as responseId ${result.responseId ?? "(none)"}.`
 		: "";
 	return `${cacheMarker(result)}Gemini ACP file analysis completed for ${result.files.length} file${result.files.length === 1 ? "" : "s"}: ${files}\n\n${result.text}${stored}`;
 }
 
 function cacheMarker(result: FileAnalyzeResult): string {
-	const status = (result as { cacheStatus?: { hit?: boolean; ageMs?: number } })
-		.cacheStatus;
-	return status?.hit
-		? `[cache: hit, age ${Math.round((status.ageMs ?? 0) / 1000)}s]\n`
-		: "";
+	const status = (result as { cacheStatus?: { hit?: boolean; ageMs?: number } }).cacheStatus;
+	return status?.hit ? `[cache: hit, age ${Math.round((status.ageMs ?? 0) / 1000)}s]\n` : "";
 }

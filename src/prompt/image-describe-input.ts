@@ -12,15 +12,9 @@ export const SUPPORTED_IMAGE_MIME_TYPES = [
 	"image/gif",
 ] as const;
 
-export const IMAGE_DESCRIBE_MODES = [
-	"caption",
-	"objects",
-	"ocr",
-	"detailed",
-] as const;
+export const IMAGE_DESCRIBE_MODES = ["caption", "objects", "ocr", "detailed"] as const;
 
-export type SupportedImageMimeType =
-	(typeof SUPPORTED_IMAGE_MIME_TYPES)[number];
+export type SupportedImageMimeType = (typeof SUPPORTED_IMAGE_MIME_TYPES)[number];
 export type ImageDescribeMode = (typeof IMAGE_DESCRIBE_MODES)[number];
 
 /** Caller-provided image input fields validated before ACP transport. */
@@ -51,8 +45,7 @@ export type ValidatedImageInput =
 export async function validateImageInput(
 	options: ImageInputOptions,
 ): Promise<
-	| { image: ValidatedImageInput; rootDir: string }
-	| { error: StructuredError; rootDir: string }
+	{ image: ValidatedImageInput; rootDir: string } | { error: StructuredError; rootDir: string }
 > {
 	const rootDir = path.resolve(options.cwd ?? process.cwd());
 	const hasPath = Boolean(options.imagePath?.trim());
@@ -68,7 +61,7 @@ export async function validateImageInput(
 		};
 	}
 	return hasPath
-		? validateImagePath(options, rootDir)
+		? await validateImagePath(options, rootDir)
 		: { ...validateImageData(options), rootDir };
 }
 
@@ -76,16 +69,12 @@ async function validateImagePath(
 	options: ImageInputOptions,
 	rootDir: string,
 ): Promise<
-	| { image: ValidatedImageInput; rootDir: string }
-	| { error: StructuredError; rootDir: string }
+	{ image: ValidatedImageInput; rootDir: string } | { error: StructuredError; rootDir: string }
 > {
 	const inputPath = options.imagePath?.trim() ?? "";
 	if (inputPath.includes("\0")) {
 		return withRoot(
-			inputError(
-				"GEMINI_IMAGE_DESCRIBE_INVALID_PATH",
-				"Image path contains an invalid NUL byte.",
-			),
+			inputError("GEMINI_IMAGE_DESCRIBE_INVALID_PATH", "Image path contains an invalid NUL byte."),
 			rootDir,
 		);
 	}
@@ -115,10 +104,7 @@ async function validateImagePath(
 		}
 		if (!stat.isFile()) {
 			return withRoot(
-				inputError(
-					"GEMINI_IMAGE_DESCRIBE_NOT_FILE",
-					"Image path must point to a regular file.",
-				),
+				inputError("GEMINI_IMAGE_DESCRIBE_NOT_FILE", "Image path must point to a regular file."),
 				rootDir,
 			);
 		}
@@ -169,7 +155,7 @@ function validateImageData(
 			"mimeType is required for imageDataBase64 and must be one of image/png, image/jpeg, image/webp, or image/gif.",
 		);
 	}
-	const normalized = (options.imageDataBase64 ?? "").replace(/\s+/gu, "");
+	const normalized = (options.imageDataBase64 ?? "").replaceAll(/\s+/gu, "");
 	if (!/^[A-Za-z0-9+/]*={0,2}$/u.test(normalized) || normalized.length % 4) {
 		return inputError(
 			"GEMINI_IMAGE_DESCRIBE_INVALID_BASE64",
@@ -207,9 +193,7 @@ async function readHeader(filePath: string): Promise<Buffer> {
 	}
 }
 
-function mimeTypeFromExtension(
-	value: string,
-): SupportedImageMimeType | undefined {
+function mimeTypeFromExtension(value: string): SupportedImageMimeType | undefined {
 	switch (path.extname(value).toLowerCase()) {
 		case ".png":
 			return "image/png";
@@ -225,17 +209,10 @@ function mimeTypeFromExtension(
 	}
 }
 
-function mimeTypeFromHeader(
-	header: Buffer,
-): SupportedImageMimeType | undefined {
-	if (
-		header
-			.subarray(0, 8)
-			.equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
-	)
+function mimeTypeFromHeader(header: Buffer): SupportedImageMimeType | undefined {
+	if (header.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])))
 		return "image/png";
-	if (header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff)
-		return "image/jpeg";
+	if (header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) return "image/jpeg";
 	if (
 		header.subarray(0, 6).toString("ascii") === "GIF87a" ||
 		header.subarray(0, 6).toString("ascii") === "GIF89a"
@@ -249,9 +226,7 @@ function mimeTypeFromHeader(
 	return undefined;
 }
 
-function normalizeSupportedMimeType(
-	value: string | undefined,
-): SupportedImageMimeType | undefined {
+function normalizeSupportedMimeType(value: string | undefined): SupportedImageMimeType | undefined {
 	return (SUPPORTED_IMAGE_MIME_TYPES as readonly string[]).includes(value ?? "")
 		? (value as SupportedImageMimeType)
 		: undefined;
@@ -269,10 +244,7 @@ function unsafePathReason(
 			`Image paths must resolve under cwd: ${inputPath}`,
 		);
 	}
-	const inputSegments = path
-		.normalize(inputPath)
-		.split(path.sep)
-		.filter(Boolean);
+	const inputSegments = path.normalize(inputPath).split(path.sep).filter(Boolean);
 	if (inputSegments.some((segment) => segment.startsWith("."))) {
 		return imageDescribeError(
 			"GEMINI_IMAGE_DESCRIBE_HIDDEN_PATH_REJECTED",
@@ -314,21 +286,14 @@ function withRoot(
 
 function isWithinRoot(filePath: string, rootDir: string): boolean {
 	const relative = path.relative(rootDir, filePath);
-	return (
-		relative === "" ||
-		(!relative.startsWith("..") && !path.isAbsolute(relative))
-	);
+	return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
 function toPosix(value: string): string {
 	return value.split(path.sep).join("/");
 }
 
-export function imageDescribeError(
-	code: string,
-	phase: string,
-	message: string,
-): StructuredError {
+export function imageDescribeError(code: string, phase: string, message: string): StructuredError {
 	return {
 		code,
 		phase,

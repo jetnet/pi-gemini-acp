@@ -39,10 +39,7 @@ const STOP_WORDS = new Set([
 const TAG_RULES: Array<[tag: string, pattern: RegExp]> = [
 	["llm-inference", /\b(llm|model|models|inference|inferencing)\b/iu],
 	["model-serving", /\b(serving|serve|server|batching|latency|throughput)\b/iu],
-	[
-		"performance",
-		/\b(fast|faster|quick|speed|performance|latency|optimi[sz])\b/iu,
-	],
+	["performance", /\b(fast|faster|quick|speed|performance|latency|optimi[sz])\b/iu],
 	["search", /\b(search|sources?|results?|web)\b/iu],
 	["research", /\b(research|investigate|compare|explain)\b/iu],
 ];
@@ -56,11 +53,7 @@ export function normalizeRecallQuery(input: unknown): NormalizedRecallQuery {
 	return {
 		originalQuery,
 		normalizedQuery,
-		expandedQuery: uniqueTextParts([
-			normalizedQuery,
-			...entities,
-			...tags,
-		]).join(" "),
+		expandedQuery: uniqueTextParts([normalizedQuery, ...entities, ...tags]).join(" "),
 		entities,
 		tags,
 	};
@@ -69,9 +62,7 @@ export function normalizeRecallQuery(input: unknown): NormalizedRecallQuery {
 /** Returns a safe FTS5 MATCH expression for normalized query tokens. */
 export function ftsMatchExpression(query: string): string | undefined {
 	const tokens = searchableTokens(query);
-	return tokens.length
-		? tokens.map((token) => `"${token}"*`).join(" OR ")
-		: undefined;
+	return tokens.length > 0 ? tokens.map((token) => `"${token}"*`).join(" OR ") : undefined;
 }
 
 /** Tokenizes normalized text for overlap scoring. */
@@ -86,7 +77,9 @@ export function searchableTokens(text: string): string[] {
 function originalQueryText(input: unknown): string {
 	if (typeof input === "string") return input.trim();
 	if (!input || typeof input !== "object" || Array.isArray(input)) {
-		return input === undefined || input === null ? "" : String(input);
+		if (input === undefined || input === null) return "";
+		// oxlint-disable-next-line typescript/no-base-to-string -- input is a primitive at this point (objects handled above; arrays handled by ternary branch)
+		return Array.isArray(input) ? JSON.stringify(input) : String(input);
 	}
 	const record = input as Record<string, unknown>;
 	for (const key of ["query", "prompt", "content", "text"] as const) {
@@ -100,17 +93,15 @@ function normalizeText(text: string): string {
 	return text
 		.normalize("NFKC")
 		.toLowerCase()
-		.replace(/https?:\/\//gu, " ")
-		.replace(/[^\p{L}\p{N}]+/gu, " ")
-		.replace(/\s+/gu, " ")
+		.replaceAll(/https?:\/\//gu, " ")
+		.replaceAll(/[^\p{L}\p{N}]+/gu, " ")
+		.replaceAll(/\s+/gu, " ")
 		.trim();
 }
 
 function extractEntities(text: string): string[] {
 	const entities: string[] = [];
-	for (const match of text.matchAll(
-		/\b[a-z0-9-]+\.(?:ai|com|dev|io|org|net)\b/giu,
-	)) {
+	for (const match of text.matchAll(/\b[a-z0-9-]+\.(?:ai|com|dev|io|org|net)\b/giu)) {
 		entities.push(match[0].toLowerCase());
 	}
 	return uniqueTextParts(entities);

@@ -39,24 +39,14 @@ const askExtractParamsSchema = Type.Object({
 type Params = Static<typeof askExtractParamsSchema>;
 
 export const askExtractRoute = {
-	async execute(
-		toolCallId: string,
-		params: Params,
-		signal: AbortSignal,
-		onUpdate?: ToolUpdate,
-	) {
-		return withToolResponseCache({
+	async execute(toolCallId: string, params: Params, signal: AbortSignal, onUpdate?: ToolUpdate) {
+		return await withToolResponseCache({
 			toolName: "gemini_extract",
 			inputs: params,
 			bypassCache: params.bypassCache,
 			ttlMs: 7 * 24 * 60 * 60 * 1000,
 			execute: async () => {
-				const result = await runExtract(
-					params,
-					{},
-					signal,
-					extractToolUpdate(onUpdate),
-				);
+				const result = await runExtract(params, {}, signal, extractToolUpdate(onUpdate));
 				if (result.error) {
 					return errorResult(result.error, result.error.message, {
 						responseId: result.responseId,
@@ -80,11 +70,7 @@ export const askExtractRoute = {
 			},
 		});
 	},
-	renderResult(
-		result: PiToolShell,
-		options: ToolRenderResultOptions,
-		theme: unknown,
-	) {
+	renderResult(result: PiToolShell, options: ToolRenderResultOptions, theme: unknown) {
 		return renderPromptToolResult(result, options, theme, {
 			toolName: "gemini_extract",
 			isData: isExtractRunResult,
@@ -110,16 +96,10 @@ export function formatExtractToolText(result: ExtractRunResult): string {
 
 function formatExtractCollapsedDisplay(result: ExtractRunResult): string {
 	const lines = formatExtractToolText(result).split("\n");
-	return appendExpansionHint(
-		lines,
-		"the extracted JSON and raw output details",
-	).join("\n");
+	return appendExpansionHint(lines, "the extracted JSON and raw output details").join("\n");
 }
 
-function formatExtractExpandedDisplay(
-	result: ExtractRunResult,
-	shell: PiToolShell,
-): string {
+function formatExtractExpandedDisplay(result: ExtractRunResult, shell: PiToolShell): string {
 	const lines = [
 		"Gemini ACP extract returned JSON.",
 		`provider: ${result.provider}`,
@@ -134,11 +114,7 @@ function formatExtractExpandedDisplay(
 		lines.push("", "Metadata:", formatJson(result.metadata));
 	}
 	if (result.rawText) {
-		lines.push(
-			"",
-			"Raw output preview:",
-			truncateToolText(result.rawText, 1_600),
-		);
+		lines.push("", "Raw output preview:", truncateToolText(result.rawText, 1_600));
 	}
 	return lines.join("\n");
 }
@@ -147,7 +123,7 @@ function summarizeExtractedValue(value: unknown): string {
 	if (Array.isArray(value)) return `${value.length} item(s)`;
 	if (isRecord(value)) {
 		const keys = Object.keys(value);
-		return keys.length ? `keys: ${keys.slice(0, 5).join(", ")}` : "object";
+		return keys.length > 0 ? `keys: ${keys.slice(0, 5).join(", ")}` : "object";
 	}
 	return typeof value;
 }

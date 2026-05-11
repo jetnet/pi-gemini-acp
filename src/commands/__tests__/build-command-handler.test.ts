@@ -9,9 +9,7 @@ function makeCommand(overrides: Partial<GeminiCommand> = {}): {
 	command: GeminiCommand;
 	execute: ReturnType<typeof vi.fn>;
 } {
-	const execute = vi.fn(async (_params: unknown) =>
-		toolResult({ text: "ok", data: { ok: true } }),
-	);
+	const execute = vi.fn(async (_params: unknown) => toolResult({ text: "ok", data: { ok: true } }));
 	const command: GeminiCommand = {
 		name: "gemini-test",
 		description: "test command",
@@ -91,9 +89,7 @@ describe("buildCommandHandler", () => {
 		});
 		const { ctx, notify } = makeCtx();
 
-		await expect(
-			buildCommandHandler(command)("", ctx),
-		).resolves.toBeUndefined();
+		await expect(buildCommandHandler(command)("", ctx)).resolves.toBeUndefined();
 		expect(notify).toHaveBeenCalledWith("/gemini-test failed: boom", "error");
 	});
 

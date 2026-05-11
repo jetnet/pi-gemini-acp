@@ -1,9 +1,5 @@
 import { readFile, stat } from "node:fs/promises";
-import {
-	configFromEnv,
-	loadConfig,
-	withDefaultGeminiAcpConfig,
-} from "../config/settings.js";
+import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
 import { deriveCacheKey, sha256Hex } from "../storage/cache-key.js";
 import { openResponseCacheDb } from "../storage/cache-db.js";
 import { getStoredResult, storeResult } from "../storage/results.js";
@@ -22,10 +18,9 @@ export async function readFileAnalyzeCache(
 	try {
 		const row = db.lookup(key.cacheKey);
 		if (!row) return undefined;
-		const stored = await getStoredResult<{ result: FileAnalyzeResult }>(
-			row.responseId,
-			{ rootDir: options.rootDir },
-		);
+		const stored = await getStoredResult<{ result: FileAnalyzeResult }>(row.responseId, {
+			rootDir: options.rootDir,
+		});
 		return {
 			...stored.value.result,
 			cacheStatus: {
@@ -80,6 +75,7 @@ async function fileAnalyzeCacheKey(
 		configFromEnv(await loadConfig({ rootDir: options.rootDir })),
 	);
 	const sourceHash = sha256Hex(
+		// oxlint-disable-next-line unicorn/no-array-callback-reference -- fileFingerprint takes one arg
 		(await Promise.all(files.map(fileFingerprint))).join("\n"),
 	);
 	return deriveCacheKey({

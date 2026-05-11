@@ -61,8 +61,7 @@ export function estimateCost(
 	const inputTokens = estimateTokens(inputText);
 	const outputTokens = estimateTokens(outputText);
 	const { inputPer1M, outputPer1M } = modelPrices(options.model);
-	const tokenCost =
-		(inputTokens * inputPer1M + outputTokens * outputPer1M) / 1_000_000;
+	const tokenCost = (inputTokens * inputPer1M + outputTokens * outputPer1M) / 1_000_000;
 	const searchCost = (options.searchCount ?? 0) * SEARCH_GROUNDING_COST;
 	return {
 		inputTokens,
@@ -74,8 +73,7 @@ export function estimateCost(
 
 /** Formats a concise cost string for tool titles. */
 export function formatCostLabel(estimate: CostEstimate): string {
-	const cost =
-		estimate.costUsd < 0.001 ? "<$0.001" : `~$${estimate.costUsd.toFixed(3)}`;
+	const cost = estimate.costUsd < 0.001 ? "<$0.001" : `~$${estimate.costUsd.toFixed(3)}`;
 	const k = estimate.totalTokens >= 1000;
 	const tokenText = k
 		? `~${(estimate.totalTokens / 1000).toFixed(1)}k tokens`
@@ -84,10 +82,7 @@ export function formatCostLabel(estimate: CostEstimate): string {
 }
 
 /** Builds a tool title that includes the cost estimate. */
-export function costToolTitle(
-	toolName: string,
-	estimate: CostEstimate,
-): string {
+export function costToolTitle(toolName: string, estimate: CostEstimate): string {
 	return `${toolName} · ${formatCostLabel(estimate)}`;
 }
 

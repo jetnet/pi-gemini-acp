@@ -46,19 +46,13 @@ export function renderGeminiToolCallTitle<TParams>(
 			activeTitle.start();
 			return activeTitle;
 		}
-		const title = new GeminiAnimatedTitleComponent(
-			context.invalidate,
-			theme,
-			options,
-		);
+		const title = new GeminiAnimatedTitleComponent(context.invalidate, theme, options);
 		setTitleInRenderState(context, stateKey, title);
 		return title;
 	}
 	activeTitle?.stop();
 	setTitleInRenderState(context, stateKey, undefined);
-	const cachedTitle = context.toolCallId
-		? getCachedToolTitle(context.toolCallId)
-		: undefined;
+	const cachedTitle = context.toolCallId ? getCachedToolTitle(context.toolCallId) : undefined;
 	const doneText = cachedTitle
 		? `${options.donePrefix ?? "✓"} ${cachedTitle}`
 		: `${options.donePrefix ?? "✓"} ${options.toolName}`;
@@ -108,10 +102,7 @@ function titleFromRenderState<TParams>(
 	toolName: string,
 ): GeminiAnimatedTitleComponent | undefined {
 	const stateTitle = context.state?.[stateKey];
-	if (
-		stateTitle instanceof GeminiAnimatedTitleComponent &&
-		stateTitle.matches(toolName)
-	) {
+	if (stateTitle instanceof GeminiAnimatedTitleComponent && stateTitle.matches(toolName)) {
 		return stateTitle;
 	}
 	if (
@@ -140,9 +131,7 @@ function setTitleInRenderState<TParams>(
 
 function themeFg(theme: unknown, color: string, text: string): string {
 	const maybeTheme = theme as GeminiTheme;
-	return typeof maybeTheme?.fg === "function"
-		? maybeTheme.fg(color, text)
-		: text;
+	return typeof maybeTheme?.fg === "function" ? maybeTheme.fg(color, text) : text;
 }
 
 class GeminiAnimatedTitleComponent implements Component {
@@ -198,10 +187,7 @@ class GeminiAnimatedTitleComponent implements Component {
 
 	private updateText(): void {
 		this.text.setText(
-			accentToolText(
-				`${this.frames[this.frameIndex]} ${this.toolName}`,
-				this.theme,
-			),
+			accentToolText(`${this.frames[this.frameIndex]} ${this.toolName}`, this.theme),
 		);
 	}
 }

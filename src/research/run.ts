@@ -31,12 +31,7 @@ import {
 	type SourceHydrator,
 } from "./hydrate.js";
 
-export type ResearchProgressPhase =
-	| "search"
-	| "hydrate"
-	| "assemble"
-	| "store"
-	| "done";
+export type ResearchProgressPhase = "search" | "hydrate" | "assemble" | "store" | "done";
 
 export interface ResearchProgressUpdate {
 	phase: ResearchProgressPhase;
@@ -53,9 +48,7 @@ export interface ResearchProgressUpdate {
 	responseId?: string;
 }
 
-export type ResearchProgressReporter = (
-	update: ResearchProgressUpdate,
-) => void | Promise<void>;
+export type ResearchProgressReporter = (update: ResearchProgressUpdate) => void | Promise<void>;
 
 /** Options for the Gemini research workflow. */
 export interface ResearchOptions {
@@ -232,12 +225,7 @@ async function sourcesFromSearch(
 			commandExists: deps.commandExists,
 			authProbe: deps.authProbe,
 			onProgress: (update) =>
-				emitSearchCollectionProgress(
-					update,
-					options,
-					maxResults,
-					deps.onProgress,
-				),
+				emitSearchCollectionProgress(update, options, maxResults, deps.onProgress),
 		},
 		signal,
 	);
@@ -256,12 +244,9 @@ async function emitSearchCollectionProgress(
 	onProgress?: ResearchProgressReporter,
 ): Promise<void> {
 	if (
-		![
-			"provider_preflight",
-			"provider_warm",
-			"provider_session",
-			"provider_search",
-		].includes(update.phase)
+		!["provider_preflight", "provider_warm", "provider_session", "provider_search"].includes(
+			update.phase,
+		)
 	) {
 		return;
 	}
@@ -278,9 +263,7 @@ async function emitSearchCollectionProgress(
 	});
 }
 
-function emptySearchCollection(
-	result: SearchRunResult,
-): CollectedResearchSources {
+function emptySearchCollection(result: SearchRunResult): CollectedResearchSources {
 	return {
 		sources: [],
 		provider: result.provider,
@@ -319,9 +302,7 @@ function researchRequest(options: ResearchOptions): {
 	};
 }
 
-function sourcesFromInput(
-	input: NonNullable<ResearchOptions["sources"]>,
-): ResearchSource[] {
+function sourcesFromInput(input: NonNullable<ResearchOptions["sources"]>): ResearchSource[] {
 	return input.map((source, index) => ({
 		id: `s${index + 1}`,
 		title: source.title,
@@ -333,10 +314,7 @@ function sourcesFromInput(
 	}));
 }
 
-function sourceFromSearchResult(
-	result: SearchResultItem,
-	index: number,
-): ResearchSource {
+function sourceFromSearchResult(result: SearchResultItem, index: number): ResearchSource {
 	return {
 		id: `s${index + 1}`,
 		title: result.title,
@@ -355,18 +333,11 @@ async function hydrateMissingSources(
 	onProgress?: ResearchProgressReporter,
 ): Promise<ResearchSource[]> {
 	const hydrated: ResearchSource[] = [];
-	const steps = [
-		"● Fetching source content",
-		"● Parsing text",
-		"● Extracting data",
-	];
+	const steps = ["● Fetching source content", "● Parsing text", "● Extracting data"];
 	for (const source of sources) {
 		if (source.text?.trim()) {
 			hydrated.push(source);
-			await emitProgress(
-				onProgress,
-				hydrationProgress(hydrated.length, sources),
-			);
+			await emitProgress(onProgress, hydrationProgress(hydrated.length, sources));
 			continue;
 		}
 
@@ -386,9 +357,7 @@ async function hydrateMissingSources(
 			hydrated.push({
 				...source,
 				text: hydrationFailureText(
-					hydrateError(
-						error instanceof Error ? error.message : "Source hydration failed",
-					),
+					hydrateError(error instanceof Error ? error.message : "Source hydration failed"),
 				),
 			});
 		}
@@ -412,12 +381,8 @@ function assembleFindingsAndCitations(sources: ResearchSource[]): {
 				? insertProviderCitationMarkers(findingText, metadata)
 				: { text: findingText, citations: [] }
 			: undefined;
-		if (inserted?.text)
-			findings.push({ sourceId: source.id, text: inserted.text });
-		citations.push(
-			...providerCitations(source, inserted?.citations ?? []),
-			baseCitation(source),
-		);
+		if (inserted?.text) findings.push({ sourceId: source.id, text: inserted.text });
+		citations.push(...providerCitations(source, inserted?.citations ?? []), baseCitation(source));
 	}
 	return { findings, citations };
 }
@@ -429,8 +394,8 @@ function providerCitations(
 	return inserted.map((citation) => ({
 		sourceId: source.id,
 		url:
-			citation.providerSources.find((providerSource) => providerSource.url)
-				?.url ?? source.normalizedUrl,
+			citation.providerSources.find((providerSource) => providerSource.url)?.url ??
+			source.normalizedUrl,
 		text: citation.text,
 		marker: citation.marker,
 		startByte: citation.startByte,
@@ -450,9 +415,7 @@ function baseCitation(source: ResearchSource): ResearchCitation {
 function metadataFromSource(
 	source: ResearchSource,
 ): NormalizedResearchProviderMetadata | undefined {
-	return source.providerMetadata as
-		| NormalizedResearchProviderMetadata
-		| undefined;
+	return source.providerMetadata as NormalizedResearchProviderMetadata | undefined;
 }
 
 function normalizedMetadataOrUndefined(
@@ -463,10 +426,7 @@ function normalizedMetadataOrUndefined(
 	return hasResearchProviderMetadata(metadata) ? metadata : undefined;
 }
 
-function hydrationProgress(
-	completed: number,
-	sources: ResearchSource[],
-): ResearchProgressUpdate {
+function hydrationProgress(completed: number, sources: ResearchSource[]): ResearchProgressUpdate {
 	return {
 		phase: "hydrate",
 		message: `Hydrated ${completed}/${sources.length} source(s).`,

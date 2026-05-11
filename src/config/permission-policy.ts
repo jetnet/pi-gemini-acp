@@ -7,15 +7,11 @@ export const GEMINI_ACP_PERMISSION_MODES = [
 	"terminal",
 ] as const;
 
-export type GeminiAcpPermissionMode =
-	(typeof GEMINI_ACP_PERMISSION_MODES)[number];
+export type GeminiAcpPermissionMode = (typeof GEMINI_ACP_PERMISSION_MODES)[number];
 
 export type PermissionPolicyDisplayMode = GeminiAcpPermissionMode | "custom";
 
-export type PermissionCapability =
-	| "filesystemRead"
-	| "filesystemWrite"
-	| "terminal";
+export type PermissionCapability = "filesystemRead" | "filesystemWrite" | "terminal";
 
 export interface ResolvedPermissionPolicy {
 	mode: PermissionPolicyDisplayMode;
@@ -81,27 +77,22 @@ export function resolvePermissionPolicy(
 
 /** Normalizes individual capability settings before persisting them. */
 export function normalizePermissionPolicy(
-	capabilities: Pick<
-		GeminiAcpPermissionPolicy,
-		"filesystemRead" | "filesystemWrite" | "terminal"
-	>,
+	capabilities: Pick<GeminiAcpPermissionPolicy, "filesystemRead" | "filesystemWrite" | "terminal">,
 	reason?: string,
 ): GeminiAcpPermissionPolicy {
 	return {
 		filesystemRead: capabilities.filesystemRead === true,
 		filesystemWrite: capabilities.filesystemWrite === true,
 		terminal: capabilities.terminal === true,
-		reason: reason?.trim() || undefined,
+		reason: reason?.trim() ?? undefined,
 		updatedAt: new Date().toISOString(),
 	};
 }
 
-export function describePermissionPolicy(
-	policy?: GeminiAcpPermissionPolicy,
-): string {
+export function describePermissionPolicy(policy?: GeminiAcpPermissionPolicy): string {
 	const resolved = resolvePermissionPolicy(policy);
 	const allowed = enabledPermissionLabels(resolved);
-	return `${resolved.mode}: ${allowed.length ? allowed.join(", ") : "no filesystem or terminal access"}`;
+	return `${resolved.mode}: ${allowed.length > 0 ? allowed.join(", ") : "no filesystem or terminal access"}`;
 }
 
 export function permissionPolicyCapabilities(
@@ -134,12 +125,9 @@ export function requirePermissionCapability(
 	};
 }
 
-export function isPermissionMode(
-	value: unknown,
-): value is GeminiAcpPermissionMode {
+export function isPermissionMode(value: unknown): value is GeminiAcpPermissionMode {
 	return (
-		typeof value === "string" &&
-		(GEMINI_ACP_PERMISSION_MODES as readonly string[]).includes(value)
+		typeof value === "string" && (GEMINI_ACP_PERMISSION_MODES as readonly string[]).includes(value)
 	);
 }
 
@@ -155,9 +143,7 @@ function modeForCapabilities(
 	return "custom";
 }
 
-function policyForMode(
-	mode: GeminiAcpPermissionMode,
-): ResolvedPermissionPolicy {
+function policyForMode(mode: GeminiAcpPermissionMode): ResolvedPermissionPolicy {
 	switch (mode) {
 		case "file-read":
 			return {
@@ -190,6 +176,7 @@ function enabledPermissionLabels(resolved: ResolvedPermissionPolicy): string[] {
 		resolved.filesystemRead ? "filesystem read" : undefined,
 		resolved.filesystemWrite ? "filesystem write" : undefined,
 		resolved.terminal ? "terminal" : undefined,
+		// oxlint-disable-next-line unicorn/prefer-native-coercion-functions -- type guard preserves string[] return type
 	].filter((label): label is string => Boolean(label));
 }
 

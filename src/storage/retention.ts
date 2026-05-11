@@ -1,11 +1,7 @@
 import { readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { openResponseCacheDb } from "./cache-db.js";
-import {
-	ensureDir,
-	resolveStoragePaths,
-	type StorageOptions,
-} from "./paths.js";
+import { ensureDir, resolveStoragePaths, type StorageOptions } from "./paths.js";
 
 export interface RetentionSweepResult {
 	expiredRows: number;
@@ -24,11 +20,7 @@ export async function sweepResponseCacheRetention(
 	try {
 		const expiredRows = db.deleteExpired();
 		const liveIds = db.liveResponseIds();
-		const orphanedBlobs = await sweepOrphanedResultBlobs(
-			liveIds,
-			retentionDays,
-			options,
-		);
+		const orphanedBlobs = await sweepOrphanedResultBlobs(liveIds, retentionDays, options);
 		return { expiredRows, orphanedBlobs, retentionDays };
 	} finally {
 		db.close();
@@ -63,7 +55,5 @@ export async function sweepOrphanedResultBlobs(
 export function resultRetentionDays(): number {
 	const raw = process.env.PI_GEMINI_ACP_RESULT_RETENTION_DAYS;
 	const parsed = raw ? Number.parseInt(raw, 10) : DEFAULT_RETENTION_DAYS;
-	return Number.isFinite(parsed) && parsed > 0
-		? parsed
-		: DEFAULT_RETENTION_DAYS;
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_RETENTION_DAYS;
 }

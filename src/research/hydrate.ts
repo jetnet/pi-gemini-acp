@@ -2,10 +2,7 @@ import type { ResearchSource, StructuredError } from "../types.js";
 import { directFetcher, type Fetcher } from "../url/fetcher.js";
 
 export interface SourceHydrator {
-	hydrate(
-		source: ResearchSource,
-		signal?: AbortSignal,
-	): Promise<ResearchSource>;
+	hydrate(source: ResearchSource, signal?: AbortSignal): Promise<ResearchSource>;
 }
 
 export interface PiScraperPresence {
@@ -36,20 +33,17 @@ export function detectPiScraper(pi: unknown): PiScraperPresence {
 export class FetchSourceHydrator implements SourceHydrator {
 	constructor(private readonly fetcher: Fetcher = directFetcher) {}
 
-	async hydrate(
-		source: ResearchSource,
-		signal?: AbortSignal,
-	): Promise<ResearchSource> {
+	async hydrate(source: ResearchSource, signal?: AbortSignal): Promise<ResearchSource> {
 		if (source.text?.trim()) return source;
 		const fetched = await this.fetcher.fetch(source.url, { signal });
 		return {
 			...source,
 			url: fetched.url,
 			text: fetched.text
-				.replace(/<script[\s\S]*?<\/script>/giu, " ")
-				.replace(/<style[\s\S]*?<\/style>/giu, " ")
-				.replace(/<[^>]+>/gu, " ")
-				.replace(/\s+/gu, " ")
+				.replaceAll(/<script[\s\S]*?<\/script>/giu, " ")
+				.replaceAll(/<style[\s\S]*?<\/style>/giu, " ")
+				.replaceAll(/<[^>]+>/gu, " ")
+				.replaceAll(/\s+/gu, " ")
 				.trim()
 				.slice(0, 20_000),
 			hydrated: true,

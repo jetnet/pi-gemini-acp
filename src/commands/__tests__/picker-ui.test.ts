@@ -30,9 +30,7 @@ function makeInteractiveCtx(options: {
 	notify: ReturnType<typeof vi.fn>;
 } {
 	const selections = [...(options.select ?? [])];
-	const inputs = Array.isArray(options.input)
-		? [...options.input]
-		: [options.input];
+	const inputs = Array.isArray(options.input) ? [...options.input] : [options.input];
 	const select = vi.fn(async () => selections.shift());
 	const confirm = vi.fn(async () => options.confirm ?? false);
 	const input = vi.fn(async () => inputs.shift());
@@ -83,12 +81,8 @@ describe("Gemini ACP command pickers", () => {
 			expect.arrayContaining(["Command: gemini-dev"]),
 			{ signal: undefined },
 		);
-		expect(result.content[0]?.text).toContain(
-			"Saved Gemini ACP command: gemini-dev --acp",
-		);
-		expect(
-			(await loadConfig({ rootDir })).providers?.["gemini-acp"],
-		).toMatchObject({
+		expect(result.content[0]?.text).toContain("Saved Gemini ACP command: gemini-dev --acp");
+		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]).toMatchObject({
 			command: "gemini-dev",
 			args: ["--acp"],
 		});
@@ -96,13 +90,7 @@ describe("Gemini ACP command pickers", () => {
 
 	it("stages added args before saving ACP command settings", async () => {
 		const { ctx, select, input } = makeInteractiveCtx({
-			select: [
-				"ACP command",
-				"Args: --acp",
-				"Add new arg",
-				"Done",
-				"Save and apply",
-			],
+			select: ["ACP command", "Args: --acp", "Add new arg", "Done", "Save and apply"],
 			input: "--verbose",
 		});
 
@@ -124,9 +112,9 @@ describe("Gemini ACP command pickers", () => {
 			expect.arrayContaining(["Args: --acp --verbose"]),
 			{ signal: undefined },
 		);
-		expect(
-			(await loadConfig({ rootDir })).providers?.["gemini-acp"],
-		).toMatchObject({ args: ["--acp", "--verbose"] });
+		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]).toMatchObject({
+			args: ["--acp", "--verbose"],
+		});
 	});
 
 	it("stages removed args before saving ACP command settings", async () => {
@@ -159,9 +147,9 @@ describe("Gemini ACP command pickers", () => {
 			expect.not.arrayContaining(["Remove --model"]),
 			{ signal: undefined },
 		);
-		expect(
-			(await loadConfig({ rootDir })).providers?.["gemini-acp"],
-		).toMatchObject({ args: ["--acp", "gemini-3.1-pro"] });
+		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]).toMatchObject({
+			args: ["--acp", "gemini-3.1-pro"],
+		});
 	});
 
 	it("opens ACP command settings directly for /gemini-config command with no executable", async () => {
@@ -179,9 +167,10 @@ describe("Gemini ACP command pickers", () => {
 			["Command: gemini", "Args: --acp", "Save and apply", "Cancel"],
 			{ signal: undefined },
 		);
-		expect(
-			(await loadConfig({ rootDir })).providers?.["gemini-acp"],
-		).toMatchObject({ command: "gemini", args: ["--acp"] });
+		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]).toMatchObject({
+			command: "gemini",
+			args: ["--acp"],
+		});
 	});
 
 	it("cancels ACP command settings without saving", async () => {
@@ -192,24 +181,20 @@ describe("Gemini ACP command pickers", () => {
 		});
 
 		expect(result.content[0]?.text).toBe("Cancelled.");
-		expect(
-			(await loadConfig({ rootDir })).providers?.["gemini-acp"],
-		).toBeUndefined();
+		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]).toBeUndefined();
 	});
 
 	it("persists default settings for headless /gemini-config command", async () => {
-		const result = await runGeminiConfigCommand(
-			{ action: "command" },
-			undefined,
-			{ rootDir, commandExists: async () => true },
-		);
+		const result = await runGeminiConfigCommand({ action: "command" }, undefined, {
+			rootDir,
+			commandExists: async () => true,
+		});
 
-		expect(result.content[0]?.text).toContain(
-			"Saved Gemini ACP command: gemini --acp",
-		);
-		expect(
-			(await loadConfig({ rootDir })).providers?.["gemini-acp"],
-		).toMatchObject({ command: "gemini", args: ["--acp"] });
+		expect(result.content[0]?.text).toContain("Saved Gemini ACP command: gemini --acp");
+		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]).toMatchObject({
+			command: "gemini",
+			args: ["--acp"],
+		});
 	});
 
 	it("uses Pi select for /gemini-model with no args", async () => {
@@ -225,14 +210,10 @@ describe("Gemini ACP command pickers", () => {
 
 		expect(select).toHaveBeenCalledWith(
 			"Choose a Gemini model",
-			expect.arrayContaining([
-				"Gemini 3.1 Pro Preview — gemini-3.1-pro-preview",
-			]),
+			expect.arrayContaining(["Gemini 3.1 Pro Preview — gemini-3.1-pro-preview"]),
 			{ signal: undefined },
 		);
-		expect(result.content[0]?.text).toBe(
-			"Selected model: gemini-3.1-pro-preview.",
-		);
+		expect(result.content[0]?.text).toBe("Selected model: gemini-3.1-pro-preview.");
 	});
 
 	it("uses Pi confirm before trusting the current folder for Gemini ACP", async () => {
@@ -252,9 +233,9 @@ describe("Gemini ACP command pickers", () => {
 			{ signal: undefined },
 		);
 		expect(result.content[0]?.text).toContain("--skip-trust");
-		expect(
-			(await loadConfig({ rootDir })).providers?.["gemini-acp"],
-		).toMatchObject({ args: ["--acp", "--skip-trust"] });
+		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]).toMatchObject({
+			args: ["--acp", "--skip-trust"],
+		});
 	});
 
 	it("stops trust configuration when the user declines", async () => {
@@ -267,9 +248,7 @@ describe("Gemini ACP command pickers", () => {
 
 		expect(confirm).toHaveBeenCalled();
 		expect(result.content[0]?.text).toContain("Cancelled");
-		expect(
-			(await loadConfig({ rootDir })).providers?.["gemini-acp"],
-		).toBeUndefined();
+		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]).toBeUndefined();
 	});
 
 	it("uses Pi confirm before enabling write permissions", async () => {
@@ -282,14 +261,11 @@ describe("Gemini ACP command pickers", () => {
 
 		expect(confirm).toHaveBeenCalledWith(
 			"Enable Filesystem write?",
-			expect.stringContaining(
-				"Allow Gemini ACP to write text files to your workspace.",
-			),
+			expect.stringContaining("Allow Gemini ACP to write text files to your workspace."),
 			{ signal: undefined },
 		);
 		expect(
-			(await loadConfig({ rootDir })).providers?.["gemini-acp"]
-				?.permissionPolicy,
+			(await loadConfig({ rootDir })).providers?.["gemini-acp"]?.permissionPolicy,
 		).toMatchObject({ filesystemWrite: true });
 	});
 

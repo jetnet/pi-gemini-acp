@@ -6,15 +6,8 @@ import {
 	type GeminiAcpClientWarmOptions,
 } from "../acp/client-cache.js";
 import { buildGeminiAcpCommandSettings } from "../acp/settings.js";
-import {
-	configFromEnv,
-	loadConfig,
-	withDefaultGeminiAcpConfig,
-} from "../config/settings.js";
-import type {
-	GeminiAcpAuthProbe,
-	StatusCommandChecker,
-} from "../config/status.js";
+import { configFromEnv, loadConfig, withDefaultGeminiAcpConfig } from "../config/settings.js";
+import type { GeminiAcpAuthProbe, StatusCommandChecker } from "../config/status.js";
 import type { GeminiAcpConfig, StructuredError } from "../types.js";
 import { primeSuccessfulGeminiSearchPreflight } from "./run.js";
 
@@ -50,13 +43,7 @@ export interface GeminiSearchPrewarmResult {
 
 /** Process-local visibility into the latest Gemini search prewarm attempt. */
 export interface GeminiSearchPrewarmStatus {
-	state:
-		| "not_started"
-		| "running"
-		| "warmed"
-		| "disabled"
-		| "skipped"
-		| "failed";
+	state: "not_started" | "running" | "warmed" | "disabled" | "skipped" | "failed";
 	attempted: boolean;
 	warmed: boolean;
 	startedAt?: string;
@@ -141,18 +128,14 @@ export async function prewarmGeminiSearchClient(
 		const config = withDefaultGeminiAcpConfig(configFromEnv(loaded));
 		const settings = config.providers?.["gemini-acp"];
 		const commandSettings = buildGeminiAcpCommandSettings(settings);
-		const preflight = await primeSuccessfulGeminiSearchPreflight(
-			settings,
-			commandSettings,
-			{
-				commandExists: deps.commandExists,
-				requireSearchGrounding: true,
-				rootDir: options.rootDir,
-				signal: options.signal,
-				authProbe: deps.authProbe,
-				persistAuthConfirmation: true,
-			},
-		);
+		const preflight = await primeSuccessfulGeminiSearchPreflight(settings, commandSettings, {
+			commandExists: deps.commandExists,
+			requireSearchGrounding: true,
+			rootDir: options.rootDir,
+			signal: options.signal,
+			authProbe: deps.authProbe,
+			persistAuthConfirmation: true,
+		});
 		if (preflight) {
 			return finishPrewarm(startedAt, {
 				attempted: true,
@@ -161,10 +144,9 @@ export async function prewarmGeminiSearchClient(
 				error: preflight,
 			});
 		}
-		await (deps.warmSearchClient ?? warmCachedGeminiAcpSearchClient)(
-			commandSettings,
-			{ signal: options.signal },
-		);
+		await (deps.warmSearchClient ?? warmCachedGeminiAcpSearchClient)(commandSettings, {
+			signal: options.signal,
+		});
 		return finishPrewarm(startedAt, { attempted: true, warmed: true });
 	} catch (cause) {
 		return finishPrewarm(startedAt, {
@@ -192,9 +174,7 @@ function finishPrewarm(
 	return result;
 }
 
-function prewarmStatusState(
-	result: GeminiSearchPrewarmResult,
-): GeminiSearchPrewarmStatus["state"] {
+function prewarmStatusState(result: GeminiSearchPrewarmResult): GeminiSearchPrewarmStatus["state"] {
 	if (result.warmed) return "warmed";
 	if (result.skippedReason === "disabled") return "disabled";
 	if (result.skippedReason === "failed") return "failed";
@@ -206,7 +186,5 @@ function prewarmDisabled(env: NodeJS.ProcessEnv): boolean {
 }
 
 function defaultSchedule(callback: () => void): PrewarmScheduleHandle {
-	return typeof setImmediate === "function"
-		? setImmediate(callback)
-		: setTimeout(callback, 0);
+	return typeof setImmediate === "function" ? setImmediate(callback) : setTimeout(callback, 0);
 }

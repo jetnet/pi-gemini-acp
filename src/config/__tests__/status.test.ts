@@ -4,13 +4,10 @@ import { evaluateGeminiAcpStatus } from "../status.js";
 describe("Gemini ACP status", () => {
 	it("reports missing config without checking the command when provider settings are disabled", async () => {
 		let checked = false;
-		const status = await evaluateGeminiAcpStatus(
-			{ enabled: false },
-			async () => {
-				checked = true;
-				return true;
-			},
-		);
+		const status = await evaluateGeminiAcpStatus({ enabled: false }, async () => {
+			checked = true;
+			return true;
+		});
 
 		expect(checked).toBe(false);
 		expect(status.ready).toBe(false);
@@ -85,17 +82,10 @@ describe("Gemini ACP status", () => {
 		expect(status.capabilities.imageInput).toMatchObject({
 			available: "unknown",
 			transport: "unconfirmed",
-			supportedMimeTypes: [
-				"image/png",
-				"image/jpeg",
-				"image/webp",
-				"image/gif",
-			],
+			supportedMimeTypes: ["image/png", "image/jpeg", "image/webp", "image/gif"],
 		});
 		expect(status.capabilities.permissionPolicy.mode).toBe("file-read");
-		expect(
-			status.capabilities.permissionPolicy.clientCapabilities.fs.readTextFile,
-		).toBe(true);
+		expect(status.capabilities.permissionPolicy.clientCapabilities.fs.readTextFile).toBe(true);
 	});
 
 	it("reports explicitly confirmed file-analysis capability separately from readiness", async () => {

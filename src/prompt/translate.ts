@@ -84,15 +84,11 @@ export async function runTranslate(
 		signal,
 		onUpdate,
 	);
-	if (promptResult.error)
-		return emptyTranslateResult(options, promptResult.error);
+	if (promptResult.error) return emptyTranslateResult(options, promptResult.error);
 
 	const items =
 		mode === "batch" && !promptResult.truncated
-			? parseBatchTranslationOutput(
-					promptResult.text,
-					options.batch?.length ?? 0,
-				)
+			? parseBatchTranslationOutput(promptResult.text, options.batch?.length ?? 0)
 			: undefined;
 	return {
 		provider: "gemini-acp",
@@ -144,10 +140,7 @@ export function buildTranslatePrompt(options: TranslateOptions): string {
 	return lines.join("\n");
 }
 
-function translateRequestSummary(
-	options: TranslateOptions,
-	mode: "single" | "batch",
-) {
+function translateRequestSummary(options: TranslateOptions, mode: "single" | "batch") {
 	const itemCount = mode === "batch" ? (options.batch?.length ?? 0) : 1;
 	const totalChars =
 		mode === "batch"
@@ -159,8 +152,7 @@ function translateRequestSummary(
 		subject: options.targetLanguage.trim(),
 		arguments: {
 			targetLanguage: options.targetLanguage.trim(),
-			sourceLanguage:
-				normalizedOptional(options.sourceLanguage) ?? "auto-detect",
+			sourceLanguage: normalizedOptional(options.sourceLanguage) ?? "auto-detect",
 			mode,
 			itemCount,
 			totalChars,
@@ -172,17 +164,11 @@ function translateRequestSummary(
 	};
 }
 
-function normalizedGlossaryCount(
-	entries: TranslateGlossaryEntry[] | undefined,
-): number {
-	return (entries ?? []).filter(
-		(entry) => entry.source.trim() && entry.target.trim(),
-	).length;
+function normalizedGlossaryCount(entries: TranslateGlossaryEntry[] | undefined): number {
+	return (entries ?? []).filter((entry) => entry.source.trim() && entry.target.trim()).length;
 }
 
-function validateTranslateOptions(
-	options: TranslateOptions,
-): StructuredError | undefined {
+function validateTranslateOptions(options: TranslateOptions): StructuredError | undefined {
 	if (!options.targetLanguage?.trim()) {
 		return translateError(
 			"GEMINI_TRANSLATE_TARGET_REQUIRED",
@@ -232,8 +218,7 @@ function parseBatchTranslationOutput(
 ): TranslateBatchResultItem[] | undefined {
 	try {
 		const parsed = JSON.parse(text.trim()) as unknown;
-		if (!Array.isArray(parsed) || parsed.length !== expectedLength)
-			return undefined;
+		if (!Array.isArray(parsed) || parsed.length !== expectedLength) return undefined;
 		const items = parsed.map((entry, position) => {
 			const record = asRecord(entry);
 			if (!record || record.index !== position) return undefined;
@@ -246,17 +231,13 @@ function parseBatchTranslationOutput(
 				error: typeof record.error === "string" ? record.error : undefined,
 			};
 		});
-		return items.every(Boolean)
-			? (items as TranslateBatchResultItem[])
-			: undefined;
+		return items.every(Boolean) ? (items as TranslateBatchResultItem[]) : undefined;
 	} catch {
 		return undefined;
 	}
 }
 
-function glossarySection(
-	entries: TranslateGlossaryEntry[] | undefined,
-): string {
+function glossarySection(entries: TranslateGlossaryEntry[] | undefined): string {
 	const normalized = (entries ?? [])
 		.map((entry) => ({
 			source: entry.source.trim(),
@@ -264,7 +245,7 @@ function glossarySection(
 			note: normalizedOptional(entry.note),
 		}))
 		.filter((entry) => entry.source && entry.target)
-		.sort((a, b) =>
+		.toSorted((a, b) =>
 			`${a.source}\u0000${a.target}\u0000${a.note ?? ""}`.localeCompare(
 				`${b.source}\u0000${b.target}\u0000${b.note ?? ""}`,
 			),
@@ -291,16 +272,15 @@ function preserveSection(terms: string[] | undefined): string {
 function preservationRulesSection(rules: string[] | undefined): string {
 	const normalized = normalizedList(rules);
 	if (normalized.length === 0) return "Preservation rules: none";
-	return [
-		"Preservation rules:",
-		...normalized.map((rule, index) => `${index + 1}. ${rule}`),
-	].join("\n");
+	return ["Preservation rules:", ...normalized.map((rule, index) => `${index + 1}. ${rule}`)].join(
+		"\n",
+	);
 }
 
 function normalizedList(values: string[] | undefined): string[] {
-	return [
-		...new Set((values ?? []).map((value) => value.trim()).filter(Boolean)),
-	].sort((a, b) => a.localeCompare(b));
+	return [...new Set((values ?? []).map((value) => value.trim()).filter(Boolean))].toSorted(
+		(a, b) => a.localeCompare(b),
+	);
 }
 
 function batchPayload(items: TranslateBatchItem[]): {
@@ -333,17 +313,13 @@ function emptyTranslateResult(
 	};
 }
 
-function translateError(
-	code: string,
-	phase: string,
-	message: string,
-): StructuredError {
+function translateError(code: string, phase: string, message: string): StructuredError {
 	return providerError(code, phase, message, { retryable: false });
 }
 
 function normalizedOptional(value: string | undefined): string | undefined {
 	const trimmed = value?.trim();
-	return trimmed ? trimmed : undefined;
+	return trimmed ?? undefined;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

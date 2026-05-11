@@ -31,10 +31,7 @@ export interface ModelResponse<T = unknown> {
 }
 
 export interface ModelAdapter {
-	run<T = unknown>(
-		request: ModelRequest,
-		signal?: AbortSignal,
-	): Promise<ModelResponse<T>>;
+	run<T = unknown>(request: ModelRequest, signal?: AbortSignal): Promise<ModelResponse<T>>;
 }
 
 export interface RegisteredAdapter {

@@ -1,15 +1,7 @@
 import { type Static, Type } from "@earendil-works/pi-ai";
-import {
-	runSearch,
-	type SearchProgressUpdate,
-	type SearchRunResult,
-} from "../search/run.js";
+import { runSearch, type SearchProgressUpdate, type SearchRunResult } from "../search/run.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
-import {
-	defineGeminiTool,
-	type ToolRenderResultOptions,
-	type ToolUpdate,
-} from "./define.js";
+import { defineGeminiTool, type ToolRenderResultOptions, type ToolUpdate } from "./define.js";
 import {
 	boxedToolText,
 	dimToolText,
@@ -19,11 +11,7 @@ import {
 	truncateToolText,
 } from "./gemini-rendering.js";
 import { withToolResponseCache } from "./cache.js";
-import {
-	cacheToolTitle,
-	costToolTitle,
-	estimateCost,
-} from "./cost-estimate.js";
+import { cacheToolTitle, costToolTitle, estimateCost } from "./cost-estimate.js";
 import { errorResult, toolResult } from "./result.js";
 
 export const geminiAcpSearchSchema = Type.Object({
@@ -33,12 +21,7 @@ export const geminiAcpSearchSchema = Type.Object({
 	useRecall: Type.Optional(Type.Boolean()),
 	bypassRecall: Type.Optional(Type.Boolean()),
 	localDocuments: Type.Optional(
-		Type.Array(
-			Type.Object(
-				{ url: Type.String() },
-				{ description: "opt:title,text,snippet" },
-			),
-		),
+		Type.Array(Type.Object({ url: Type.String() }, { description: "opt:title,text,snippet" })),
 	),
 });
 
@@ -61,11 +44,10 @@ export const geminiAcpSearchTool = defineGeminiTool({
 				signal,
 			);
 			if (result.error) return errorResult(result.error);
-			const cost = estimateCost(
-				params.query,
-				formatSearchModelPayload(result),
-				{ model: result.model, searchCount: 0 },
-			);
+			const cost = estimateCost(params.query, formatSearchModelPayload(result), {
+				model: result.model,
+				searchCount: 0,
+			});
 			const title = costToolTitle("gemini_search", cost);
 			cacheToolTitle(toolCallId, title);
 			return toolResult({
@@ -76,7 +58,7 @@ export const geminiAcpSearchTool = defineGeminiTool({
 				title,
 			});
 		}
-		return withToolResponseCache({
+		return await withToolResponseCache({
 			toolName: "gemini_search",
 			inputs: params,
 			bypassCache: params.bypassCache,
@@ -95,11 +77,10 @@ export const geminiAcpSearchTool = defineGeminiTool({
 					signal,
 				);
 				if (result.error) return errorResult(result.error);
-				const cost = estimateCost(
-					params.query,
-					formatSearchModelPayload(result),
-					{ model: result.model, searchCount: 1 },
-				);
+				const cost = estimateCost(params.query, formatSearchModelPayload(result), {
+					model: result.model,
+					searchCount: 1,
+				});
 				const title = costToolTitle("gemini_search", cost);
 				cacheToolTitle(toolCallId, title);
 				return toolResult({
@@ -119,9 +100,7 @@ export const geminiAcpSearchTool = defineGeminiTool({
 		});
 	},
 	renderResult(result, options, theme) {
-		return boxedToolText(
-			dimToolText(formatSearchToolDisplay(result, options), theme),
-		);
+		return boxedToolText(dimToolText(formatSearchToolDisplay(result, options), theme));
 	},
 });
 
@@ -139,10 +118,7 @@ async function emitSearchProgress(
 	);
 }
 
-function formatSearchToolDisplay(
-	result: PiToolShell,
-	options: ToolRenderResultOptions,
-): string {
+function formatSearchToolDisplay(result: PiToolShell, options: ToolRenderResultOptions): string {
 	const details = result.details as Partial<ResultEnvelope<unknown>>;
 	if (isProgressData(details.data)) {
 		return formatCollapsedOrExpanded(details.data.progress, options, {
@@ -178,27 +154,23 @@ function formatSearchProgressExpanded(update: SearchProgressUpdate): string {
 	];
 	if (update.provider) lines.push(`provider: ${update.provider}`);
 	if (update.model) lines.push(`model: ${update.model}`);
-	if (update.maxResults !== undefined)
-		lines.push(`maxResults: ${update.maxResults}`);
-	if (update.resultCount !== undefined)
-		lines.push(`resultCount: ${update.resultCount}`);
+	if (update.maxResults !== undefined) lines.push(`maxResults: ${update.maxResults}`);
+	if (update.resultCount !== undefined) lines.push(`resultCount: ${update.resultCount}`);
 	if (update.responseId) lines.push(`responseId: ${update.responseId}`);
-	if (update.chunk?.text)
-		lines.push("latest chunk:", truncateToolText(update.chunk.text, 800));
+	if (update.chunk?.text) lines.push("latest chunk:", truncateToolText(update.chunk.text, 800));
 	return lines.join("\n");
 }
 
 function searchProgressLine(update: SearchProgressUpdate): string {
 	if (update.phase === "provider_stream") {
-		const latest = update.chunk?.text.trim() || update.message;
+		const latest = update.chunk?.text.trim() ?? update.message;
 		return `Searching: ${truncateToolText(latest, 220)}`;
 	}
 	return progressMessage(update);
 }
 
 function progressMessage(update: SearchProgressUpdate): string {
-	if (update.phase === "provider_stream")
-		return "Receiving Gemini ACP search response.";
+	if (update.phase === "provider_stream") return "Receiving Gemini ACP search response.";
 	return update.message;
 }
 
@@ -209,8 +181,7 @@ function formatSearchModelPayload(result: SearchRunResult): string {
 	];
 	if (result.model) lines.push(`model: ${result.model}`);
 	if (result.responseId) lines.push(`responseId: ${result.responseId}`);
-	if (result.fullOutputPath)
-		lines.push(`fullOutputPath: ${result.fullOutputPath}`);
+	if (result.fullOutputPath) lines.push(`fullOutputPath: ${result.fullOutputPath}`);
 	lines.push("", "Results:");
 	if (result.results.length === 0) lines.push("No normalized search results.");
 	for (const item of result.results) {
@@ -235,8 +206,7 @@ function formatSearchExpandedDisplay(result: SearchRunResult): string {
 	];
 	if (result.model) lines.push(`model: ${result.model}`);
 	if (result.responseId) lines.push(`responseId: ${result.responseId}`);
-	if (result.fullOutputPath)
-		lines.push(`fullOutputPath: ${result.fullOutputPath}`);
+	if (result.fullOutputPath) lines.push(`fullOutputPath: ${result.fullOutputPath}`);
 	lines.push("", "Results:");
 	if (result.results.length === 0) lines.push("No normalized search results.");
 	for (const item of result.results) {

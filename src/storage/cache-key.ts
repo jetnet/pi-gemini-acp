@@ -44,10 +44,11 @@ export function sha256Hex(value: string | Uint8Array): string {
 function canonicalize(value: unknown): unknown {
 	if (value === undefined || typeof value === "function") return undefined;
 	if (value === null || typeof value !== "object") return value;
+	// oxlint-disable-next-line unicorn/no-array-callback-reference -- canonicalize takes one arg
 	if (Array.isArray(value)) return value.map(canonicalize);
 	const input = value as Record<string, unknown>;
 	const output: Record<string, unknown> = {};
-	for (const key of Object.keys(input).sort()) {
+	for (const key of Object.keys(input).toSorted()) {
 		const next = canonicalize(input[key]);
 		if (next !== undefined) output[key] = next;
 	}
@@ -70,6 +71,6 @@ function providerSettingsFingerprint(
 		permissionPolicy: settings?.permissionPolicy,
 		envKeys: Object.keys(process.env)
 			.filter((key) => key.startsWith("PI_GEMINI_ACP_"))
-			.sort(),
+			.toSorted(),
 	};
 }

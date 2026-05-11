@@ -1,19 +1,11 @@
 import { providerError } from "../prompt/provider-result.js";
 import type { StorageOptions } from "../storage/paths.js";
 import type { GeminiAcpProviderSettings, StructuredError } from "../types.js";
-import {
-	type CommandExists,
-	defaultGeminiAcpCommandExists,
-} from "./command.js";
-import {
-	DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS,
-	saveGeminiAcpSettings,
-} from "./settings.js";
+import { type CommandExists, defaultGeminiAcpCommandExists } from "./command.js";
+import { DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS, saveGeminiAcpSettings } from "./settings.js";
 
-const SECRET_FLAG_PATTERN =
-	/^--?(?:api[-_]?key|key|token|secret|password)(?:=|$)/iu;
-const SECRET_ENV_PATTERN =
-	/^[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*=/iu;
+const SECRET_FLAG_PATTERN = /^--?(?:api[-_]?key|key|token|secret|password)(?:=|$)/iu;
+const SECRET_ENV_PATTERN = /^[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*=/iu;
 
 /** User-provided command settings accepted by `/gemini-config command`. */
 export interface ConfigureGeminiAcpInput {
@@ -70,12 +62,12 @@ export async function configureGeminiAcpSettings(
 			? {
 					commandFound,
 					checkedAt,
-					message: `Command '${settings.command}' is executable.`,
+					message: `Command '${settings.command ?? "(unset)"}' is executable.`,
 				}
 			: {
 					commandFound,
 					checkedAt,
-					message: `Command '${settings.command}' was saved but was not found or is not executable.`,
+					message: `Command '${settings.command ?? "(unset)"}' was saved but was not found or is not executable.`,
 					remediation:
 						"Install and authenticate the Gemini CLI, ensure it is on PATH, or rerun /gemini-config command with an executable path.",
 				},
@@ -86,9 +78,7 @@ export async function configureGeminiAcpSettings(
 export function normalizeGeminiAcpSettings(
 	input: ConfigureGeminiAcpInput,
 ): { settings: GeminiAcpProviderSettings } | { error: StructuredError } {
-	const command = (
-		input.command ?? DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.command
-	)?.trim();
+	const command = (input.command ?? DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.command)?.trim();
 	if (!command || /\s/u.test(command)) {
 		return {
 			error: providerError(
@@ -102,6 +92,7 @@ export function normalizeGeminiAcpSettings(
 	const args = input.args
 		? input.args.map((arg) => arg.trim()).filter(Boolean)
 		: [...DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.args];
+	// oxlint-disable-next-line unicorn/no-array-callback-reference -- isSecretLikeArgument takes one arg
 	const secretArg = [command, ...args].find(isSecretLikeArgument);
 	if (secretArg) {
 		return {

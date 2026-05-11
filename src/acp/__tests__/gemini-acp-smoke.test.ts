@@ -10,9 +10,7 @@ import { runSearch } from "../../search/run.js";
 
 const enabled = process.env.PI_GEMINI_ACP === "1";
 const command = process.env.PI_GEMINI_ACP_COMMAND ?? "gemini";
-const args = (process.env.PI_GEMINI_ACP_ARGS ?? "--acp")
-	.split(" ")
-	.filter(Boolean);
+const args = (process.env.PI_GEMINI_ACP_ARGS ?? "--acp").split(" ").filter(Boolean);
 const pngBytes = Buffer.from(
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
 	"base64",

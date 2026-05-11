@@ -5,10 +5,7 @@ import { type Static, Type } from "@earendil-works/pi-ai";
 import { getGeminiAcpStatus } from "../config/status.js";
 import { configFromEnv, loadConfig } from "../config/settings.js";
 import { getModelAdapterStatus } from "../adapter/status.js";
-import {
-	getGeminiSearchPrewarmStatus,
-	type GeminiSearchPrewarmStatus,
-} from "../search/prewarm.js";
+import { getGeminiSearchPrewarmStatus, type GeminiSearchPrewarmStatus } from "../search/prewarm.js";
 import type { PiToolShell, ResultEnvelope } from "../types.js";
 import { geminiApiKeyConfigured } from "../api/config.js";
 import { getQuotaExhaustedEntries } from "../api/quota-cache.js";
@@ -42,9 +39,7 @@ export const geminiAcpStatusTool = defineGeminiTool({
 			quotaExhausted: quotaEntries.map((e) => ({
 				model: e.model ?? "unknown",
 				elapsedMinutes: Math.round((Date.now() - e.exhaustedAt) / 60000),
-				resetAfterMinutes: e.resetAfterMs
-					? Math.round(e.resetAfterMs / 60000)
-					: undefined,
+				resetAfterMinutes: e.resetAfterMs ? Math.round(e.resetAfterMs / 60000) : undefined,
 			})),
 			modelAdapter: getModelAdapterStatus(),
 		};
@@ -61,9 +56,7 @@ export const geminiAcpStatusTool = defineGeminiTool({
 		});
 	},
 	renderResult(result, options, theme) {
-		return boxedToolText(
-			dimToolText(formatStatusToolDisplay(result, options), theme),
-		);
+		return boxedToolText(dimToolText(formatStatusToolDisplay(result, options), theme));
 	},
 });
 
@@ -78,10 +71,7 @@ type GeminiStatusData = Awaited<ReturnType<typeof getGeminiAcpStatus>> & {
 	modelAdapter: ReturnType<typeof getModelAdapterStatus>;
 };
 
-function formatStatusToolDisplay(
-	result: PiToolShell,
-	options: ToolRenderResultOptions,
-): string {
+function formatStatusToolDisplay(result: PiToolShell, options: ToolRenderResultOptions): string {
 	const details = result.details as Partial<ResultEnvelope<unknown>>;
 	if (isGeminiStatusData(details.data)) {
 		return formatCollapsedOrExpanded(details.data, options, {
@@ -120,14 +110,10 @@ function isGeminiStatusData(value: unknown): value is GeminiStatusData {
 	);
 }
 
-function formatQuotaLines(
-	entries: GeminiStatusData["quotaExhausted"],
-): string[] {
+function formatQuotaLines(entries: GeminiStatusData["quotaExhausted"]): string[] {
 	if (entries.length === 0) return [];
 	return entries.map((e) => {
-		const reset = e.resetAfterMinutes
-			? `; reset in ~${e.resetAfterMinutes}m`
-			: "";
+		const reset = e.resetAfterMinutes ? `; reset in ~${e.resetAfterMinutes}m` : "";
 		return `- Quota exhausted for ${e.model} (${e.elapsedMinutes}m ago${reset}). Using API key fallback.`;
 	});
 }
@@ -153,25 +139,17 @@ function statusText(status: GeminiStatusData): string {
 }
 
 function prewarmLabel(status: GeminiSearchPrewarmStatus): string {
-	if (status.state === "warmed")
-		return "last prewarm warmed ACP process and search session";
-	if (status.state === "running")
-		return "warming ACP process and search session";
+	if (status.state === "warmed") return "last prewarm warmed ACP process and search session";
+	if (status.state === "running") return "warming ACP process and search session";
 	if (status.state === "not_started") return "not attempted in this process";
-	if (status.state === "disabled")
-		return "disabled by PI_GEMINI_ACP_NO_PREWARM";
+	if (status.state === "disabled") return "disabled by PI_GEMINI_ACP_NO_PREWARM";
 	if (status.state === "failed") return "failed during warmup";
-	if (status.skippedReason === "preflight")
-		return "skipped: command, auth, or grounding not ready";
+	if (status.skippedReason === "preflight") return "skipped: command, auth, or grounding not ready";
 	if (status.skippedReason === "aborted") return "skipped: request aborted";
 	return status.state;
 }
 
-function boolLabel(
-	value: boolean | "unknown",
-	trueLabel: string,
-	falseLabel: string,
-): string {
+function boolLabel(value: boolean | "unknown", trueLabel: string, falseLabel: string): string {
 	if (value === "unknown") return "unknown";
 	return value ? trueLabel : falseLabel;
 }

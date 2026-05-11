@@ -4,9 +4,7 @@
 import type { GeminiAcpPromptUpdateHandler } from "./client.js";
 
 export type GeminiBackendProgressState = "waiting" | "generating";
-export type GeminiBackendProgressEmitter = (
-	message: string,
-) => void | Promise<void>;
+export type GeminiBackendProgressEmitter = (message: string) => void | Promise<void>;
 
 const BACKEND_PROGRESS_TEXT: Record<GeminiBackendProgressState, string> = {
 	waiting: "● Waiting for Gemini backend...",

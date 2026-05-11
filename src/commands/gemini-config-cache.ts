@@ -83,7 +83,7 @@ function cacheStatusText(result: GeminiConfigCacheResult): string {
 		`- hits: ${result.hitCount ?? 0}`,
 		`- bytes: ${result.totalBytes ?? 0}`,
 		`- oldest: ${result.oldestCreatedAt ?? "none"}`,
-		`- embeddings: ${result.embeddingCount ?? 0} rows; models: ${result.embeddingModels?.join(", ") || "none"}; queue: ${result.embeddingQueueDepth ?? 0} (${result.embeddingDeadQueueDepth ?? 0} dead); stale: ${result.embeddingStaleCount ?? 0}`,
+		`- embeddings: ${result.embeddingCount ?? 0} rows; models: ${result.embeddingModels?.join(", ") ?? "none"}; queue: ${result.embeddingQueueDepth ?? 0} (${result.embeddingDeadQueueDepth ?? 0} dead); stale: ${result.embeddingStaleCount ?? 0}`,
 		`- sqlite-vec: ${result.sqliteVecAvailable ? "loaded" : "unavailable"}`,
 		`- embedder: ${result.embeddingStatus ?? "unavailable"}${result.embeddingReason ? ` (${result.embeddingReason})` : ""}`,
 	].join("\n");

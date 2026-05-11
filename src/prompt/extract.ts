@@ -1,13 +1,7 @@
 import { storeResult } from "../storage/results.js";
 import type { GeminiAcpConfig, StructuredError } from "../types.js";
-import {
-	normalizeExtractMetadata,
-	parseExtractionPayload,
-} from "./extract-json.js";
-import {
-	validateExtractionSchema,
-	validateValueAgainstSchema,
-} from "./extract-schema.js";
+import { normalizeExtractMetadata, parseExtractionPayload } from "./extract-json.js";
+import { validateExtractionSchema, validateValueAgainstSchema } from "./extract-schema.js";
 import { providerError } from "./provider-result.js";
 import { type PromptDeps, type PromptUpdateHandler, runPrompt } from "./run.js";
 
@@ -138,9 +132,7 @@ function schemaSummary(schema: unknown): string {
 	return typeof type === "string" ? type : "object";
 }
 
-function validateExtractInputs(
-	options: ExtractOptions,
-): StructuredError | undefined {
+function validateExtractInputs(options: ExtractOptions): StructuredError | undefined {
 	if (!options.prompt.trim()) {
 		return providerError(
 			"GEMINI_EXTRACT_EMPTY_PROMPT",
@@ -173,13 +165,8 @@ async function rawOutputError(
 		message,
 	});
 	return {
-		...emptyExtractResult(
-			providerError(code, phase, message, { retryable: false }),
-		),
-		rawText: compactRawText(
-			rawText,
-			rawText.length > EXTRACT_RAW_STORAGE_LIMIT,
-		),
+		...emptyExtractResult(providerError(code, phase, message, { retryable: false })),
+		rawText: compactRawText(rawText, rawText.length > EXTRACT_RAW_STORAGE_LIMIT),
 		responseLength: rawText.length,
 		truncated: rawText.length > EXTRACT_RAW_STORAGE_LIMIT,
 		responseId: stored.responseId,
@@ -188,9 +175,7 @@ async function rawOutputError(
 }
 
 function compactRawText(rawText: string, shouldCompact: boolean): string {
-	return shouldCompact
-		? `${rawText.slice(0, EXTRACT_RAW_STORAGE_LIMIT)}…`
-		: rawText;
+	return shouldCompact ? `${rawText.slice(0, EXTRACT_RAW_STORAGE_LIMIT)}…` : rawText;
 }
 
 async function storeRawExtraction(

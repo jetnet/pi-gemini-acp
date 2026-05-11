@@ -55,9 +55,7 @@ export function normalizeResearchProviderMetadata(
 /**
  * Returns true when normalized provider metadata contains citation inputs.
  */
-export function hasResearchProviderMetadata(
-	metadata: NormalizedResearchProviderMetadata,
-): boolean {
+export function hasResearchProviderMetadata(metadata: NormalizedResearchProviderMetadata): boolean {
 	return (
 		metadata.groundingChunks.length > 0 ||
 		metadata.groundingSupports.length > 0 ||
@@ -77,8 +75,7 @@ export function insertProviderCitationMarkers(
 	metadata.groundingSupports.forEach((support, index) => {
 		const endByte = support.endByte;
 		if (endByte === undefined) return;
-		const sourceIndexes =
-			support.sourceIndexes.length > 0 ? support.sourceIndexes : [index];
+		const sourceIndexes = support.sourceIndexes.length > 0 ? support.sourceIndexes : [index];
 		const marker = `[${sourceIndexes.map((value) => value + 1).join(",")}]`;
 		const insertionIndex = stringIndexAtUtf8Byte(text, endByte, "end");
 		const markers = insertions.get(insertionIndex) ?? [];
@@ -90,14 +87,12 @@ export function insertProviderCitationMarkers(
 			endByte: support.endByte,
 			text: support.text,
 			providerSources: sourceIndexes.flatMap((sourceIndex) =>
-				metadata.groundingChunks[sourceIndex]
-					? [metadata.groundingChunks[sourceIndex]]
-					: [],
+				metadata.groundingChunks[sourceIndex] ? [metadata.groundingChunks[sourceIndex]] : [],
 			),
 		});
 	});
 	let citedText = text;
-	for (const [index, markers] of [...insertions.entries()].sort(
+	for (const [index, markers] of [...insertions.entries()].toSorted(
 		([left], [right]) => right - left,
 	)) {
 		citedText = `${citedText.slice(0, index)}${markers.join("")}${citedText.slice(index)}`;
@@ -110,9 +105,7 @@ function normalizeGroundingChunks(
 	retrievedUrls: ResearchProviderSourceMetadata[],
 ): ResearchProviderSourceMetadata[] {
 	const record = asRecord(grounding);
-	const chunks = arrayValue(
-		record && recordValue(record, "groundingChunks", "grounding_chunks"),
-	);
+	const chunks = arrayValue(record && recordValue(record, "groundingChunks", "grounding_chunks"));
 	return chunks.map((chunk, index) => {
 		const chunkRecord = asRecord(chunk);
 		const web = chunkRecord
@@ -124,13 +117,10 @@ function normalizeGroundingChunks(
 			firstDefined(
 				webRecord && recordValue(webRecord, "uri", "url"),
 				chunkRecord && recordValue(chunkRecord, "uri", "url"),
-				chunkRecord &&
-					recordValue(chunkRecord, "retrievedUrl", "retrieved_url"),
+				chunkRecord && recordValue(chunkRecord, "retrievedUrl", "retrieved_url"),
 			),
 		);
-		const matched = url
-			? retrievedUrls.find((candidate) => candidate.url === url)
-			: undefined;
+		const matched = url ? retrievedUrls.find((candidate) => candidate.url === url) : undefined;
 		return {
 			index,
 			url,
@@ -144,8 +134,7 @@ function normalizeGroundingChunks(
 			retrievalStatus:
 				coerceString(
 					firstDefined(
-						chunkRecord &&
-							recordValue(chunkRecord, "retrievalStatus", "retrieval_status"),
+						chunkRecord && recordValue(chunkRecord, "retrievalStatus", "retrieval_status"),
 						matched?.retrievalStatus,
 					),
 				) ?? matched?.retrievalStatus,
@@ -153,26 +142,20 @@ function normalizeGroundingChunks(
 	});
 }
 
-function normalizeGroundingSupports(
-	grounding: unknown,
-): NormalizedGroundingSupport[] {
+function normalizeGroundingSupports(grounding: unknown): NormalizedGroundingSupport[] {
 	const record = asRecord(grounding);
 	const supports = arrayValue(
 		record && recordValue(record, "groundingSupports", "grounding_supports"),
 	);
 	return supports.map((support) => {
 		const supportRecord = asRecord(support);
-		const segment = supportRecord
-			? asRecord(recordValue(supportRecord, "segment"))
-			: undefined;
+		const segment = supportRecord ? asRecord(recordValue(supportRecord, "segment")) : undefined;
 		return {
 			startByte: coerceFiniteNumber(
 				firstDefined(
 					segment && recordValue(segment, "startIndex", "start_index"),
-					supportRecord &&
-						recordValue(supportRecord, "startByte", "start_byte"),
-					supportRecord &&
-						recordValue(supportRecord, "startIndex", "start_index"),
+					supportRecord && recordValue(supportRecord, "startByte", "start_byte"),
+					supportRecord && recordValue(supportRecord, "startIndex", "start_index"),
 				),
 			),
 			endByte: coerceFiniteNumber(
@@ -185,19 +168,13 @@ function normalizeGroundingSupports(
 			text: coerceString(segment && recordValue(segment, "text")),
 			sourceIndexes: numberArray(
 				supportRecord &&
-					recordValue(
-						supportRecord,
-						"groundingChunkIndices",
-						"grounding_chunk_indices",
-					),
+					recordValue(supportRecord, "groundingChunkIndices", "grounding_chunk_indices"),
 			),
 		};
 	});
 }
 
-function normalizeRetrievedUrls(
-	raw: unknown,
-): ResearchProviderSourceMetadata[] {
+function normalizeRetrievedUrls(raw: unknown): ResearchProviderSourceMetadata[] {
 	const record = asRecord(raw);
 	const entries = arrayValue(
 		record &&
@@ -226,11 +203,7 @@ function normalizeRetrievedUrls(
 					entryRecord &&
 						firstDefined(
 							recordValue(entryRecord, "retrievalStatus", "retrieval_status"),
-							recordValue(
-								entryRecord,
-								"urlRetrievalStatus",
-								"url_retrieval_status",
-							),
+							recordValue(entryRecord, "urlRetrievalStatus", "url_retrieval_status"),
 						),
 				),
 			},
@@ -238,27 +211,16 @@ function normalizeRetrievedUrls(
 	});
 }
 
-function stringIndexAtUtf8Byte(
-	text: string,
-	byteOffset: number,
-	mode: "start" | "end",
-): number {
+function stringIndexAtUtf8Byte(text: string, byteOffset: number, mode: "start" | "end"): number {
 	const buffer = Buffer.from(text, "utf8");
 	let offset = Math.max(0, Math.min(buffer.length, Math.trunc(byteOffset)));
-	while (
-		offset > 0 &&
-		offset < buffer.length &&
-		isContinuationByte(buffer[offset])
-	) {
+	while (offset > 0 && offset < buffer.length && isContinuationByte(buffer[offset])) {
 		offset += mode === "end" ? 1 : -1;
 	}
 	return buffer.subarray(0, offset).toString("utf8").length;
 }
 
-function recordValue(
-	record: Record<string, unknown>,
-	...keys: string[]
-): unknown {
+function recordValue(record: Record<string, unknown>, ...keys: string[]): unknown {
 	for (const key of keys) {
 		if (record[key] !== undefined) return record[key];
 	}

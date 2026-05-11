@@ -35,9 +35,7 @@ describe("buildCodeReviewPrompt", () => {
 
 		expect(prompt).toContain("Do not edit files");
 		expect(prompt).toContain("do not assume filesystem access");
-		expect(prompt).toMatch(
-			/## Blockers[\s\S]*## Important[\s\S]*## Optional[\s\S]*## Validation/,
-		);
+		expect(prompt).toMatch(/## Blockers[\s\S]*## Important[\s\S]*## Optional[\s\S]*## Validation/u);
 		expect(prompt).toContain("Focus areas: security, tests.");
 		expect(prompt).toContain("Severity threshold: important.");
 		expect(prompt).toContain("Maximum findings: 3.");
@@ -57,8 +55,7 @@ describe("runCodeReview", () => {
 			"- Run npm test.",
 		].join("\n");
 		const client = new FakeGeminiClient([review]);
-		const updates: Array<{ phase?: string; text: string; request?: unknown }> =
-			[];
+		const updates: Array<{ phase?: string; text: string; request?: unknown }> = [];
 
 		const result = await runCodeReview(
 			{
@@ -84,20 +81,11 @@ describe("runCodeReview", () => {
 
 		expect(result.error).toBeUndefined();
 		expect(result.text).toBe(review);
-		expect(result.sections).toEqual([
-			"Blockers",
-			"Important",
-			"Optional",
-			"Validation",
-		]);
+		expect(result.sections).toEqual(["Blockers", "Important", "Optional", "Validation"]);
 		expect(client.promptText).toContain("@@ -1 +1 @@");
 		expect(client.promptText).toContain("analysis-only code review");
-		const providerPrompt = updates.find(
-			(update) => update.phase === "provider_prompt",
-		);
-		expect(providerPrompt?.text).toContain(
-			'Sending code review prompt: "src/example.ts"',
-		);
+		const providerPrompt = updates.find((update) => update.phase === "provider_prompt");
+		expect(providerPrompt?.text).toContain('Sending code review prompt: "src/example.ts"');
 		expect(providerPrompt?.text).toContain("language TypeScript");
 		expect(providerPrompt?.text).toContain("focus security/tests");
 		expect(providerPrompt?.text).toContain("maxFindings 3");
@@ -149,10 +137,7 @@ describe("runCodeReview", () => {
 
 		expect(result.truncated).toBe(true);
 		expect(result.responseId).toBeTruthy();
-		const stored = await getStoredResult<{ text: string }>(
-			result.responseId ?? "",
-			{ rootDir },
-		);
+		const stored = await getStoredResult<{ text: string }>(result.responseId ?? "", { rootDir });
 		expect(stored.value.text).toBe(fullText);
 	});
 });

@@ -74,9 +74,7 @@ describe("Gemini ACP command resolution", () => {
 			["--acp", "--model", "gemini-3.1-pro-preview"],
 		);
 
-		expect(path.win32.basename(spawnCommand.command).toLowerCase()).toBe(
-			"cmd.exe",
-		);
+		expect(path.win32.basename(spawnCommand.command).toLowerCase()).toBe("cmd.exe");
 		expect(spawnCommand.args).toEqual([
 			"/d",
 			"/s",
@@ -95,8 +93,7 @@ describe("Gemini ACP command resolution", () => {
 			{
 				input: "gemini",
 				found: true,
-				command:
-					"C:\\Users\\Administrator\\scoop\\apps\\nodejs\\current\\bin\\gemini.CMD",
+				command: "C:\\Users\\Administrator\\scoop\\apps\\nodejs\\current\\bin\\gemini.CMD",
 				source: "path",
 				platform: "win32",
 				searched: [],
@@ -125,16 +122,12 @@ describe("Gemini ACP command resolution", () => {
 		});
 
 		expect(resolution.found).toBe(false);
-		expect(geminiAcpCommandNotFoundMessage(resolution)).toContain(
-			"where gemini",
-		);
+		expect(geminiAcpCommandNotFoundMessage(resolution)).toContain("where gemini");
 		expect(geminiAcpCommandNotFoundMessage(resolution)).toContain("gemini.cmd");
 	});
 });
 
-function accessFor(
-	found: readonly string[],
-): CommandAccess & { modes: number[] } {
+function accessFor(found: readonly string[]): CommandAccess & { modes: number[] } {
 	const normalized = new Set(found.map((candidate) => candidate.toLowerCase()));
 	const access = (async (candidate: string, mode: number) => {
 		access.modes.push(mode);
