@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ALLOWLIST="$ROOT/dup-check.toml"
+ALLOWLIST="$ROOT/dup.toml"
 THRESHOLD="0.85"
 MIN_LINES="5"
 
@@ -25,7 +25,7 @@ if [ -z "$func_section" ]; then
 	exit 2
 fi
 
-# Parse dup-check.toml — pairs = [...] and clusters = [...] arrays of quoted strings.
+# Parse dup.toml — pairs = [...] and clusters = [...] arrays of quoted strings.
 # Bash state machine: tracks which array we're inside; extracts each quoted string;
 # requires every entry to carry an inline # comment with reason + date.
 declare -a allowlisted_pairs
@@ -55,11 +55,11 @@ while IFS= read -r line || [ -n "$line" ]; do
 
 	# Entry line must contain a quoted string and an inline # comment
 	if [[ ! "$line" =~ \" ]]; then
-		echo "::error::dup-check.toml: malformed entry (no quoted string): $line" >&2
+		echo "::error::dup.toml: malformed entry (no quoted string): $line" >&2
 		exit 2
 	fi
 	if [[ ! "$line" =~ \# ]]; then
-		echo "::error::dup-check.toml: entry missing inline # comment with reason+date: $line" >&2
+		echo "::error::dup.toml: entry missing inline # comment with reason+date: $line" >&2
 		exit 2
 	fi
 
@@ -220,7 +220,7 @@ done <<<"$pair_list"
 
 if [ "$remaining" -gt 0 ]; then
 	echo ""
-	echo "::error::dup-check found $remaining unallowlisted duplicate(s). Either fix the duplicate, or add an entry to dup-check.toml with a reason." >&2
+	echo "::error::dup-check found $remaining unallowlisted duplicate(s). Either fix the duplicate, or add an entry to dup.toml with a reason." >&2
 	exit 1
 fi
 
