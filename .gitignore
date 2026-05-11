@@ -37,3 +37,6 @@ tmp/
 temp/
 .cache/
 .gitnexus
+
+# Downloaded tooling
+.bin/
