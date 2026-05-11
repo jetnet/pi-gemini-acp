@@ -8,7 +8,7 @@ ALLOWLIST="$ROOT/dup.toml"
 if [ ! -f "$ALLOWLIST" ]; then
 	cat >"$ALLOWLIST" <<'EOF'
 # dup-check.toml — allowlist of known-false-positive duplicates from similarity-ts.
-# Every entry MUST include an inline `# (YYYY-MM-DD) reason` comment.
+# Every entry MUST include an inline `# (YYYY-MM-DD)` comment.
 # Re-evaluate quarterly.
 #
 # Format:
@@ -16,13 +16,11 @@ if [ ! -f "$ALLOWLIST" ]; then
 #   clusters — list of glob patterns; silences a cluster when EVERY symbol matches
 
 pairs = [
-	# Example:
-	# "src/foo.ts:doA||src/bar.ts:doB", # (2026-05-11) shared domain vocabulary
+	# "src/foo.ts:doA||src/bar.ts:doB", # (2026-05-11)
 ]
 
 clusters = [
-	# Example:
-	# "formatSearch*", # (2026-05-11) by-design same-file search-display helpers
+	# "formatSearch*", # (2026-05-11)
 ]
 EOF
 fi
@@ -82,7 +80,7 @@ while IFS= read -r line || [ -n "$line" ]; do
 		exit 2
 	fi
 	if [[ ! "$line" =~ \# ]]; then
-		echo "::error::dup.toml: entry missing inline # comment with reason and date: $line" >&2
+		echo "::error::dup.toml: entry missing inline # (YYYY-MM-DD) comment: $line" >&2
 		exit 2
 	fi
 
@@ -243,7 +241,7 @@ done <<<"$pair_list"
 
 if [ "$remaining" -gt 0 ]; then
 	echo ""
-	echo "::error::dup-check found $remaining unallowlisted duplicate(s). Either fix the duplicate, or add an entry to dup.toml with a reason and date." >&2
+	echo "::error::dup-check found $remaining unallowlisted duplicate(s). Either fix the duplicate, or add an entry to dup.toml with a # (YYYY-MM-DD) comment." >&2
 	exit 1
 fi
 
