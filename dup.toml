@@ -1,5 +1,4 @@
 # dup-check.toml — allowlist of known-false-positive duplicates from similarity-ts.
-# Every entry MUST include an inline `# (YYYY-MM-DD)` comment.
 # Re-evaluate quarterly.
 #
 # Format:
@@ -8,17 +7,17 @@
 
 # Cross-domain coincidence — model completions vs citation normalization
 pairs = [
-  "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeGroundingChunks", # (2026-05-11)
-  "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeRetrievedUrls",   # (2026-05-11)
+  "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeGroundingChunks",
+  "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeRetrievedUrls",
 
   # Same-file citation helpers — different responsibilities within citations.ts
-  "src/research/citations.ts:normalizeGroundingChunks||src/research/citations.ts:normalizeRetrievedUrls",       # (2026-05-11)
+  "src/research/citations.ts:normalizeGroundingChunks||src/research/citations.ts:normalizeRetrievedUrls",
 
   # Different domains — citation marker insertion vs error code formatter
-  "src/research/citations.ts:insertProviderCitationMarkers||src/search/run.ts:structuredErrorCode",              # (2026-05-11)
+  "src/research/citations.ts:insertProviderCitationMarkers||src/search/run.ts:structuredErrorCode",
 ]
 
 # By-design same-file search-display helpers
 clusters = [
-  "formatSearch*", # (2026-05-11)
+  "formatSearch*",
 ]
