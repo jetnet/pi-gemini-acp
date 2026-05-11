@@ -36,12 +36,7 @@ export async function primeSuccessfulGeminiSearchPreflight(
 	commandSettings: GeminiAcpCommandSettings,
 	options: GeminiAcpProviderPreflightOptions,
 ): Promise<StructuredError | undefined> {
-	const key = searchPreflightCacheKey(commandSettings, true);
-	const cached = cachedSearchPreflight(key);
-	if (cached) return cached.result;
-	const result = await preflightGeminiAcpProvider(settings, options);
-	if (!result) setSuccessfulSearchPreflight(key, commandSettings, result);
-	return result;
+	return await preflightSearchProvider(settings, commandSettings, options, true);
 }
 
 /** Runs provider preflight through the success-only search preflight cache. */
