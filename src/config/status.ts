@@ -412,9 +412,9 @@ function sanitizeArgs(args: string[] | undefined): string[] {
 			/^(--?(?:api[-_]?key|token|secret|password|credential|auth))(?:=(.*))?$/iu,
 		);
 		if (!secretFlag) return arg;
-		if (secretFlag[2] === undefined) {
+		if ((secretFlag as (string | undefined)[])[2] === undefined) {
 			redactNext = true;
-			return secretFlag[1] ?? "<redacted>";
+			return (secretFlag as (string | undefined)[])[1] ?? "<redacted>";
 		}
 		return `${secretFlag[1]}=<redacted>`;
 	});

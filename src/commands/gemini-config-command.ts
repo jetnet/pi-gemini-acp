@@ -63,7 +63,7 @@ async function showInteractiveAcpCommandPicker(
 	let localCommand = current.command;
 	let localArgs = [...current.args];
 
-	while (true) {
+	for (;;) {
 		const picked = await ctx.ui.select(
 			"ACP command settings",
 			settingsChoices(localCommand, localArgs),
@@ -89,7 +89,7 @@ async function showInteractiveAcpCommandPicker(
 
 async function editArgs(ctx: InteractiveCommandContext, initialArgs: string[]): Promise<string[]> {
 	const localArgs = [...initialArgs];
-	while (true) {
+	for (;;) {
 		const choices = argsChoices(localArgs);
 		const picked = await ctx.ui.select("Edit Gemini ACP args", choices, {
 			signal: ctx.signal,

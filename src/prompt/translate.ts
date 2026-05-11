@@ -169,7 +169,7 @@ function normalizedGlossaryCount(entries: TranslateGlossaryEntry[] | undefined):
 }
 
 function validateTranslateOptions(options: TranslateOptions): StructuredError | undefined {
-	if (!options.targetLanguage?.trim()) {
+	if (!options.targetLanguage.trim()) {
 		return translateError(
 			"GEMINI_TRANSLATE_TARGET_REQUIRED",
 			"input_validation",
@@ -221,9 +221,9 @@ function parseBatchTranslationOutput(
 		if (!Array.isArray(parsed) || parsed.length !== expectedLength) return undefined;
 		const items = parsed.map((entry, position) => {
 			const record = asRecord(entry);
-			if (!record || record.index !== position) return undefined;
+			if (!record || record.index !== position) return null;
 			const translation = record.translation;
-			if (typeof translation !== "string") return undefined;
+			if (typeof translation !== "string") return null;
 			return {
 				index: position,
 				id: typeof record.id === "string" ? record.id : undefined,
@@ -302,7 +302,7 @@ function emptyTranslateResult(
 	return {
 		provider: "gemini-acp",
 		mode: options.batch ? "batch" : "single",
-		targetLanguage: options.targetLanguage?.trim() ?? "",
+		targetLanguage: options.targetLanguage.trim(),
 		sourceLanguage: normalizedOptional(options.sourceLanguage),
 		tone: normalizedOptional(options.tone),
 		itemCount: options.batch ? options.batch.length : 1,

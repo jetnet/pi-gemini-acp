@@ -71,11 +71,7 @@ export function formatToolDisplay<TProgress, TResult>(
 		});
 	}
 
-	return (
-		result.content[0]?.text ??
-		(spec.includeErrorInFallback ? details.error?.message : undefined) ??
-		spec.toolName
-	);
+	return result.content[0].text;
 }
 
 /** Tool-specific final-result formatters used by shared prompt-style rendering. */

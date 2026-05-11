@@ -77,7 +77,7 @@ async function showGeminiModelPicker(
 		});
 	}
 	const choice = choices[labels.indexOf(picked)];
-	const modelId = choice?.id ?? picked;
+	const modelId = choice.id;
 	return await setGeminiModel({ model: modelId }, deps);
 }
 

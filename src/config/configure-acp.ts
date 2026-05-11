@@ -78,7 +78,7 @@ export async function configureGeminiAcpSettings(
 export function normalizeGeminiAcpSettings(
 	input: ConfigureGeminiAcpInput,
 ): { settings: GeminiAcpProviderSettings } | { error: StructuredError } {
-	const command = (input.command ?? DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.command)?.trim();
+	const command = (input.command ?? DEFAULT_GEMINI_ACP_PROVIDER_SETTINGS.command).trim();
 	if (!command || /\s/u.test(command)) {
 		return {
 			error: providerError(

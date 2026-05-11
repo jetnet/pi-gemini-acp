@@ -48,9 +48,11 @@ export function scheduleEmbeddingQueueDrain(options: DrainEmbeddingOptions = {})
 	scheduled = true;
 	const timer = setTimeout(() => {
 		scheduled = false;
-		void drainEmbeddingQueue(options).catch(() => undefined);
+		void drainEmbeddingQueue(options).catch(() => {
+			// fire-and-forget
+		});
 	}, 0);
-	timer.unref?.();
+	timer.unref();
 }
 
 /** Drains pending embedding jobs with bounded concurrency and retry bookkeeping. */

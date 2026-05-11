@@ -172,7 +172,6 @@ async function recallShortCircuit<TData extends object | null>(
 		const cached = await getStoredResult<CachedShell<TData>>(hit.responseId, {
 			rootDir: options.rootDir,
 		});
-		if (!cached.value.shell) return undefined;
 		options.onCacheHit?.(cached.value.shell);
 		return withCacheStatus(cached.value.shell, {
 			hit: true,

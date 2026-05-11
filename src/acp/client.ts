@@ -195,7 +195,7 @@ export function parseSearchPayload(text: string): unknown {
 }
 
 /** Resolves the neutral cwd used by provider-backed search sessions. */
-export function searchSessionCwd(cwd: string | undefined): string {
+export function searchSessionCwd(cwd?: string): string {
 	// Use a neutral existing directory unless a workflow explicitly needs a project cwd;
 	// this avoids triggering Gemini CLI project-trust/agent discovery for text-only ACP tools.
 	return cwd ?? (homedir() || process.cwd());

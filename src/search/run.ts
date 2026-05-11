@@ -417,7 +417,7 @@ function modelFromArgs(args: readonly string[] | undefined): string | undefined 
 		if ((arg === "--model" || arg === "-m") && args[index + 1]?.trim()) {
 			return args[index + 1].trim();
 		}
-		if (arg?.startsWith("--model=")) {
+		if (arg.startsWith("--model=")) {
 			const value = arg.slice("--model=".length).trim();
 			if (value) return value;
 		}

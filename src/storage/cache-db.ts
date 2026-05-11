@@ -139,14 +139,14 @@ export class ResponseCacheDatabase {
 		const result = tool
 			? this.db.prepare("DELETE FROM response_cache WHERE tool = ?").run(tool)
 			: this.db.prepare("DELETE FROM response_cache").run();
-		return Number(result.changes ?? 0);
+		return Number(result.changes);
 	}
 
 	deleteExpired(now = Date.now()): number {
 		const result = this.db
 			.prepare("DELETE FROM response_cache WHERE expires_at IS NOT NULL AND expires_at < ?")
 			.run(now);
-		return Number(result.changes ?? 0);
+		return Number(result.changes);
 	}
 
 	liveResponseIds(): Set<string> {

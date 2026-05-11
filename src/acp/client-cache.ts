@@ -223,7 +223,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 	async warmSearchSession(signal?: AbortSignal): Promise<void> {
 		await this.enqueue(() =>
 			this.withWarmProcess(signal, async (active) => {
-				await this.ensureIdleSearchSession(active, searchSessionCwd(undefined));
+				await this.ensureIdleSearchSession(active, searchSessionCwd());
 			}),
 		);
 	}
@@ -391,7 +391,9 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 
 	private enqueue<T>(operation: () => Promise<T>): Promise<T> {
 		const run = this.queue.then(operation, operation);
-		this.queue = run.catch(() => undefined);
+		this.queue = run.catch(() => {
+			// fire-and-forget
+		});
 		return run;
 	}
 
@@ -400,7 +402,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		this.idleTimer = setTimeout(() => {
 			void this.close();
 		}, this.idleTtlMs);
-		this.idleTimer.unref?.();
+		this.idleTimer.unref();
 	}
 
 	private removeFromCacheOnce(): void {

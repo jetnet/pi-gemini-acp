@@ -98,9 +98,9 @@ async function showInteractivePermissionsPicker(
 	ctx: InteractiveCommandContext,
 	options: GeminiConfigPermissionsOptions,
 ): Promise<PiToolShell<ResultEnvelope<GeminiConfigPermissionsResult | null>>> {
-	while (true) {
+	for (;;) {
 		const result = await runGeminiConfigPermissions({}, options);
-		const data = (result.details as ResultEnvelope<GeminiConfigPermissionsResult>).data;
+		const data = result.details.data;
 		if (!data) return result;
 
 		const choices = permissionsChoices(data.capabilities);
@@ -111,8 +111,9 @@ async function showInteractivePermissionsPicker(
 			return toolResult({ text: data.summary, data });
 		}
 
-		const setting = data.capabilities[choices.indexOf(picked)];
-		if (!setting) continue;
+		const settingIndex = choices.indexOf(picked);
+		if (settingIndex < 0) continue;
+		const setting = data.capabilities[settingIndex];
 		const enabled = !setting.enabled;
 		const confirmRisk = await confirmPermissionRisk(ctx, setting, enabled);
 		if (confirmRisk === undefined) continue;

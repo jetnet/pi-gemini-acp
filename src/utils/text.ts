@@ -8,5 +8,5 @@ export function truncateToolText(value: string, maxLength: number): string {
 
 /** Pretty-prints a value as indented JSON. */
 export function formatJson(value: unknown): string {
-	return JSON.stringify(value, null, 2) ?? "undefined";
+	return JSON.stringify(value, null, 2);
 }

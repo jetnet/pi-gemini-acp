@@ -25,7 +25,9 @@ export function createGeminiAcpSearchEarlyStop(
 	if (!geminiAcpSearchEarlyStopEnabled(env)) {
 		return {
 			onUpdate,
-			parsedPayload: () => undefined,
+			parsedPayload: () => {
+				// no-op
+			},
 			stopped: () => false,
 		};
 	}

@@ -45,6 +45,7 @@
 		"typescript/no-base-to-string": "error",
 		"typescript/unbound-method": "error",
 		"typescript/no-unnecessary-type-assertion": "error",
+		"typescript/no-unnecessary-condition": "error",
 		"typescript/no-unnecessary-type-parameters": "warn",
 		"typescript/return-await": ["error", "always"],
 		"typescript/strict-void-return": "warn",
@@ -76,7 +77,7 @@
 		"typescript/no-meaningless-void-operator": "off",
 		"unicorn/no-array-sort": "warn",
 		"unicorn/no-array-callback-reference": "warn",
-		"unicorn/no-useless-undefined": "off",
+		"unicorn/no-useless-undefined": "error",
 		"unicorn/no-empty-file": "error",
 		"unicorn/no-negated-condition": "off",
 		"unicorn/no-null": "off",
@@ -189,7 +190,9 @@
 				"max-lines-per-function": "off",
 				"max-lines": "off",
 				"import/max-dependencies": "off",
-				"typescript/strict-void-return": "off"
+				"typescript/strict-void-return": "off",
+				"unicorn/no-useless-undefined": "off",
+				"typescript/no-unnecessary-condition": "off"
 			}
 		},
 		{

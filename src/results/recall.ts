@@ -64,10 +64,12 @@ export const resultsRecallRoute = {
 
 /** Formats a local recall result for assistant-facing tool output. */
 export function formatRecallToolText(result: RecallResult): string {
-	const top = result.hits[0];
+	const hitCount = result.hits.length;
+	const topSimilarity =
+		hitCount > 0 ? `, top similarity ${result.hits[0].similarity.toFixed(2)}` : "";
 	const lines = [
-		`[recall: ${result.hits.length} prior hit(s)${top ? `, top similarity ${top.similarity.toFixed(2)}` : ""}]`,
-		`Gemini recall found ${result.hits.length} prior result(s).`,
+		`[recall: ${hitCount} prior hit(s)${topSimilarity}]`,
+		`Gemini recall found ${hitCount} prior result(s).`,
 		`query: ${result.query}`,
 		`recallProvider: ${result.recallProvider}`,
 		`totalCandidates: ${result.totalCandidates}`,
@@ -93,12 +95,12 @@ export function formatRecallToolText(result: RecallResult): string {
 function formatRecallToolDisplay(result: PiToolShell): string {
 	const details = result.details as Partial<ResultEnvelope<unknown>>;
 	if (isRecallResult(details.data)) {
-		const top = details.data.hits[0];
-		return top
-			? `gemini_recall: ${details.data.hits.length} ${details.data.recallProvider} hit(s), top ${top.similarity.toFixed(2)} (${top.tool}, ${top.responseId})`
+		const hitCount = details.data.hits.length;
+		return hitCount > 0
+			? `gemini_recall: ${hitCount} ${details.data.recallProvider} hit(s), top ${details.data.hits[0].similarity.toFixed(2)} (${details.data.hits[0].tool}, ${details.data.hits[0].responseId})`
 			: `gemini_recall: no prior ${details.data.recallProvider} hits`;
 	}
-	return result.content[0]?.text ?? details.error?.message ?? "gemini_recall";
+	return result.content[0].text;
 }
 
 function isRecallResult(value: unknown): value is RecallResult {

@@ -138,7 +138,9 @@ export async function runImageDescribe(
 			image: validation.image,
 		};
 
-	const cached = await readImageDescribeCache(options, validation.image).catch(() => undefined);
+	const cached = await readImageDescribeCache(options, validation.image).catch(() => {
+		// fire-and-forget
+	});
 	if (cached) return cached;
 
 	const commandSettings = withAllowedImagePath(
@@ -154,7 +156,9 @@ export async function runImageDescribe(
 		sessionFactory: deps.acpSessionFactory ?? AcpProcessSession.start,
 		signal,
 	});
-	await writeImageDescribeCache(options, validation.image, result).catch(() => undefined);
+	await writeImageDescribeCache(options, validation.image, result).catch(() => {
+		// fire-and-forget
+	});
 	return result;
 }
 
@@ -183,7 +187,7 @@ async function executeImageDescribeSession(
 				image: attempt.image,
 			};
 		}
-		const sessionId = await session.newSession(searchSessionCwd(undefined));
+		const sessionId = await session.newSession(searchSessionCwd());
 		const header = `Analyzing image ${attempt.image.relativePath} (${attempt.image.mimeType}) via Gemini ACP.`;
 		await emitGeminiBackendProgress(
 			promptWorkflowProgressEmitter(attempt.onUpdate, "provider_wait"),

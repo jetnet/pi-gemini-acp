@@ -124,6 +124,7 @@ function setTitleInRenderState<TParams>(
 
 function themeFg(theme: unknown, color: string, text: string): string {
 	const maybeTheme = theme as GeminiTheme;
+	// oxlint-disable-next-line typescript/no-unnecessary-condition -- tests pass undefined as theme; optional chain prevents runtime crash
 	return typeof maybeTheme?.fg === "function" ? maybeTheme.fg(color, text) : text;
 }
 
@@ -157,7 +158,7 @@ class GeminiAnimatedTitleComponent implements Component {
 			this.updateText();
 			this.requestRender?.();
 		}, this.intervalMs);
-		this.timer.unref?.();
+		this.timer.unref();
 	}
 
 	stop(): void {

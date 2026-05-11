@@ -21,8 +21,8 @@ export function notifyResult(
 	ctx: InteractiveCommandContext,
 	result: Pick<PiToolShell<ResultEnvelope<unknown>>, "content" | "details">,
 ): void {
-	const text = result.content?.[0]?.text;
+	const text = result.content[0]?.text;
 	if (!text) return;
-	const hasError = Boolean(result.details?.error?.code);
+	const hasError = Boolean(result.details.error?.code);
 	ctx.ui.notify(text, hasError ? "error" : "info");
 }

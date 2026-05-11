@@ -106,9 +106,9 @@ export async function runFileAnalyze(
 	if (signal?.aborted) return abortedInputResult();
 	if (validation.error) return { ...emptyFileAnalyzeResult(), error: validation.error };
 
-	const cached = await readFileAnalyzeCache(options, instructions, validation.files).catch(
-		() => undefined,
-	);
+	const cached = await readFileAnalyzeCache(options, instructions, validation.files).catch(() => {
+		// fire-and-forget
+	});
 	if (cached) return cached;
 
 	// oxlint-disable-next-line typescript/unbound-method -- AcpProcessSession.start is static and does not reference `this`
@@ -119,14 +119,14 @@ export async function runFileAnalyze(
 		instructions,
 		options,
 		sessionFactory,
-		sessionCwd: searchSessionCwd(undefined),
+		sessionCwd: searchSessionCwd(),
 		signal,
 		onUpdate,
 	});
 	if (!firstAttempt.error || !isTrustRequiredError(firstAttempt.error)) {
-		await writeFileAnalyzeCache(options, instructions, validation.files, firstAttempt).catch(
-			() => undefined,
-		);
+		await writeFileAnalyzeCache(options, instructions, validation.files, firstAttempt).catch(() => {
+			// fire-and-forget
+		});
 		return firstAttempt;
 	}
 	const trustedFolderPath = trustedFolderForFiles(validation.files, validation.rootDir);
@@ -147,9 +147,9 @@ export async function runFileAnalyze(
 		signal,
 		onUpdate,
 	});
-	await writeFileAnalyzeCache(options, instructions, validation.files, trustedResult).catch(
-		() => undefined,
-	);
+	await writeFileAnalyzeCache(options, instructions, validation.files, trustedResult).catch(() => {
+		// fire-and-forget
+	});
 	return trustedResult;
 }
 

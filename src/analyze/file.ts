@@ -81,8 +81,8 @@ export const analyzeFileRoute = {
 	},
 };
 
-function fileAnalyzeTrustHandler(ctx: ToolExecutionContext | undefined) {
-	if (!ctx?.hasUI || !ctx.ui) return undefined;
+function fileAnalyzeTrustHandler(ctx?: ToolExecutionContext) {
+	if (!ctx?.hasUI || !ctx.ui) return;
 	return async (folderPath: string, signal?: AbortSignal): Promise<boolean> => {
 		const confirmed = await ctx.ui?.confirm(
 			"Trust folder for Gemini ACP file analysis?",

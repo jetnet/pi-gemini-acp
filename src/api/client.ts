@@ -163,7 +163,7 @@ function extractSearchResults(
 	const fromMetadata: SearchResultItem[] = [];
 	for (let i = 0; i < chunks.length && fromMetadata.length < maxResults; i++) {
 		const web = chunks[i]?.web;
-		if (web?.title && web?.uri) {
+		if (web?.title && web.uri) {
 			fromMetadata.push({
 				title: web.title,
 				url: web.uri,

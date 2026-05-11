@@ -286,7 +286,8 @@ export function permissionOptionId(
 function permissionCapabilityForRequest(
 	params: unknown,
 ): "filesystemRead" | "filesystemWrite" | "terminal" | undefined {
-	const text = JSON.stringify(params)?.toLowerCase() ?? "";
+	// oxlint-disable-next-line typescript/no-unnecessary-condition -- JSON.stringify(undefined) returns undefined at runtime, not a string
+	const text = (JSON.stringify(params) ?? "").toLowerCase();
 	if (/(^|[^a-z])(terminal|shell|command|execute|exec)([^a-z]|$)/u.test(text)) {
 		return "terminal";
 	}

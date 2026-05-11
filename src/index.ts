@@ -30,9 +30,11 @@ export default function registerPiGeminiAcpExtension(
 
 function scheduleCacheRetentionSweep(): void {
 	const timer = setTimeout(() => {
-		void sweepResponseCacheRetention().catch(() => undefined);
+		void sweepResponseCacheRetention().catch(() => {
+			// fire-and-forget
+		});
 	}, 0);
-	timer.unref?.();
+	timer.unref();
 }
 
 function hasCommandRegistrar(

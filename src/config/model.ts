@@ -115,7 +115,7 @@ export async function setGeminiAcpModel(
 	const model = resolveGeminiModelName(options.model);
 	if (!model) {
 		return {
-			status: modelStatus(undefined),
+			status: modelStatus(),
 			error: providerError(
 				"GEMINI_ACP_INVALID_MODEL",
 				"model_validation",
@@ -179,7 +179,7 @@ export async function setGeminiAcpModel(
 	return { settings: saved, status: modelStatus(saved) };
 }
 
-export function modelStatus(settings: GeminiAcpProviderSettings | undefined): GeminiAcpModelStatus {
+export function modelStatus(settings?: GeminiAcpProviderSettings): GeminiAcpModelStatus {
 	const selectedModel = settings?.model;
 	const availability = settings?.modelSelectionAvailable ?? "unknown";
 	const message = selectedModel

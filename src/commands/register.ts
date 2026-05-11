@@ -58,14 +58,14 @@ function emitResult(
 	ctx: PiCommandContext,
 	result: { content?: Array<{ text?: string }>; details?: unknown },
 ): void {
-	const text = result?.content?.[0]?.text;
-	const errorCode = (result?.details as { error?: { code?: string } })?.error?.code;
+	const text = result.content?.[0]?.text;
+	const errorCode = (result.details as { error?: { code?: string } }).error?.code;
 	const type: "info" | "error" = errorCode ? "error" : "info";
 	if (text) emit(ctx, text, type);
 }
 
 function emit(ctx: PiCommandContext, message: string, type: "info" | "warning" | "error"): void {
-	if (ctx?.hasUI && ctx.ui?.notify) {
+	if (ctx.hasUI && ctx.ui?.notify) {
 		ctx.ui.notify(message, type);
 		return;
 	}

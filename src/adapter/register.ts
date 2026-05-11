@@ -17,7 +17,8 @@ export interface ModelAdapterRegistrar {
 export function registerModelAdapter(pi: ModelAdapterRegistrar): void {
 	if (process.env.PI_GEMINI_ACP_OFFER_MODEL_ADAPTER === "0") return;
 	const events = pi.events;
-	if (!events?.on || !events?.emit) return;
+	// oxlint-disable-next-line typescript/no-unnecessary-condition -- events.emit may be missing on test stubs even when events.on exists
+	if (!events?.on || !events.emit) return;
 
 	const entry: RegisteredAdapter = {
 		id: ADAPTER_ID,

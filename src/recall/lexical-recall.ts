@@ -310,11 +310,11 @@ export function sourceTextForLexicalRecall(result: unknown): string | undefined 
 		results?: SearchResultItem[];
 		sourceText?: string;
 	};
-	if (typeof record?.sourceText === "string" && record.sourceText.trim())
+	if (typeof record.sourceText === "string" && record.sourceText.trim())
 		return record.sourceText.trim();
-	const results = Array.isArray(record?.results)
+	const results = Array.isArray(record.results)
 		? record.results
-		: Array.isArray(record?.data?.results)
+		: Array.isArray(record.data?.results)
 			? record.data.results
 			: undefined;
 	return results
