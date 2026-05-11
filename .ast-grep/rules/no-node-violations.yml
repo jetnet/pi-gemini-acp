@@ -1,3 +1,18 @@
+# ============================================================================
+# no-node-violations — Node.js platform-specific safety rules.
+#
+# In scope: rules about Node-specific API misuse where the failure mode is
+# tied to Node's runtime semantics (sync I/O without try/catch, process
+# lifecycle mistakes, stream/event-handler pitfalls, etc.).
+#
+# Out of scope: security (→ no-security-violations.yml), canonical homes
+# (→ no-architecture-violation.yml), style/idiom (→ prefer-idiomatic-ts.yml).
+#
+# To add a new Node rule: append a YAML doc below following the same shape.
+# Each rule keeps its own scope because ast-grep applies `ignores` per YAML
+# document.
+# ============================================================================
+
 id: no-unchecked-sync-fs
 language: TypeScript
 severity: warning

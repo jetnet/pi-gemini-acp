@@ -20,15 +20,6 @@
 # 1. Outdated idioms → modern API
 # ----------------------------------------------------------------------------
 
-id: ts-isnan-check
-language: typescript
-severity: warning
-message: "x !== x to check NaN — use Number.isNaN(x)"
-metadata: { weight: 3, category: slop }
-rule:
-  kind: binary_expression
-  pattern: "$X !== $X"
----
 id: ts-void-zero
 language: typescript
 severity: warning
@@ -201,3 +192,9 @@ rule:
     - has:
         kind: number
         regex: ^[1-9][0-9]*$
+
+# ----------------------------------------------------------------------------
+# Removed (oxlint covers) — paper trail for migrated sub-rules.
+# Verify any future migration with a fixture test before deleting.
+# ----------------------------------------------------------------------------
+# - ts-isnan-check  →  eslint(no-self-compare)  (migrated 2026-05-11, verified by fixture)

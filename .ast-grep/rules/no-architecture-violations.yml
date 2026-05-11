@@ -13,32 +13,6 @@
 # ast-grep applies `ignores` per YAML document, not per the whole file.
 # ============================================================================
 
-id: no-coerce-utils-elsewhere
-language: TypeScript
-severity: error
-message: "Coerce helpers must live in src/utils/coerce.ts"
-note: |
-  Use coerceString / coerceFiniteNumber / coerceEnum from "../utils/coerce.js" (adjust depth).
-  If you need a new coerce* helper, add it to src/utils/coerce.ts and import it here.
-rule:
-  any:
-    - kind: function_declaration
-      has:
-        field: name
-        regex: "^coerce[A-Z]"
-    - kind: variable_declarator
-      has:
-        field: name
-        regex: "^coerce[A-Z]"
-files:
-  - "src/**/*.ts"
-ignores:
-  - "src/utils/coerce.ts"
-  - "**/__tests__/**"
-  - "**/*.test.ts"
-  - "**/*.spec.ts"
-
----
 id: no-define-gemini-tool-elsewhere
 language: TypeScript
 severity: error
@@ -61,7 +35,7 @@ language: TypeScript
 severity: error
 message: "node:sqlite must only be imported in src/storage/cache-db.ts"
 note: |
-  Use openCacheDb() and the cache-db helpers from "../storage/cache-db.js" (adjust depth).
+  Use openCacheDb() and the cache-db helpers from "../storage/cache-db.ts" (adjust depth).
 rule:
   any:
     - pattern: import $$$ from 'node:sqlite'
@@ -79,7 +53,7 @@ language: TypeScript
 severity: error
 message: "URL normalization must live in src/utils/normalize.ts"
 note: |
-  Import normalizeUrl from "../utils/normalize.js" (adjust depth) instead of rolling your own.
+  Import normalizeUrl from "../utils/normalize.ts" (adjust depth) instead of rolling your own.
 rule:
   any:
     - kind: function_declaration
@@ -96,3 +70,29 @@ ignores:
   - "src/utils/normalize.ts"
   - "**/__tests__/**"
   - "**/*.test.ts"
+
+---
+id: no-coerce-utils-elsewhere
+language: TypeScript
+severity: error
+message: "Coerce helpers must live in src/utils/coerce.ts"
+note: |
+  Use coerceString / coerceFiniteNumber / coerceEnum from "../utils/coerce.ts" (adjust depth).
+  If you need a new coerce* helper, add it to src/utils/coerce.ts and import it here.
+rule:
+  any:
+    - kind: function_declaration
+      has:
+        field: name
+        regex: "^coerce[A-Z]"
+    - kind: variable_declarator
+      has:
+        field: name
+        regex: "^coerce[A-Z]"
+files:
+  - "src/**/*.ts"
+ignores:
+  - "src/utils/coerce.ts"
+  - "**/__tests__/**"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"

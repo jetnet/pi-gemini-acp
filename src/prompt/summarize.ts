@@ -1,7 +1,7 @@
 import { storeResult } from "../storage/results.js";
 import type { GeminiAcpConfig, StructuredError } from "../types.js";
-import { directFetcher, type Fetcher } from "../url/fetcher.js";
 import { assertPublicHttpUrl } from "../url/public-http.js";
+import { directFetcher, type Fetcher } from "../utils/fetch.js";
 import { providerError } from "./provider-result.js";
 import { type PromptDeps, type PromptWorkflowUpdate, runPrompt } from "./run.js";
 

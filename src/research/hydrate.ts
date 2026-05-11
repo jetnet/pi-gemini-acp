@@ -1,5 +1,5 @@
 import type { ResearchSource, StructuredError } from "../types.js";
-import { directFetcher, type Fetcher } from "../url/fetcher.js";
+import { directFetcher, type Fetcher } from "../utils/fetch.js";
 
 export interface SourceHydrator {
 	hydrate(source: ResearchSource, signal?: AbortSignal): Promise<ResearchSource>;
