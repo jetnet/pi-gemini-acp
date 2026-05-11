@@ -50,9 +50,9 @@ describe("runTranslate", () => {
 			undefined,
 			(update) => {
 				updates.push({
-					phase: update.type === "progress" ? update.phase : undefined,
+					phase: progressPhase(update),
 					text: update.text,
-					request: update.type === "progress" ? update.request : undefined,
+					request: progressRequest(update),
 				});
 			},
 		);
@@ -163,7 +163,7 @@ describe("runTranslate", () => {
 
 		expect(result.truncated).toBe(true);
 		expect(result.responseId).toBeTruthy();
-		const stored = await getStoredResult<{ text: string }>(result.responseId ?? "", { rootDir });
+		const stored = await getStoredResult<{ text: string }>(result.responseId!, { rootDir });
 		expect(stored.value.text).toBe(fullText);
 	});
 });
@@ -181,4 +181,12 @@ class FakeGeminiClient implements GeminiAcpClient {
 		this.promptText = request.prompt;
 		return this.response;
 	}
+}
+
+function progressPhase(update: { type: string; phase?: string }): string | undefined {
+	return update.type === "progress" ? update.phase : undefined;
+}
+
+function progressRequest(update: { type: string; request?: unknown }): unknown {
+	return update.type === "progress" ? update.request : undefined;
 }

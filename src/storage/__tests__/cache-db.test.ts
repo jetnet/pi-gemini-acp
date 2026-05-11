@@ -6,6 +6,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { openResponseCacheDb } from "../cache-db.ts";
 
+type CacheDb = Awaited<ReturnType<typeof openResponseCacheDb>>;
+
+function queryVectorRows(db: CacheDb, responseId: string): unknown[] {
+	return db.sqliteVecAvailable
+		? db.db.prepare("SELECT response_id FROM embeddings_vec WHERE response_id = ?").all(responseId)
+		: [];
+}
+
 let rootDir: string;
 
 beforeEach(async () => {
@@ -63,23 +71,21 @@ describe("ResponseCacheDatabase", () => {
 				responseId: "response-c",
 				tool: "gemini_extract",
 			});
+			const embedding = Array.from({ length: 768 }, () => 0);
+			embedding[0] = 1;
 			db.putEmbedding({
 				responseId: "response-c",
 				tool: "gemini_extract",
 				recallText: "tool: gemini_extract",
 				model: "fake-embedding",
-				embedding: Array.from({ length: 768 }, (_, index) => (index === 0 ? 1 : 0)),
+				embedding,
 			});
 			expect(db.embeddingSummary("fake-embedding").rowCount).toBe(1);
 
 			db.clear("gemini_extract");
 
 			expect(db.embeddingSummary("fake-embedding").rowCount).toBe(0);
-			const vectorRows = db.sqliteVecAvailable
-				? db.db
-						.prepare("SELECT response_id FROM embeddings_vec WHERE response_id = ?")
-						.all("response-c")
-				: [];
+			const vectorRows = queryVectorRows(db, "response-c");
 			expect(vectorRows).toHaveLength(0);
 		} finally {
 			db.close();

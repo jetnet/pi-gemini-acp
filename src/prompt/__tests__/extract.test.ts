@@ -40,9 +40,9 @@ describe("runExtract", () => {
 			undefined,
 			(update) => {
 				updates.push({
-					phase: update.type === "progress" ? update.phase : undefined,
+					phase: progressPhase(update),
 					text: update.text,
-					request: update.type === "progress" ? update.request : undefined,
+					request: progressRequest(update),
 				});
 			},
 		);
@@ -104,7 +104,7 @@ describe("runExtract", () => {
 		const stored = await getStoredResult<{
 			rawText: string;
 			error: { code: string };
-		}>(result.responseId ?? "", { rootDir });
+		}>(result.responseId!, { rootDir });
 		expect(stored.value.rawText).toBe("not json");
 		expect(stored.value.error.code).toBe("GEMINI_EXTRACT_INVALID_JSON");
 	});
@@ -208,4 +208,12 @@ class FakeGeminiClient implements GeminiAcpClient {
 		this.promptText = request.prompt;
 		return this.response;
 	}
+}
+
+function progressPhase(update: { type: string; phase?: string }): string | undefined {
+	return update.type === "progress" ? update.phase : undefined;
+}
+
+function progressRequest(update: { type: string; request?: unknown }): unknown {
+	return update.type === "progress" ? update.request : undefined;
 }

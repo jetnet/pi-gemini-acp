@@ -41,15 +41,18 @@ describe("Gemini tool registration", () => {
 		const files = (await readdir(TOOLS_DIR, { recursive: true })).filter((file) =>
 			file.endsWith(".ts"),
 		);
-		const publicToolFiles: string[] = [];
+		const sources = new Map<string, string>();
 
 		for (const file of files) {
 			const source = await readFile(new URL(`../${file}`, import.meta.url), "utf8");
-			if (/export const \w+ = defineGeminiTool\(/u.test(source)) {
-				publicToolFiles.push(file);
-			}
+			sources.set(file, source);
 		}
+		const publicToolFiles = files.filter((file) => isPublicToolSource(sources.get(file)));
 
 		expect(publicToolFiles.toSorted()).toEqual(PUBLIC_TOOL_FILES);
 	});
 });
+
+function isPublicToolSource(source: string | undefined): boolean {
+	return source !== undefined && /export const \w+ = defineGeminiTool\(/u.test(source);
+}

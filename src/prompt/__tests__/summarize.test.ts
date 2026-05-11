@@ -67,9 +67,9 @@ describe("runSummarize", () => {
 			async (update) => {
 				updates.push({
 					type: update.type,
-					phase: update.type === "progress" ? update.phase : undefined,
+					phase: progressPhase(update),
 					text: update.text,
-					request: update.type === "progress" ? update.request : undefined,
+					request: progressRequest(update),
 				});
 			},
 		);
@@ -104,7 +104,7 @@ describe("runSummarize", () => {
 		const stored = await getStoredResult<{
 			preparedSource: string;
 			summary: string;
-		}>(result.responseId ?? "", { rootDir });
+		}>(result.responseId!, { rootDir });
 		expect(stored.value.preparedSource).toHaveLength(1000);
 		expect(stored.value.summary).toBe("Short summary");
 	});
@@ -216,4 +216,12 @@ function fetchedSource(url: string, text: string) {
 		contentHash: "test-hash",
 		fetchedAt: new Date(0).toISOString(),
 	};
+}
+
+function progressPhase(update: { type: string; phase?: string }): string | undefined {
+	return update.type === "progress" ? update.phase : undefined;
+}
+
+function progressRequest(update: { type: string; request?: unknown }): unknown {
+	return update.type === "progress" ? update.request : undefined;
 }

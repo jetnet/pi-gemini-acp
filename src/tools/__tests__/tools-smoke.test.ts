@@ -327,9 +327,7 @@ describe("gemini ACP tools smoke", () => {
 			{ expanded: false, isPartial: true },
 		);
 		expect(collapsed?.render(120).join("\n")).toContain("Press Ctrl+O");
-		expect(collapsed?.render(120).join("\n").length).toBeLessThan(
-			expanded?.render(120).join("\n").length ?? 0,
-		);
+		expect(renderLength(collapsed)).toBeLessThan(renderLength(expanded));
 		expect(expanded?.render(120).join("\n")).toContain("targetLanguage: Spanish");
 		expect(progressCollapsed?.render(120).join("\n")).toContain("hola");
 		expect(
@@ -444,4 +442,8 @@ describe("gemini ACP tools smoke", () => {
 function assertShell(result: PiToolShell | undefined): asserts result is PiToolShell {
 	expect(result?.content[0]?.type).toBe("text");
 	expect(result?.details).toBeTruthy();
+}
+
+function renderLength(component: { render(width: number): string[] } | undefined): number {
+	return component?.render(120).join("\n").length ?? 0;
 }

@@ -78,7 +78,7 @@ describe("GeminiAcpClientCache", () => {
 
 			expect(factory.sessions).toHaveLength(1);
 			expect(factory.sessions[0]?.newSessionCalls).toBe(1);
-			expect(factory.sessions[0]?.cwds).toEqual([homedir() || cwdOne]);
+			expect(factory.sessions[0]?.cwds).toEqual([homedir()]);
 		} finally {
 			process.chdir(originalCwd);
 			await cache.close();
@@ -111,7 +111,7 @@ describe("GeminiAcpClientCache", () => {
 		expect(factory.sessions[0]?.initializeCalls).toBe(1);
 		expect(factory.sessions[0]?.newSessionCalls).toBe(1);
 		expect(factory.sessions[0]?.promptCalls).toBe(1);
-		expect(factory.sessions[0]?.cwds).toEqual([homedir() || originalCwd]);
+		expect(factory.sessions[0]?.cwds).toEqual([homedir()]);
 		await cache.close();
 	});
 

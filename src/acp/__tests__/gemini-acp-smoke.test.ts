@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { createGeminiSummarizeAdapter } from "../../adapter/gemini-summarize.ts";
 import { runFileAnalyze } from "../../prompt/file-analyze.ts";
-import { runImageDescribe } from "../../prompt/image-describe.ts";
+import { runImageDescribe, type ImageDescribeResult } from "../../prompt/image-describe.ts";
 import { runSearch } from "../../search/run.ts";
 
 const enabled = process.env.PI_GEMINI_ACP === "1";
@@ -67,9 +67,7 @@ describe.skipIf(!enabled)("opt-in Gemini ACP smoke", () => {
 				config: fileReadConfig(),
 			});
 			expect(result.image?.kind).toBe("path");
-			if (result.error?.code === "GEMINI_ACP_IMAGE_INPUT_UNSUPPORTED") return;
-			expect(result.error).toBeUndefined();
-			expect(result.caption?.length).toBeGreaterThan(0);
+			expectImageDescribeSuccess(result);
 		} finally {
 			await rm(cwd, { recursive: true, force: true });
 		}
@@ -120,4 +118,10 @@ function fileReadConfig() {
 			},
 		},
 	};
+}
+
+function expectImageDescribeSuccess(result: ImageDescribeResult) {
+	if (result.error?.code === "GEMINI_ACP_IMAGE_INPUT_UNSUPPORTED") return;
+	expect(result.error).toBeUndefined();
+	expect(result.caption?.length).toBeGreaterThan(0);
 }

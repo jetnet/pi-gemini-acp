@@ -96,13 +96,8 @@ describe("runPrompt", () => {
 	it("allows the factory seam to reuse a prompt client across calls", async () => {
 		const clients = new Map<string, FakeGeminiClient>();
 		const factory = (settings: GeminiAcpCommandSettings): GeminiAcpClient => {
-			const key = `${settings.command} ${(settings.args ?? []).join(" ")}`;
-			let client = clients.get(key);
-			if (!client) {
-				client = new FakeGeminiClient(["warm"]);
-				clients.set(key, client);
-			}
-			return client;
+			const key = cacheKey(settings);
+			return getOrCreateClient(clients, key, () => new FakeGeminiClient(["warm"]));
 		};
 
 		await runPrompt(
@@ -137,7 +132,7 @@ describe("runPrompt", () => {
 				updates.push({
 					type: update.type,
 					text: update.text,
-					request: update.type === "progress" ? update.request : undefined,
+					request: progressRequest(update),
 				});
 			},
 		);
@@ -192,7 +187,7 @@ describe("runPrompt", () => {
 			provider: string;
 			prompt: string;
 			text: string;
-		}>(result.responseId ?? "", { rootDir });
+		}>(result.responseId!, { rootDir });
 		expect(stored.value.text).toBe(fullText);
 	});
 
@@ -303,4 +298,21 @@ class AbortAwareGeminiClient extends FakeGeminiClient {
 		}
 		return "not aborted";
 	}
+}
+
+function cacheKey(settings: GeminiAcpCommandSettings): string {
+	return `${settings.command} ${(settings.args ?? []).join(" ")}`;
+}
+
+function getOrCreateClient<K, V>(map: Map<K, V>, key: K, factory: () => V): V {
+	let client = map.get(key);
+	if (!client) {
+		client = factory();
+		map.set(key, client);
+	}
+	return client;
+}
+
+function progressRequest(update: { type: string; request?: unknown }): unknown {
+	return update.type === "progress" ? update.request : undefined;
 }

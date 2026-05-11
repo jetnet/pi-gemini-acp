@@ -139,6 +139,7 @@ describe("runFileAnalyze", () => {
 		await writeFile(path.join(rootDir, "notes.txt"), "alpha beta", "utf8");
 		const sessionCwds: string[] = [];
 		let trustedFolder: string | undefined;
+		const throwState = { thrown: false };
 
 		const result = await runFileAnalyze(
 			{
@@ -165,12 +166,7 @@ describe("runFileAnalyze", () => {
 						sessionCwds.push(cwd);
 						return `session-${sessionCwds.length}`;
 					},
-					prompt: async () => {
-						if (sessionCwds.length === 1) {
-							throw new Error("FatalUntrustedWorkspaceError: not trusted");
-						}
-						return "Trusted retry worked.";
-					},
+					prompt: createPromptThatThrowsOnce(throwState),
 					close: async () => undefined,
 				}),
 			},
@@ -288,6 +284,16 @@ describe("runFileAnalyze", () => {
 		expect(result.error?.code).toBe("GEMINI_FILE_ANALYZE_SECRET_PATH_REJECTED");
 	});
 });
+
+function createPromptThatThrowsOnce(shared: { thrown: boolean }): () => Promise<string> {
+	return async () => {
+		if (!shared.thrown) {
+			shared.thrown = true;
+			throw new Error("FatalUntrustedWorkspaceError: not trusted");
+		}
+		return "Trusted retry worked.";
+	};
+}
 
 function fileReadConfig(): GeminiAcpConfig {
 	return {

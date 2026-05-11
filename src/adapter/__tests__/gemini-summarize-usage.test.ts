@@ -38,13 +38,12 @@ describe("adapter usage", () => {
 		const result = await adapter.run<{ summary: string }>(request);
 		const usage = result.usage;
 		expect(usage).toBeDefined();
-		if (!usage) throw new Error("usage expected");
-		expect(usage.provider).toBe("gemini-acp");
-		expect(usage.model).toBe("gemini-1.5-flash");
-		expect(usage.inputTokens).toBeGreaterThan(0);
-		expect(usage.outputTokens).toBeGreaterThan(0);
-		expect(usage.totalTokens).toBeGreaterThan(0);
-		expect(usage.costUSD).toBeGreaterThan(0);
+		expect(usage!.provider).toBe("gemini-acp");
+		expect(usage!.model).toBe("gemini-1.5-flash");
+		expect(usage!.inputTokens).toBeGreaterThan(0);
+		expect(usage!.outputTokens).toBeGreaterThan(0);
+		expect(usage!.totalTokens).toBeGreaterThan(0);
+		expect(usage!.costUSD).toBeGreaterThan(0);
 	});
 
 	it("token counts match estimateCost output", async () => {
@@ -74,11 +73,10 @@ describe("adapter usage", () => {
 		});
 		const usage = result.usage;
 		expect(usage).toBeDefined();
-		if (!usage) throw new Error("usage expected");
-		expect(usage.inputTokens).toBe(expected.inputTokens);
-		expect(usage.outputTokens).toBe(expected.outputTokens);
-		expect(usage.totalTokens).toBe(expected.totalTokens);
-		expect(usage.costUSD).toBe(expected.costUsd);
+		expect(usage!.inputTokens).toBe(expected.inputTokens);
+		expect(usage!.outputTokens).toBe(expected.outputTokens);
+		expect(usage!.totalTokens).toBe(expected.totalTokens);
+		expect(usage!.costUSD).toBe(expected.costUsd);
 	});
 
 	it("falls back to default model when result.model is undefined", async () => {
@@ -91,8 +89,7 @@ describe("adapter usage", () => {
 		const result = await adapter.run<{ summary: string }>(request);
 		const usage = result.usage;
 		expect(usage).toBeDefined();
-		if (!usage) throw new Error("usage expected");
-		expect(usage.model).toBe("gemini-1.5-flash");
+		expect(usage!.model).toBe("gemini-1.5-flash");
 	});
 
 	it("picks up model passed through result.model", async () => {
@@ -120,16 +117,15 @@ describe("adapter usage", () => {
 		const result = await adapter.run<{ summary: string }>(request);
 		const usage = result.usage;
 		expect(usage).toBeDefined();
-		if (!usage) throw new Error("usage expected");
-		expect(usage.model).toBe("gemini-1.5-pro");
+		expect(usage!.model).toBe("gemini-1.5-pro");
 		const expectedFlash = estimateCost("Some input.", "A short summary.", {
 			model: "gemini-1.5-flash",
 		});
 		const expectedPro = estimateCost("Some input.", "A short summary.", {
 			model: "gemini-1.5-pro",
 		});
-		expect(usage.costUSD).toBe(expectedPro.costUsd);
-		expect(usage.costUSD).toBeGreaterThan(expectedFlash.costUsd);
+		expect(usage!.costUSD).toBe(expectedPro.costUsd);
+		expect(usage!.costUSD).toBeGreaterThan(expectedFlash.costUsd);
 	});
 
 	it("still throws on result.error and does not return usage", async () => {

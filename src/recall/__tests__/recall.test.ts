@@ -1,3 +1,4 @@
+import assert from "node:assert";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -40,7 +41,7 @@ describe("runRecall", () => {
 		});
 
 		expect(result).not.toHaveProperty("error");
-		if ("error" in result) return;
+		assert.ok(!("error" in result));
 		expect(result.recallProvider).toBe("fts5");
 		expect(result.hits[0]).toMatchObject({
 			responseId: "response-fireworks",
@@ -66,7 +67,7 @@ describe("runRecall", () => {
 		});
 
 		expect(result).not.toHaveProperty("error");
-		if ("error" in result) return;
+		assert.ok(!("error" in result));
 		expect(result.hits[0]).toMatchObject({
 			responseId: "response-summary",
 			tool: "gemini_ask",
@@ -77,7 +78,7 @@ describe("runRecall", () => {
 		const result = await runRecall({ rootDir, query: "dogs" });
 
 		expect(result).not.toHaveProperty("error");
-		if ("error" in result) return;
+		assert.ok(!("error" in result));
 		expect(result).toMatchObject({
 			query: "dogs",
 			hits: [],

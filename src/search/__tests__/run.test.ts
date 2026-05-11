@@ -1,3 +1,4 @@
+import assert from "node:assert";
 /** @file Tests for local and Gemini ACP search orchestration. */
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -66,7 +67,7 @@ describe("runSearch", () => {
 		});
 
 		expect(recall).not.toHaveProperty("error");
-		if ("error" in recall) return;
+		assert.ok(!("error" in recall));
 		expect(recall.hits[0]).toMatchObject({
 			responseId: result.responseId,
 			tool: "gemini_search",

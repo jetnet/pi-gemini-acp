@@ -7,6 +7,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { modelStatus, setGeminiAcpModel } from "../model.ts";
 import { loadConfig, saveGeminiAcpSettings } from "../settings.ts";
 
+function buildPath(binDir: string, originalPath: string | undefined): string {
+	return `${binDir}${path.delimiter}${originalPath ?? ""}`;
+}
+
 let rootDir: string;
 let originalPath: string | undefined;
 
@@ -48,7 +52,7 @@ describe("Gemini ACP model configuration", () => {
 			const geminiPath = path.join(binDir, "gemini");
 			await writeFile(geminiPath, "#!/bin/sh\necho 'Usage: gemini --acp --model <model>'\n");
 			await chmod(geminiPath, 0o755);
-			process.env.PATH = `${binDir}${path.delimiter}${originalPath ?? ""}`;
+			process.env.PATH = buildPath(binDir, originalPath);
 			await saveGeminiAcpSettings(
 				{ enabled: true, command: "gemini", args: ["--acp"] },
 				{ rootDir },
