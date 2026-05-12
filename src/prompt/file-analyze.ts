@@ -200,6 +200,7 @@ async function executeFileAnalyzePrompt(
 			config: attempt.options.config,
 			rootDir: attempt.options.rootDir,
 			requireSearchGrounding: false,
+			allowApiKeyFallback: false,
 			requestSummary: {
 				toolName: "gemini_file_analyze",
 				action: "Sending file analysis prompt",

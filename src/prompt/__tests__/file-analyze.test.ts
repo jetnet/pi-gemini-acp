@@ -283,6 +283,32 @@ describe("runFileAnalyze", () => {
 
 		expect(result.error?.code).toBe("GEMINI_FILE_ANALYZE_SECRET_PATH_REJECTED");
 	});
+
+	it("surfaces preflight error instead of API-key fallback for file analysis", async () => {
+		await writeFile(path.join(rootDir, "notes.txt"), "alpha beta", "utf8");
+
+		const result = await runFileAnalyze(
+			{
+				paths: ["notes.txt"],
+				instructions: "Summarize this file.",
+				cwd: rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							apiKey: "test-key-fake",
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => false,
+			},
+		);
+
+		expect(result.error?.code).toBe("GEMINI_ACP_COMMAND_NOT_FOUND");
+		expect(result.text).toBe("");
+	});
 });
 
 function createPromptThatThrowsOnce(shared: { thrown: boolean }): () => Promise<string> {

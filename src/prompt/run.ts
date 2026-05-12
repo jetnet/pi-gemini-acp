@@ -51,6 +51,12 @@ export interface PromptOptions {
 	inlineLimit?: number;
 	useDefaultConfig?: boolean;
 	requestSummary?: PromptRequestSummary;
+	/**
+	 * When false, ACP-unavailable and quota-exhausted preflights return the structured error instead
+	 * of falling back to GeminiApiKeyClient. File and image analysis MUST set this to false because
+	 * the REST API client silently drops resource_link parts.
+	 */
+	allowApiKeyFallback?: boolean;
 }
 
 /** Injectable dependencies for prompt tests and future shared status wiring. */
@@ -105,6 +111,12 @@ export interface ProviderPromptContext {
 export interface ProviderPromptOptions extends PromptOptions {
 	parts?: GeminiAcpPromptPart[];
 	requireSearchGrounding?: boolean;
+	/**
+	 * When false, ACP-unavailable and quota-exhausted preflights return the structured error instead
+	 * of falling back to GeminiApiKeyClient. File and image analysis MUST set this to false because
+	 * the REST API client silently drops resource_link parts.
+	 */
+	allowApiKeyFallback?: boolean;
 	commandSettingsTransform?: (settings: GeminiAcpCommandSettings) => GeminiAcpCommandSettings;
 	prePromptCheck?: (context: Omit<ProviderPromptContext, "request">) => StructuredError | undefined;
 	errorClassification?: ProviderErrorClassificationOptions;
@@ -145,10 +157,16 @@ export async function runProviderPrompt(
 		options.commandSettingsTransform?.(baseCommandSettings) ?? baseCommandSettings;
 	const model = geminiAcpModelLabel(settings, commandSettings);
 	const quotaExhausted = isQuotaExhausted(model);
-	if (preflight && isAcpFallbackError(preflight) && geminiApiKeyConfigured(config)) {
+	const fallbackAllowed = options.allowApiKeyFallback !== false;
+	if (
+		fallbackAllowed &&
+		preflight &&
+		isAcpFallbackError(preflight) &&
+		geminiApiKeyConfigured(config)
+	) {
 		return await runApiKeyPrompt(options, deps, config, model, signal, onUpdate);
 	}
-	if (quotaExhausted && geminiApiKeyConfigured(config)) {
+	if (fallbackAllowed && quotaExhausted && geminiApiKeyConfigured(config)) {
 		return await runApiKeyPrompt(options, deps, config, model, signal, onUpdate);
 	}
 	if (preflight) return { text: "", error: preflight };
@@ -183,7 +201,7 @@ export async function runProviderPrompt(
 	} catch (cause) {
 		if (isQuotaExhaustedError(cause)) {
 			recordQuotaExhausted(model, cause instanceof Error ? cause.message : String(cause));
-			if (geminiApiKeyConfigured(config)) {
+			if (fallbackAllowed && geminiApiKeyConfigured(config)) {
 				return await runApiKeyPrompt(options, deps, config, model, signal, onUpdate);
 			}
 		}

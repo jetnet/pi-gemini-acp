@@ -300,6 +300,40 @@ describe("runPrompt", () => {
 		// Already narrowed to the { prompt } arm by the assertion above.
 		expect((req as { prompt: string }).prompt).toBe("Hello");
 	});
+
+	it("respects allowApiKeyFallback: false and returns preflight error", async () => {
+		const apiKeyClient: GeminiAcpClient = {
+			async search() {
+				return [];
+			},
+			async prompt() {
+				throw new Error("must not be called");
+			},
+		};
+
+		const result = await runPrompt(
+			{
+				prompt: "Hello",
+				rootDir,
+				allowApiKeyFallback: false,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							apiKey: "test-key-fake",
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => false,
+				geminiApiKeyClientFactory: () => apiKeyClient,
+			},
+		);
+
+		expect(result.error).toBeDefined();
+		expect(result.error?.code).toBe("GEMINI_ACP_COMMAND_NOT_FOUND");
+	});
 });
 
 class FakeGeminiClient implements GeminiAcpClient {

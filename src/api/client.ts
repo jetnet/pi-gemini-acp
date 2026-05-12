@@ -88,7 +88,15 @@ export class GeminiApiKeyClient implements GeminiAcpClient {
 		signal?: AbortSignal,
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
-		const textParts = requestToParts(request)
+		const parts = requestToParts(request);
+		const hasNonText = parts.some((p) => p.type !== "text");
+		if (hasNonText) {
+			throw new Error(
+				"GEMINI_API_KEY_UNSUPPORTED_TRANSPORT: REST API key client does not support resource_link parts. " +
+					"Configure local ACP for file/image analysis.",
+			);
+		}
+		const textParts = parts
 			.filter((p): p is { type: "text"; text: string } => p.type === "text")
 			.map((p) => ({ text: p.text }));
 
