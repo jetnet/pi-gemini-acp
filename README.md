@@ -2,7 +2,7 @@
 
 Gemini ACP chat, prompt, search, and research provider for Pi.
 
-`pi-gemini-acp` adds a compact Gemini ACP tool surface for status, supplied-text tasks, search, research, local file/image analysis, stored results, and recall while preserving local/no-key search over supplied documents. Gemini ACP also registers as a selectable Pi chat model, so you can pick it from the Pi model picker and chat directly through your authenticated local Gemini CLI.
+`pi-gemini-acp` adds a compact Gemini ACP tool surface — status, supplied-text tasks, search, research, file/image analysis, stored results, recall — and registers Gemini ACP as a selectable Pi chat model. Local/no-key search over supplied documents still works without Gemini.
 
 ## Install
 
