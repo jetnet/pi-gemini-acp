@@ -16,13 +16,17 @@ describe("DirectFetcher", () => {
 			status: 302,
 			ok: false,
 			headers: {
+				// oxlint-disable-next-line vitest/no-conditional-in-test -- mock Headers.get is case-insensitive
 				get: (k: string) => (k.toLowerCase() === "location" ? "https://example.com/page2" : null),
 			},
 		});
 		mockFetch.mockResolvedValueOnce({
 			status: 200,
 			ok: true,
-			headers: { get: (k: string) => (k.toLowerCase() === "content-type" ? "text/html" : null) },
+			headers: {
+				// oxlint-disable-next-line vitest/no-conditional-in-test -- mock Headers.get is case-insensitive
+				get: (k: string) => (k.toLowerCase() === "content-type" ? "text/html" : null),
+			},
 			text: async () => "final content",
 		});
 
@@ -40,6 +44,7 @@ describe("DirectFetcher", () => {
 			status: 302,
 			ok: false,
 			headers: {
+				// oxlint-disable-next-line vitest/no-conditional-in-test -- mock Headers.get is case-insensitive
 				get: (k: string) => (k.toLowerCase() === "location" ? "http://127.0.0.1:11434/api" : null),
 			},
 		});
@@ -58,6 +63,7 @@ describe("DirectFetcher", () => {
 			status: 302,
 			ok: false,
 			headers: {
+				// oxlint-disable-next-line vitest/no-conditional-in-test -- mock Headers.get is case-insensitive
 				get: (k: string) => (k.toLowerCase() === "location" ? "http://localhost:3000/data" : null),
 			},
 		});
@@ -78,6 +84,7 @@ describe("DirectFetcher", () => {
 				ok: false,
 				headers: {
 					get: (k: string) =>
+						// oxlint-disable-next-line vitest/no-conditional-in-test -- mock Headers.get is case-insensitive
 						k.toLowerCase() === "location" ? `https://example.com/page${i + 2}` : null,
 				},
 			});
@@ -126,6 +133,7 @@ describe("DirectFetcher", () => {
 		const stream = new ReadableStream({
 			start(controller) {
 				function push() {
+					// oxlint-disable-next-line vitest/no-conditional-in-test -- ReadableStream controller termination
 					if (enqueueCount >= chunks.length) {
 						controller.close();
 						return;

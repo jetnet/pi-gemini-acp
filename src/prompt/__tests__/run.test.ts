@@ -297,7 +297,8 @@ describe("runPrompt", () => {
 		const req = captured[0];
 		// Must be the { prompt } arm of the discriminated union, never { prompt, parts: undefined }
 		expect("parts" in req).toBe(false);
-		expect("prompt" in req && req.prompt).toBe("Hello");
+		// Already narrowed to the { prompt } arm by the assertion above.
+		expect((req as { prompt: string }).prompt).toBe("Hello");
 	});
 });
 
