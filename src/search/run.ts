@@ -410,6 +410,11 @@ function geminiAcpModelLabel(
 	return settings?.model?.trim() ?? modelFromArgs(commandSettings.args) ?? "Gemini ACP default";
 }
 
+/** Resolves a display model label into a valid API model ID for REST fallback. */
+function apiModelFromLabel(label: string): string {
+	return label === "Gemini ACP default" ? "gemini-1.5-flash" : label;
+}
+
 function modelFromArgs(args: readonly string[] | undefined): string | undefined {
 	if (!args) return undefined;
 	for (let index = 0; index < args.length; index += 1) {
@@ -444,9 +449,14 @@ async function runApiKeySearch(
 		model,
 		maxResults,
 	});
-	const client = deps.geminiApiKeyClientFactory?.() ?? new GeminiApiKeyClient({ config, model });
+	const apiModel = apiModelFromLabel(model);
+	const client =
+		deps.geminiApiKeyClientFactory?.() ?? new GeminiApiKeyClient({ config, model: apiModel });
 	try {
-		const results = await client.search({ query: options.query, maxResults, model }, signal);
+		const results = await client.search(
+			{ query: options.query, maxResults, model: apiModel },
+			signal,
+		);
 		if (results.length === 0) {
 			return {
 				provider: "gemini-acp",

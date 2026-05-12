@@ -264,12 +264,13 @@ async function runApiKeyPrompt(
 		text: `${header}\n\n● ${fallbackNote}`,
 		request: requestSummary,
 	});
-	const client = deps.geminiApiKeyClientFactory?.() ?? new GeminiApiKeyClient({ config, model });
-	const request: GeminiAcpPromptRequest = {
-		prompt: options.prompt,
-		cwd: options.cwd,
-		parts: options.parts,
-	};
+	const client =
+		deps.geminiApiKeyClientFactory?.() ??
+		new GeminiApiKeyClient({ config, model: apiModelFromLabel(model) });
+	const request: GeminiAcpPromptRequest =
+		options.parts && options.parts.length > 0
+			? { parts: options.parts, cwd: options.cwd }
+			: { prompt: options.prompt, cwd: options.cwd };
 	try {
 		const text = await client.prompt(request, signal, async (chunk) => {
 			await onUpdate?.(chunk);
@@ -360,6 +361,11 @@ function geminiAcpModelLabel(
 	commandSettings: GeminiAcpCommandSettings,
 ): string {
 	return settings?.model?.trim() ?? modelFromArgs(commandSettings.args) ?? "Gemini ACP default";
+}
+
+/** Resolves a display model label into a valid API model ID for REST fallback. */
+function apiModelFromLabel(label: string): string {
+	return label === "Gemini ACP default" ? "gemini-1.5-flash" : label;
 }
 
 function modelFromArgs(args: readonly string[] | undefined): string | undefined {
