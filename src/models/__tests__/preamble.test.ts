@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+/* oxlint-disable no-deprecated -- tests intentionally exercise the deprecated unmemoized buildPiPreamble */
 import { buildPiPreamble, type PiToolsSource } from "../preamble.ts";
 
 let cwd: string;

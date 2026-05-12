@@ -6,14 +6,14 @@
 #   clusters — list of glob patterns; silences a cluster when EVERY symbol matches
 
 pairs = [
-  "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeGroundingChunks", # (2026-05-12 bk) Cross-domain coincidence
-  "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeRetrievedUrls", # (2026-05-12 bk) Cross-domain coincidence
-  "src/research/citations.ts:normalizeGroundingChunks||src/research/citations.ts:normalizeRetrievedUrls", # (2026-05-12 bk) Same-file, different responsibilities
-  "src/research/citations.ts:insertProviderCitationMarkers||src/search/run.ts:structuredErrorCode", # (2026-05-12 bk) Different domains
-  "src/tools/gemini-search.ts:formatSearchModelPayload||src/tools/gemini-search.ts:formatSearchProgressExpanded", # (2026-05-12 bk) Same-file display helpers
+  "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeGroundingChunks",      # (2026-05-12 bk) Cross-domain coincidence
+  "src/commands/gemini-model.ts:getGeminiModelCompletions||src/research/citations.ts:normalizeRetrievedUrls",        # (2026-05-12 bk) Cross-domain coincidence
+  "src/research/citations.ts:normalizeGroundingChunks||src/research/citations.ts:normalizeRetrievedUrls",            # (2026-05-12 bk) Same-file, different responsibilities
+  "src/research/citations.ts:insertProviderCitationMarkers||src/search/run.ts:structuredErrorCode",                  # (2026-05-12 bk) Different domains
+  "src/tools/gemini-search.ts:formatSearchModelPayload||src/tools/gemini-search.ts:formatSearchProgressExpanded",    # (2026-05-12 bk) Same-file display helpers
   "src/tools/gemini-search.ts:formatSearchExpandedDisplay||src/tools/gemini-search.ts:formatSearchProgressExpanded", # (2026-05-12 bk) Same-file display helpers
-  "src/tools/gemini-search.ts:formatSearchExpandedDisplay||src/tools/gemini-search.ts:formatSearchModelPayload", # (2026-05-12 bk) Same-file display helpers
-  "src/models/preamble.ts:createPreambleBuilder||src/prompt/image-describe-input.ts:unsafePathReason", # (2026-05-12 bk) Different domains
+  "src/tools/gemini-search.ts:formatSearchExpandedDisplay||src/tools/gemini-search.ts:formatSearchModelPayload",     # (2026-05-12 bk) Same-file display helpers
+  "src/models/preamble.ts:createPreambleBuilder||src/prompt/image-describe-input.ts:unsafePathReason",               # (2026-05-12 bk) Different domains
 ]
 
 clusters = [
