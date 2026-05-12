@@ -22,6 +22,11 @@ export interface Fetcher {
 	fetch(url: string, opts?: FetchOptions): Promise<FetchedSource>;
 }
 
+/**
+ * Maximum number of redirects to follow. After this many 3xx responses, the next response MUST be
+ * non-3xx or the fetch errors. Example: with MAX_REDIRECT_HOPS = 5, a chain of URL1 → URL2 → URL3 →
+ * URL4 → URL5 → URL6 (200) succeeds and returns URL6's body.
+ */
 const MAX_REDIRECT_HOPS = 5;
 
 /**
@@ -38,7 +43,7 @@ export class DirectFetcher implements Fetcher {
 		let currentUrl = assertPublicHttpUrl(url).toString();
 		let hops = 0;
 
-		while (hops < MAX_REDIRECT_HOPS) {
+		while (hops <= MAX_REDIRECT_HOPS) {
 			const response = await fetch(currentUrl, {
 				signal: opts.signal,
 				redirect: "manual",

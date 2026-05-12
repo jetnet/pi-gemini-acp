@@ -78,7 +78,8 @@ describe("DirectFetcher", () => {
 		const mockFetch = vi.fn();
 		vi.stubGlobal("fetch", mockFetch);
 
-		for (let i = 0; i < 6; i += 1) {
+		// 7 redirects: enough to exceed the cap of 5 (followed) + 1 (final attempt).
+		for (let i = 0; i < 7; i += 1) {
 			mockFetch.mockResolvedValueOnce({
 				status: 302,
 				ok: false,
@@ -93,7 +94,65 @@ describe("DirectFetcher", () => {
 		await expect(new DirectFetcher().fetch("https://example.com/page1")).rejects.toThrow(
 			"redirect exceeded 5 hops",
 		);
-		expect(mockFetch).toHaveBeenCalledTimes(5);
+		// 5 redirects followed + 1 attempt that turned out to also be a redirect = 6 fetches before throw.
+		expect(mockFetch).toHaveBeenCalledTimes(6);
+	});
+
+	it("successfully follows exactly MAX_REDIRECT_HOPS (5) redirects to a final 200", async () => {
+		const mockFetch = vi.fn();
+		vi.stubGlobal("fetch", mockFetch);
+
+		// 5 redirects, then a 200 on the 6th request.
+		for (let i = 0; i < 5; i += 1) {
+			mockFetch.mockResolvedValueOnce({
+				status: 302,
+				ok: false,
+				headers: {
+					get: (k: string) =>
+						// oxlint-disable-next-line vitest/no-conditional-in-test -- mock Headers.get is case-insensitive
+						k.toLowerCase() === "location" ? `https://example.com/page${i + 2}` : null,
+				},
+			});
+		}
+		mockFetch.mockResolvedValueOnce({
+			status: 200,
+			ok: true,
+			headers: { get: () => null },
+			text: async () => "final content",
+		});
+
+		const result = await new DirectFetcher().fetch("https://example.com/page1");
+		expect(result.text).toBe("final content");
+		expect(result.url).toBe("https://example.com/page6");
+		expect(mockFetch).toHaveBeenCalledTimes(6);
+	});
+
+	it("throws on MAX_REDIRECT_HOPS + 1 (6) redirects even with a final 200 behind them", async () => {
+		const mockFetch = vi.fn();
+		vi.stubGlobal("fetch", mockFetch);
+
+		for (let i = 0; i < 6; i += 1) {
+			mockFetch.mockResolvedValueOnce({
+				status: 302,
+				ok: false,
+				headers: {
+					get: (k: string) =>
+						// oxlint-disable-next-line vitest/no-conditional-in-test -- mock Headers.get is case-insensitive
+						k.toLowerCase() === "location" ? `https://example.com/page${i + 2}` : null,
+				},
+			});
+		}
+		// This final 200 should never be reached.
+		mockFetch.mockResolvedValueOnce({
+			status: 200,
+			ok: true,
+			headers: { get: () => null },
+			text: async () => "should not be returned",
+		});
+
+		await expect(new DirectFetcher().fetch("https://example.com/page1")).rejects.toThrow(
+			"redirect exceeded 5 hops",
+		);
 	});
 
 	it("respects maxBytes and stops reading early", async () => {
@@ -163,6 +222,47 @@ describe("DirectFetcher", () => {
 			maxBytes: 14,
 		});
 		expect(result.text).toBe("Hello world th");
+	});
+
+	it("blocks a redirect to a cloud metadata endpoint (169.254.169.254)", async () => {
+		const mockFetch = vi.fn();
+		vi.stubGlobal("fetch", mockFetch);
+
+		mockFetch.mockResolvedValueOnce({
+			status: 302,
+			ok: false,
+			headers: {
+				/* oxlint-disable vitest/no-conditional-in-test -- mock Headers.get is case-insensitive */
+				get: (k: string) =>
+					k.toLowerCase() === "location" ? "http://169.254.169.254/latest/meta-data/" : null,
+				/* oxlint-enable vitest/no-conditional-in-test */
+			},
+		});
+
+		await expect(new DirectFetcher().fetch("https://example.com/page1")).rejects.toThrow(
+			"Link-local IPv4",
+		);
+		expect(mockFetch).toHaveBeenCalledTimes(1);
+	});
+
+	it("blocks a redirect to IPv4-mapped IPv6 loopback", async () => {
+		const mockFetch = vi.fn();
+		vi.stubGlobal("fetch", mockFetch);
+
+		mockFetch.mockResolvedValueOnce({
+			status: 302,
+			ok: false,
+			headers: {
+				/* oxlint-disable vitest/no-conditional-in-test -- mock Headers.get is case-insensitive */
+				get: (k: string) =>
+					k.toLowerCase() === "location" ? "http://[::ffff:127.0.0.1]/admin" : null,
+				/* oxlint-enable vitest/no-conditional-in-test */
+			},
+		});
+
+		await expect(new DirectFetcher().fetch("https://example.com/page1")).rejects.toThrow(
+			/IPv4-mapped|Private IPv4/u,
+		);
 	});
 
 	it("cancels the body stream after maxBytes is reached, not just releases the lock", async () => {
