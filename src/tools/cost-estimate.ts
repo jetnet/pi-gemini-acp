@@ -58,13 +58,14 @@ function modelPrices(model?: string): {
 }
 
 /** Estimates cost for a Gemini-backed tool call. */
-export function estimateCost(
-	inputText: string,
-	outputText: string,
+/** Estimates cost from character counts instead of strings (avoids join allocation). */
+export function estimateCostChars(
+	inputChars: number,
+	outputChars: number,
 	options: { model?: string; searchCount?: number } = {},
 ): CostEstimate {
-	const inputTokens = estimateTokens(inputText);
-	const outputTokens = estimateTokens(outputText);
+	const inputTokens = Math.max(1, Math.ceil(inputChars / CHARS_PER_TOKEN));
+	const outputTokens = Math.max(1, Math.ceil(outputChars / CHARS_PER_TOKEN));
 	const { inputPer1M, outputPer1M } = modelPrices(options.model);
 	const inputCostUsd = (inputTokens * inputPer1M) / 1_000_000;
 	const outputCostUsd = (outputTokens * outputPer1M) / 1_000_000;
@@ -78,6 +79,15 @@ export function estimateCost(
 		outputCostUsd,
 		searchCostUsd,
 	};
+}
+
+/** Estimates cost for a Gemini-backed tool call. */
+export function estimateCost(
+	inputText: string,
+	outputText: string,
+	options: { model?: string; searchCount?: number } = {},
+): CostEstimate {
+	return estimateCostChars(inputText.length, outputText.length, options);
 }
 
 /** Formats a concise cost string for tool titles. */

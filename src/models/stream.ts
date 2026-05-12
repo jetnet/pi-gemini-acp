@@ -17,9 +17,9 @@ import type {
 	GeminiAcpPromptPart,
 	GeminiAcpPromptUpdateHandler,
 } from "../acp/client.ts";
-import { estimateCost } from "../tools/cost-estimate.ts";
+import { estimateCostChars } from "../tools/cost-estimate.ts";
 import type { GeminiAcpChatSettings } from "../types.ts";
-import { buildPiPreamble, type PiToolsSource } from "./preamble.ts";
+import { createPreambleBuilder, type PiToolsSource } from "./preamble.ts";
 import type { GeminiAcpStreamSimple } from "./types.ts";
 
 // Pi's Api type is KnownApi | (string & {}); it accepts any string routing key.
@@ -91,13 +91,13 @@ function createPartialMessage(model: Model<Api>): AssistantMessage {
 	};
 }
 
-/** Estimates Usage from input/output text and model id. */
+/** Estimates Usage from character counts and model id (avoids string allocation). */
 function estimateUsage(
-	inputText: string,
-	outputText: string,
+	inputChars: number,
+	outputChars: number,
 	modelId: string,
 ): AssistantMessage["usage"] {
-	const est = estimateCost(inputText, outputText, { model: modelId });
+	const est = estimateCostChars(inputChars, outputChars, { model: modelId });
 	return {
 		input: est.inputTokens,
 		output: est.outputTokens,
@@ -128,6 +128,13 @@ export function createGeminiAcpStreamSimple(
 	pi: PiToolsSource,
 	chatConfig: GeminiAcpChatSettings,
 ): GeminiAcpStreamSimple {
+	const buildPreamble = createPreambleBuilder({
+		appendSystemPrompt: chatConfig.appendSystemPrompt !== false,
+		appendAgents: chatConfig.appendAgents !== false,
+		appendTools: chatConfig.appendTools !== false,
+		pi,
+	});
+
 	return (model, context, options) => {
 		const stream = createAssistantMessageEventStream();
 		const partial = createPartialMessage(model);
@@ -136,28 +143,29 @@ export function createGeminiAcpStreamSimple(
 
 		void (async () => {
 			try {
-				const preamble = await buildPiPreamble({
+				const preamble = await buildPreamble({
 					modelId: model.id,
 					cwd: resolveCwd(options),
-					appendSystemPrompt: chatConfig.appendSystemPrompt !== false,
-					appendAgents: chatConfig.appendAgents !== false,
-					appendTools: chatConfig.appendTools !== false,
-					pi,
 					upstreamSystemPrompt: context.systemPrompt,
 				});
 
 				const request = buildAcpPromptRequest(context, preamble);
-				const inputText = request.parts.map((p) => (p.type === "text" ? p.text : "")).join("\n");
+				const inputChars = request.parts.reduce(
+					(sum, p) => sum + (p.type === "text" ? p.text.length : 0),
+					0,
+				);
+				const textBlock: TextContent = { type: "text", text: "" };
 
 				const onUpdate: GeminiAcpPromptUpdateHandler = (chunk) => {
 					accumulatedOutput = chunk.accumulatedText;
+					textBlock.text = accumulatedOutput;
 					stream.push({
 						type: "text_delta",
 						contentIndex: 0,
 						delta: chunk.text,
 						partial: {
 							...partial,
-							content: [{ type: "text", text: accumulatedOutput }],
+							content: [textBlock],
 						},
 					});
 				};
@@ -167,7 +175,7 @@ export function createGeminiAcpStreamSimple(
 				const final: AssistantMessage = {
 					...partial,
 					content: [{ type: "text", text: result }],
-					usage: estimateUsage(inputText, result, model.id),
+					usage: estimateUsage(inputChars, result.length, model.id),
 					stopReason: "stop",
 					timestamp: Date.now(),
 				};

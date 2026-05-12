@@ -24,37 +24,78 @@ const AGENTS_FILE = "AGENTS.md";
 
 /** Builds a Pi-aware preamble string for injection ahead of the user history. */
 export async function buildPiPreamble(opts: PreambleOptions): Promise<string> {
-	const { appendSystemPrompt, appendAgents, appendTools, upstreamSystemPrompt } = opts;
-	const lines: string[] = [];
+	const builder = createPreambleBuilder({
+		appendSystemPrompt: opts.appendSystemPrompt,
+		appendAgents: opts.appendAgents,
+		appendTools: opts.appendTools,
+		pi: opts.pi,
+	});
+	return await builder({
+		modelId: opts.modelId,
+		cwd: opts.cwd,
+		upstreamSystemPrompt: opts.upstreamSystemPrompt,
+	});
+}
 
-	if (appendSystemPrompt) {
-		lines.push(
-			"You are running inside Pi, an AI coding agent CLI.",
-			`Model: ${opts.modelId}`,
-			`Working directory: ${opts.cwd}`,
-			"",
-		);
-	}
+/** Static portion of preamble options (expensive parts that rarely change per session). */
+interface PreambleBuilderStatic {
+	appendSystemPrompt: boolean;
+	appendAgents: boolean;
+	appendTools: boolean;
+	pi: PiToolsSource;
+}
 
-	if (upstreamSystemPrompt) {
-		lines.push(upstreamSystemPrompt, "");
-	}
+/** Per-turn portion of preamble options (cheap parts that may change each turn). */
+interface PreambleBuilderTurn {
+	modelId: string;
+	cwd: string;
+	upstreamSystemPrompt?: string;
+}
 
-	if (appendAgents) {
-		const agentsContent = await readAgentsMd(opts.cwd);
-		if (agentsContent) {
-			lines.push("## Project context (AGENTS.md)", "", agentsContent, "");
+/**
+ * Creates a memoized preamble builder. AGENTS.md content is cached by cwd after first read. Tools
+ * list is pre-formatted once at creation time (tools rarely change mid-session).
+ */
+export function createPreambleBuilder(
+	staticOpts: PreambleBuilderStatic,
+): (turn: PreambleBuilderTurn) => Promise<string> {
+	const { appendSystemPrompt, appendAgents, appendTools, pi } = staticOpts;
+	const toolsList = appendTools ? formatToolsList(pi) : undefined;
+	const agentsCache = new Map<string, string | undefined>();
+
+	return async (turn) => {
+		const lines: string[] = [];
+
+		if (appendSystemPrompt) {
+			lines.push(
+				"You are running inside Pi, an AI coding agent CLI.",
+				`Model: ${turn.modelId}`,
+				`Working directory: ${turn.cwd}`,
+				"",
+			);
 		}
-	}
 
-	if (appendTools) {
-		const toolsList = formatToolsList(opts.pi);
+		if (turn.upstreamSystemPrompt) {
+			lines.push(turn.upstreamSystemPrompt, "");
+		}
+
+		if (appendAgents) {
+			let agentsContent = agentsCache.get(turn.cwd);
+			if (agentsContent === undefined && !agentsCache.has(turn.cwd)) {
+				agentsContent = await readAgentsMd(turn.cwd);
+				agentsCache.set(turn.cwd, agentsContent);
+			}
+			if (agentsContent) {
+				lines.push("## Project context (AGENTS.md)", "", agentsContent, "");
+			}
+		}
+
 		if (toolsList) {
 			lines.push("## Available tools", "", toolsList, "");
 		}
-	}
 
-	return lines.join("\n").trim();
+		return lines.join("\n").trim();
+	};
 }
 
 /** Reads AGENTS.md from cwd, capped at ~32 KB. */

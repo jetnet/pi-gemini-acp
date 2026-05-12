@@ -20,6 +20,9 @@ pairs = [
   "src/tools/gemini-search.ts:formatSearchModelPayload||src/tools/gemini-search.ts:formatSearchProgressExpanded",
   "src/tools/gemini-search.ts:formatSearchExpandedDisplay||src/tools/gemini-search.ts:formatSearchProgressExpanded",
   "src/tools/gemini-search.ts:formatSearchExpandedDisplay||src/tools/gemini-search.ts:formatSearchModelPayload",
+
+  # Different domains — preamble cache builder vs path-safety validator
+  "src/models/preamble.ts:createPreambleBuilder||src/prompt/image-describe-input.ts:unsafePathReason",
 ]
 
 # By-design same-file search-display helpers
