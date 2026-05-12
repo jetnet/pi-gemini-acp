@@ -30,7 +30,7 @@ export default function registerPiGeminiAcpExtension(
 	if (hasModelProviderRegistrar(pi)) {
 		void registerGeminiAcpModelProvider(pi).catch((reason) => {
 			// best-effort provider registration — log failure so it's visible in Pi output
-			// eslint-disable-next-line no-console
+			// oxlint-disable-next-line no-console -- registration failure must surface to the user
 			console.error("[pi-gemini-acp] Model provider registration failed:", reason);
 		});
 	}
