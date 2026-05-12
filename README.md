@@ -147,6 +147,30 @@ Aliases include `pro`, `flash`, `flash-lite`, `lite`, and compatible versioned a
 
 **Pi chat model picker:** Gemini ACP appears as a selectable Pi model when the extension registers it via `pi.registerProvider()`. This requires the ACP command to be configured and available. When absent or unauthenticated, the provider is not shown.
 
+### Chat preamble injection
+
+When Gemini ACP is selected as the active Pi model, every prompt is prefixed with a Pi-aware preamble so Gemini knows it's running inside Pi, which model is active, the working directory, the project's `AGENTS.md`, and available skills. Three opt-out flags control this:
+
+```json
+{
+  "providers": {
+    "gemini-acp": {
+      "chat": {
+        "appendSystemPrompt": true,
+        "appendAgents": true,
+        "appendSkills": true
+      }
+    }
+  }
+}
+```
+
+- `appendSystemPrompt` (default `true`) — includes the Pi identity header (`You are running inside Pi...`) and the upstream system prompt.
+- `appendAgents` (default `true`) — includes the `AGENTS.md` from the working directory (capped at ~32 KB).
+- `appendSkills` (default `true`) — lists active Pi skills/tools.
+
+Set any flag to `false` in `~/.pi/gemini-acp/config/settings.json` to suppress that section.
+
 ## Model adapter for pi-scraper
 
 Install both `pi-gemini-acp` and [`pi-scraper`](https://github.com/brandonkramer/pi-scraper) and pi-scraper's `web_summarize` will route through Gemini automatically — no config. Without pi-scraper, this section doesn't apply.

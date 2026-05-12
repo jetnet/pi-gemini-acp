@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 import type { GeminiAcpClient } from "../../acp/client.ts";
 import { createGeminiAcpStreamSimple } from "../stream.ts";
 
+const fakePi = {};
+const fakeChatConfig = {};
+
 function fakeModel(id = "gemini-2.5-flash"): Model<"gemini-acp"> {
 	return {
 		id,
@@ -37,7 +40,11 @@ describe("createGeminiAcpStreamSimple", () => {
 			search: vi.fn(),
 		} as unknown as GeminiAcpClient;
 
-		const stream = createGeminiAcpStreamSimple(client)(fakeModel(), fakeContext());
+		const stream = createGeminiAcpStreamSimple(
+			client,
+			fakePi,
+			fakeChatConfig,
+		)(fakeModel(), fakeContext());
 		const events: unknown[] = [];
 		for await (const ev of stream) {
 			events.push(ev);
@@ -63,7 +70,11 @@ describe("createGeminiAcpStreamSimple", () => {
 			search: vi.fn(),
 		} as unknown as GeminiAcpClient;
 
-		const stream = createGeminiAcpStreamSimple(client)(fakeModel(), fakeContext());
+		const stream = createGeminiAcpStreamSimple(
+			client,
+			fakePi,
+			fakeChatConfig,
+		)(fakeModel(), fakeContext());
 		const events: unknown[] = [];
 		for await (const ev of stream) {
 			events.push(ev);
@@ -80,19 +91,24 @@ describe("createGeminiAcpStreamSimple", () => {
 	it("respects AbortSignal and emits aborted error", async () => {
 		const client = {
 			prompt: vi.fn(async (_req, signal) => {
-				return await new Promise((resolve, reject) => {
+				return await new Promise((_resolve, reject) => {
 					signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
-					setTimeout(() => resolve("late"), 10_000);
 				});
 			}),
 			search: vi.fn(),
 		} as unknown as GeminiAcpClient;
 
 		const controller = new AbortController();
-		const stream = createGeminiAcpStreamSimple(client)(fakeModel(), fakeContext(), {
-			signal: controller.signal,
-		});
+		const stream = createGeminiAcpStreamSimple(client, fakePi, fakeChatConfig)(
+			fakeModel(),
+			fakeContext(),
+			{
+				signal: controller.signal,
+			},
+		);
 
+		// Let the stream worker start and reach client.prompt before aborting
+		await new Promise((resolve) => setTimeout(resolve, 50));
 		controller.abort();
 
 		const events: unknown[] = [];
@@ -100,8 +116,9 @@ describe("createGeminiAcpStreamSimple", () => {
 			events.push(ev);
 		}
 
-		expect(events).toHaveLength(2);
-		expect((events[1] as { error: { stopReason: string } }).error.stopReason).toBe("aborted");
+		expect(events.length).toBeGreaterThanOrEqual(1);
+		expect((events.at(-1) as { type: string }).type).toBe("error");
+		expect((events.at(-1) as { error: { stopReason: string } }).error.stopReason).toBe("aborted");
 	});
 
 	it("flattens multi-turn context into a single ACP prompt", async () => {
@@ -136,7 +153,11 @@ describe("createGeminiAcpStreamSimple", () => {
 			] as unknown as Context["messages"],
 		});
 
-		const stream = createGeminiAcpStreamSimple(client)(fakeModel(), context);
+		const stream = createGeminiAcpStreamSimple(
+			client,
+			fakePi,
+			fakeChatConfig,
+		)(fakeModel(), context);
 		const events: unknown[] = [];
 		for await (const ev of stream) {
 			events.push(ev);

@@ -18,6 +18,8 @@ import type {
 	GeminiAcpPromptUpdateHandler,
 } from "../acp/client.ts";
 import { estimateCost } from "../tools/cost-estimate.ts";
+import type { GeminiAcpChatSettings } from "../types.ts";
+import { buildPiPreamble, type PiSkillsSource } from "./preamble.ts";
 import type { GeminiAcpStreamSimple } from "./types.ts";
 
 // Pi's Api type is KnownApi | (string & {}); it accepts any string routing key.
@@ -25,9 +27,14 @@ import type { GeminiAcpStreamSimple } from "./types.ts";
 const GEMINI_ACP_API: Api = "gemini-acp";
 
 /** Builds a single ACP prompt request from Pi's multi-turn Context. */
-function buildAcpPromptRequest(context: Context): { parts: GeminiAcpPromptPart[] } {
+function buildAcpPromptRequest(
+	context: Context,
+	preamble?: string,
+): { parts: GeminiAcpPromptPart[] } {
 	const parts: GeminiAcpPromptPart[] = [];
-	if (context.systemPrompt) {
+	if (preamble) {
+		parts.push({ type: "text", text: preamble });
+	} else if (context.systemPrompt) {
 		parts.push({ type: "text", text: context.systemPrompt });
 	}
 	for (const msg of context.messages) {
@@ -107,8 +114,19 @@ function estimateUsage(
 	};
 }
 
+/** Extracts cwd from Pi's runtime options. */
+function resolveCwd(options: unknown): string {
+	if (typeof options !== "object" || options === null) return process.cwd();
+	const cwd = (options as Record<string, unknown>).cwd;
+	return typeof cwd === "string" ? cwd : process.cwd();
+}
+
 /** Factory that returns a Pi-compatible streamSimple function backed by our ACP client. */
-export function createGeminiAcpStreamSimple(client: GeminiAcpClient): GeminiAcpStreamSimple {
+export function createGeminiAcpStreamSimple(
+	client: GeminiAcpClient,
+	pi: PiSkillsSource,
+	chatConfig: GeminiAcpChatSettings,
+): GeminiAcpStreamSimple {
 	return (model, context, options) => {
 		const stream = createAssistantMessageEventStream();
 		const partial = createPartialMessage(model);
@@ -118,7 +136,17 @@ export function createGeminiAcpStreamSimple(client: GeminiAcpClient): GeminiAcpS
 			try {
 				stream.push({ type: "start", partial });
 
-				const request = buildAcpPromptRequest(context);
+				const preamble = await buildPiPreamble({
+					modelId: model.id,
+					cwd: resolveCwd(options),
+					appendSystemPrompt: chatConfig.appendSystemPrompt !== false,
+					appendAgents: chatConfig.appendAgents !== false,
+					appendSkills: chatConfig.appendSkills !== false,
+					pi,
+					upstreamSystemPrompt: context.systemPrompt,
+				});
+
+				const request = buildAcpPromptRequest(context, preamble);
 				const inputText = request.parts.map((p) => (p.type === "text" ? p.text : "")).join("\n");
 
 				const onUpdate: GeminiAcpPromptUpdateHandler = (chunk) => {

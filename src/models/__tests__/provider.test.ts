@@ -11,7 +11,7 @@ describe("registerGeminiAcpModelProvider", () => {
 
 	it("does not register when buildGeminiAcpProviderConfig returns undefined", async () => {
 		const pi = { registerProvider: vi.fn() };
-		withEnv("PI_GEMINI_ACP_COMMAND", "__nonexistent_gemini_command__", async () => {
+		await withEnv("PI_GEMINI_ACP_COMMAND", "__nonexistent_gemini_command__", async () => {
 			await registerGeminiAcpModelProvider(pi, undefined);
 			expect(pi.registerProvider).not.toHaveBeenCalled();
 		});

@@ -138,6 +138,15 @@ export interface GeminiAcpProviderSettings {
 	permissionPolicy?: GeminiAcpPermissionPolicy;
 	/** Optional Gemini API key for REST API fallback when ACP is unavailable. */
 	apiKey?: string;
+	/** Chat preamble injection settings. */
+	chat?: GeminiAcpChatSettings;
+}
+
+/** Chat preamble injection settings for Gemini ACP model provider. */
+export interface GeminiAcpChatSettings {
+	appendSystemPrompt?: boolean;
+	appendAgents?: boolean;
+	appendSkills?: boolean;
 }
 
 /** Top-level persisted and environment-derived Gemini ACP configuration. */
