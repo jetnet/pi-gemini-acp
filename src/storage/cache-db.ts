@@ -307,6 +307,13 @@ export class ResponseCacheDatabase {
 			next_attempt_at INTEGER,
 			dead_at INTEGER
 		)`);
+		// Older builds of this extension created an embeddings_vec virtual table backed by the
+		// sqlite-vec extension plus an AFTER DELETE trigger on `embeddings` that referenced it.
+		// We no longer load sqlite-vec at runtime, so any statement that requires SQLite to resolve
+		// that trigger (including INSERT OR REPLACE on response_cache, via the embeddings FK
+		// cascade) fails with "no such module: vec0". Drop the trigger on every open so legacy
+		// caches recover; new caches never created it.
+		this.db.exec("DROP TRIGGER IF EXISTS trg_embeddings_delete_vec");
 		this.db.exec("PRAGMA user_version = 2");
 	}
 }

@@ -118,10 +118,10 @@ export async function withToolResponseCache<TData extends object | null>(
 		} catch {
 			/* FTS recall indexing is best-effort; exact cache and live results still work. */
 		}
-	} catch {
+	} catch (cause) {
 		return withCacheStatus(fresh, {
 			hit: false,
-			warning: "Response cache write failed; live result returned.",
+			warning: `Response cache write failed; live result returned (${cacheWarning(cause)}).`,
 		});
 	}
 	return lookupWarning ? withCacheStatus(fresh, { hit: false, warning: lookupWarning }) : fresh;
