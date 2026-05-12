@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 /* oxlint-disable no-deprecated -- tests intentionally exercise the deprecated unmemoized buildPiPreamble */
-import { buildPiPreamble, type PiToolsSource } from "../preamble.ts";
+import { buildPiPreamble, createPreambleBuilder, type PiToolsSource } from "../preamble.ts";
 
 let cwd: string;
 
@@ -125,5 +125,50 @@ describe("buildPiPreamble", () => {
 	it("appendTools with no skills — section absent", async () => {
 		const result = await buildPiPreamble(opts({ appendSystemPrompt: false, appendAgents: false }));
 		expect(result).not.toContain("Available tools");
+	});
+});
+
+describe("createPreambleBuilder", () => {
+	it("does not call Pi action APIs during builder creation (lazy toolsList)", () => {
+		const pi: PiToolsSource = {
+			getActiveTools: () => {
+				throw new Error(
+					"Extension runtime not initialized. Action methods cannot be called during extension loading.",
+				);
+			},
+		};
+		// Builder creation must not throw — tools enumeration is deferred to first turn.
+		expect(() =>
+			createPreambleBuilder({
+				appendSystemPrompt: false,
+				appendAgents: false,
+				appendTools: true,
+				pi,
+			}),
+		).not.toThrow();
+	});
+
+	it("enumerates tools on first turn and caches them thereafter", async () => {
+		let callCount = 0;
+		const pi: PiToolsSource = {
+			getActiveTools: () => {
+				callCount += 1;
+				return ["read", "write"];
+			},
+		};
+		const builder = createPreambleBuilder({
+			appendSystemPrompt: false,
+			appendAgents: false,
+			appendTools: true,
+			pi,
+		});
+		const first = await builder({ modelId: "m", cwd });
+		expect(first).toContain("- read");
+		expect(callCount).toBe(1);
+
+		const second = await builder({ modelId: "m", cwd });
+		expect(second).toContain("- write");
+		// Cached: toolsList was resolved on first turn, not re-enumerated.
+		expect(callCount).toBe(1);
 	});
 });

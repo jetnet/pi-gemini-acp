@@ -59,7 +59,8 @@ interface PreambleBuilderTurn {
 
 /**
  * Creates a memoized preamble builder. AGENTS.md content is cached by cwd after first read. Tools
- * list is pre-formatted once at creation time (tools rarely change mid-session).
+ * list is formatted lazily on the first turn (not during builder creation), because Pi action APIs
+ * such as getActiveTools throw when called during the extension-loading phase.
  */
 export function createPreambleBuilder(
 	staticOpts: PreambleBuilderStatic,
@@ -67,7 +68,8 @@ export function createPreambleBuilder(
 	const { appendSystemPrompt, appendAgents, appendTools, pi } = staticOpts;
 	// Known assumption: tools don't change mid-session. Dynamic tool registration would
 	// require cache invalidation or periodic refresh.
-	const toolsList = appendTools ? formatToolsList(pi) : undefined;
+	let toolsList: string | undefined;
+	let toolsListResolved = false;
 	const agentsCache = new Map<string, string | undefined>();
 
 	return async (turn) => {
@@ -100,8 +102,14 @@ export function createPreambleBuilder(
 			}
 		}
 
-		if (toolsList) {
-			lines.push("## Available tools", "", toolsList, "");
+		if (appendTools) {
+			if (!toolsListResolved) {
+				toolsList = formatToolsList(pi);
+				toolsListResolved = true;
+			}
+			if (toolsList) {
+				lines.push("## Available tools", "", toolsList, "");
+			}
 		}
 
 		return lines.join("\n").trim();
