@@ -137,7 +137,7 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
-	it("uses a fresh caller-cwd ACP session for each prompt while keeping the process warm", async () => {
+	it("reuses the caller-cwd ACP session across prompts while keeping the process warm", async () => {
 		const cwdRoot = await mkdtemp(path.join(tmpdir(), "pi-gemini-prompt-cwd-"));
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
@@ -150,14 +150,30 @@ describe("GeminiAcpClientCache", () => {
 
 			expect(factory.sessions).toHaveLength(1);
 			expect(factory.sessions[0]?.initializeCalls).toBe(1);
-			expect(factory.sessions[0]?.newSessionCalls).toBe(2);
+			expect(factory.sessions[0]?.newSessionCalls).toBe(1);
 			expect(factory.sessions[0]?.promptCalls).toBe(2);
-			expect(factory.sessions[0]?.cwds).toEqual([callerCwd, callerCwd]);
+			expect(factory.sessions[0]?.cwds).toEqual([callerCwd]);
 		} finally {
 			process.chdir(originalCwd);
 			await cache.close();
 			await rm(cwdRoot, { recursive: true, force: true });
 		}
+	});
+
+	it("evicts the cached prompt session after a prompt error", async () => {
+		const factory = new FakeSessionFactory({ failPromptAfterCount: 1 });
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const client = cache.get(settings("gemini"), "prompt");
+		await client.prompt({ prompt: "ok" });
+		await expect(client.prompt({ prompt: "fail" })).rejects.toThrow("planned failure");
+		// After eviction the next prompt creates a new session (in a fresh process because
+		// withWarmProcess closes the active process on error).
+		await client.prompt({ prompt: "recover" });
+		expect(factory.sessions).toHaveLength(2);
+		expect(factory.sessions[0]?.newSessionCalls).toBe(1);
+		expect(factory.sessions[1]?.newSessionCalls).toBe(1);
+		expect(factory.sessions[0]?.promptCalls + factory.sessions[1]?.promptCalls).toBe(3);
+		await cache.close();
 	});
 
 	it("passes prompt AbortSignal into fresh cached prompt sessions", async () => {
@@ -361,17 +377,21 @@ function settings(
 
 class FakeSessionFactory {
 	readonly sessions: FakeSession[] = [];
+	private promptSuccessesRemaining: number;
 	private promptFailuresRemaining: number;
 	private waitForClosePromptsRemaining: number;
 
 	constructor(
 		private readonly options: {
 			failFirstPrompt?: boolean;
+			failPromptAfterCount?: number;
 			delayedPrompt?: boolean;
 			waitForClosePrompt?: boolean;
 		} = {},
 	) {
-		this.promptFailuresRemaining = options.failFirstPrompt ? 1 : 0;
+		this.promptSuccessesRemaining = options.failPromptAfterCount ?? 0;
+		this.promptFailuresRemaining =
+			options.failPromptAfterCount !== undefined ? 1 : options.failFirstPrompt ? 1 : 0;
 		this.waitForClosePromptsRemaining = options.waitForClosePrompt ? 1 : 0;
 	}
 
@@ -382,6 +402,10 @@ class FakeSessionFactory {
 	};
 
 	shouldFailPrompt(): boolean {
+		if (this.promptSuccessesRemaining > 0) {
+			this.promptSuccessesRemaining -= 1;
+			return false;
+		}
 		if (this.promptFailuresRemaining <= 0) return false;
 		this.promptFailuresRemaining -= 1;
 		return true;

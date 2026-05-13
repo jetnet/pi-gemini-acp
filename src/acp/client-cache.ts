@@ -37,6 +37,7 @@ export type GeminiAcpClientCachePurpose = "search" | "prompt";
 interface ActiveProcess {
 	session: GeminiAcpProcessSession;
 	searchSessions: Map<string, SearchSessionEntry[]>;
+	promptSessions: Map<string, Promise<string>>;
 }
 
 interface SearchSessionEntry {
@@ -338,9 +339,24 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		onUpdate?: GeminiAcpPromptUpdateHandler,
 	): Promise<string> {
 		return await this.withWarmProcess(signal, async (active) => {
-			const sessionId = await active.session.newSession(cwd);
-			return await active.session.prompt(sessionId, parts, onUpdate, { signal });
+			const sessionId = await this.ensurePromptSession(active, cwd);
+			try {
+				return await active.session.prompt(sessionId, parts, onUpdate, { signal });
+			} catch (error) {
+				// Session may have expired or become invalid; evict so the next turn creates a fresh one.
+				active.promptSessions.delete(cwd);
+				throw error;
+			}
 		});
+	}
+
+	private async ensurePromptSession(active: ActiveProcess, cwd: string): Promise<string> {
+		let sessionId = active.promptSessions.get(cwd);
+		if (!sessionId) {
+			sessionId = active.session.newSession(cwd);
+			active.promptSessions.set(cwd, sessionId);
+		}
+		return await sessionId;
 	}
 
 	private async withWarmProcess<T>(
@@ -388,7 +404,7 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		const session = await this.sessionFactory(this.settings, signal);
 		try {
 			await session.initialize();
-			return { session, searchSessions: new Map() };
+			return { session, searchSessions: new Map(), promptSessions: new Map() };
 		} catch (error) {
 			await session.close();
 			throw error;
