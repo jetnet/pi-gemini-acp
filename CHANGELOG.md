@@ -6,6 +6,37 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-05-13
+
+### Added
+
+- Chat-mode benchmark with TTFT and tokens/sec measurements (`e1c41a6`).
+- `maxHistoryMessages` setting to cap conversation history per turn for lower latency.
+- Chat prompt session prewarm: hidden warmup at Pi registration reduces first-prompt TTFT by ~64% (`66cf973`).
+
+### Changed
+
+- Reuse ACP sessions across chat turns in `CachedGeminiAcpClient`; TTFT improves ~3× on reused sessions and compounds with conversation length (`bfec85f`).
+- Bump API-key fallback default model to `gemini-3-flash-preview` (`ffe6dfa`).
+- Refactor URL helpers into dedicated `src/url` module (`673f21b`, `26390ad`, `6f867ce`, `6cbdc02`).
+
+### Fixed
+
+- Drop stale `vec0` trigger on cache open; surface cause in write warning (`0d3637d`).
+- Classify `UNSUPPORTED_TRANSPORT` API-key errors with own non-retryable code (`3ccc7ab`).
+- Gate IPv6 private checks on bracketed hostnames to avoid DNS false positives (`05dd418`).
+- Apply 4 MiB default cap to production fetch callers; cancel stream on truncation (`c0fe5d2`).
+- Strip `models/` prefix from API-key fallback model IDs (`4d830c5`).
+- Block API-key fallback for ACP-only file analysis operations (`e58679f`).
+- Surface provider search/preflight errors in `gemini_research` instead of masking as empty results (`1c81f76`).
+- Correct API-key fallback request shape and model name for prompt/search paths (`930ab13`).
+- Stream-read response body with byte limit instead of buffering entire text (`e47eb97`).
+
+### Security
+
+- Block link-local, CGNAT, and IPv4-mapped IPv6 ranges; fix redirect hop off-by-one (`88dff7d`).
+- Validate redirect targets against SSRF rules (`6049837`).
+
 ## [0.10.0] - 2026-05-09
 
 ### Added
