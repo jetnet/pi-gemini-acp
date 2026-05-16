@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AccountsConfig } from "../../types.ts";
 import {
 	DEFAULT_FAILOVER_CONFIG,
+	primaryAccountEnv,
 	resolveAccountsConfig,
 	resolveEnabledAccounts,
 } from "../account-config.ts";
@@ -62,5 +63,27 @@ describe("resolveEnabledAccounts", () => {
 		const entries = resolveEnabledAccounts([{ name: "a", env: { GEMINI_CLI_HOME: "/a" } }]);
 		expect(entries).toHaveLength(1);
 		expect(entries[0].name).toBe("a");
+	});
+});
+
+describe("primaryAccountEnv", () => {
+	it("returns the first enabled account env for non-pool startup paths", () => {
+		const config: AccountsConfig = {
+			entries: [
+				{ name: "disabled", enabled: false, env: { GEMINI_CLI_HOME: "/disabled" } },
+				{ name: "primary", env: { GEMINI_CLI_HOME: "/primary" } },
+				{ name: "secondary", env: { GEMINI_CLI_HOME: "/secondary" } },
+			],
+		};
+
+		expect(primaryAccountEnv(config)).toEqual({ GEMINI_CLI_HOME: "/primary" });
+	});
+
+	it("returns undefined when there is no enabled account", () => {
+		expect(
+			primaryAccountEnv({
+				entries: [{ name: "disabled", enabled: false, env: { GEMINI_CLI_HOME: "/disabled" } }],
+			}),
+		).toBeUndefined();
 	});
 });

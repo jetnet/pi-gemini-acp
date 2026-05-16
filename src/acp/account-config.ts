@@ -26,7 +26,7 @@ export function resolveAccountsConfig(
 	config: AccountsConfig | undefined,
 ): ResolvedAccountsConfig | undefined {
 	if (!config) return undefined;
-	if (!config.entries.length) return undefined;
+	if (config.entries.length === 0) return undefined;
 	const entries = resolveEnabledAccounts(config.entries);
 	if (entries.length === 0) return undefined;
 	return {
@@ -39,6 +39,13 @@ export function resolveEnabledAccounts(entries: AccountEntry[]): ResolvedAccount
 	return entries
 		.filter((entry) => entry.enabled !== false)
 		.map((entry) => ({ name: entry.name, env: entry.env }));
+}
+
+/** Returns the first enabled account env for startup paths that do not rotate accounts. */
+export function primaryAccountEnv(
+	config: AccountsConfig | undefined,
+): Record<string, string> | undefined {
+	return resolveAccountsConfig(config)?.entries[0]?.env;
 }
 
 function resolveFailoverConfig(config?: AccountFailoverConfig): ResolvedFailoverConfig {

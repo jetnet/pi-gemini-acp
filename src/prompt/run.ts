@@ -337,6 +337,7 @@ async function runProviderPromptWithPool(
 					rootDir: options.rootDir,
 					signal,
 					authProbe: deps.authProbe,
+					accountEnv: commandSettings.env,
 					persistAuthConfirmation: !options.config,
 				});
 				if (preflight) {

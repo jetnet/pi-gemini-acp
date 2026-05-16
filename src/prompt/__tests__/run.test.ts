@@ -221,6 +221,48 @@ describe("runPrompt", () => {
 		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]?.authenticated).toBe(true);
 	});
 
+	it("uses the selected account env for account-pool prompt auth and client creation", async () => {
+		let probedEnv: Record<string, string> | undefined;
+		let clientSettings: GeminiAcpCommandSettings | undefined;
+
+		const result = await runPrompt(
+			{
+				prompt: "Hi",
+				rootDir,
+				config: {
+					providers: {
+						"gemini-acp": {
+							enabled: true,
+							command: "gemini",
+							args: ["--acp"],
+							authenticated: false,
+							searchGroundingAvailable: true,
+						},
+						accounts: {
+							entries: [{ name: "primary", env: { GEMINI_CLI_HOME: "/tmp/gemini-primary" } }],
+						},
+					},
+				},
+			},
+			{
+				commandExists: async () => true,
+				authProbe: async (_settings, _signal, accountEnv) => {
+					probedEnv = accountEnv;
+					return { authenticated: true };
+				},
+				geminiAcpClientFactory: (settings) => {
+					clientSettings = settings;
+					return new FakeGeminiClient(["ok"]);
+				},
+			},
+		);
+
+		expect(result.error).toBeUndefined();
+		expect(result.text).toBe("ok");
+		expect(probedEnv).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
+		expect(clientSettings?.env).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
+	});
+
 	it("returns structured provider preflight errors", async () => {
 		const result = await runPrompt(
 			{
