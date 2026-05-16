@@ -158,6 +158,57 @@ Aliases include `pro`, `flash`, `flash-lite`, `lite`, and compatible versioned a
 
 **Pi chat model picker:** Gemini ACP also appears as a selectable Pi chat model when the extension registers it via `pi.registerProvider()`. This requires the ACP command to be configured and available. When absent or unauthenticated, the provider is not shown. The chat model's own model choice is controlled by Pi, independent of `/gemini-model`.
 
+### Multi-account failover
+
+Configure multiple authenticated Gemini CLI accounts for automatic failover when one account hits quota exhaustion:
+
+```json
+{
+  "providers": {
+    "accounts": {
+      "failover": {
+        "retries": 3,
+        "codes": [429],
+        "coolDownSeconds": 600
+      },
+      "entries": [
+        {
+          "name": "primary",
+          "enabled": true,
+          "env": { "GEMINI_CLI_HOME": "~/.gemini" }
+        },
+        {
+          "name": "secondary",
+          "enabled": true,
+          "env": { "GEMINI_CLI_HOME": "~/.gemini-2" }
+        }
+      ]
+    },
+    "gemini-acp": {
+      "enabled": true,
+      "command": "gemini",
+      "args": ["--acp", "--skip-trust"],
+      "model": "gemini-3.1-pro-preview"
+    }
+  }
+}
+```
+
+Each account entry points to a separate `GEMINI_CLI_HOME` with its own authenticated Gemini CLI credentials. All accounts share the `gemini-acp` provider settings (command, args, model, permissions).
+
+**Failover behavior:**
+- On HTTP 429 (or codes listed in `failover.codes`): retry the same account up to `failover.retries` times, then switch to the next healthy account.
+- On other errors: switch to the next healthy account immediately.
+- Quota reset time is parsed from the error message (e.g. "Your quota will reset after 2h21m46s"). If not parseable, `coolDownSeconds` is used as fallback.
+- Cooldown tracking is in-memory only; process restart clears all cooldowns.
+- When no accounts are configured, behavior is identical to previous versions.
+
+**Prerequisites:** each `GEMINI_CLI_HOME` path must contain a valid authenticated Gemini CLI installation (`gemini auth login` completed under that home).
+
+Set `enabled: false` on any entry to temporarily disable an account without removing it from config.
+
+Use `gemini_status` to see active accounts and current cooldown state.
+
 ### Chat preamble injection
 
 When Gemini ACP is selected as the active Pi model, every prompt is prefixed with a Pi-aware preamble so Gemini knows it's running inside Pi, which model is active, the working directory, the project's `AGENTS.md`, and available skills. Three opt-out flags control this:
