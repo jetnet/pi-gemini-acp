@@ -245,6 +245,10 @@ When Gemini ACP is the active Pi chat model and its shell-tool permission is ena
 
 **Expected process shape:** in a normal top-level Pi session, it is normal to see a small fixed number of `gemini --acp` subprocesses. Startup can create one prompt-provider warm process plus one search warm process, and active chat/tool turns can add their own live ACP processes. The Gemini CLI wrapper commonly appears as a parent `node .../gemini --acp ...` process with a child `node-22 --max-old-space-size=... .../gemini --acp ...`; that parent/child pair is one logical Gemini ACP subprocess. What should not happen is unbounded nesting where a Gemini-spawned `pi` process creates another pair, which creates another pair, and so on.
 
+**Nested Pi prompt mode:** Gemini may intentionally use terminal access to run `pi -p ...` as a non-interactive batch worker for complex workflows, such as processing one generated prompt file at a time. That is allowed and can be useful. Those nested Pi processes inherit `GEMINI_CLI=1`, so this extension skips ACP-spawning activation paths inside them. Prefer non-interactive invocations such as `PI_MODE=text pi -p "@file.txt" < /dev/null > output.md`; avoid bare interactive `pi` from inside Gemini shell commands.
+
+TODO: add a narrow safety guard for future releases that warns on or denies bare interactive nested `pi` invocations while still allowing explicit non-interactive `pi -p ...` batch-worker calls.
+
 To disable prewarm unconditionally (e.g. for debugging or memory-constrained hosts) set `PI_GEMINI_ACP_NO_PREWARM=1`.
 
 ### Chat preamble injection

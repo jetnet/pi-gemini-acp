@@ -7,6 +7,7 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 ## [Unreleased]
 
 - Documented the expected fixed Gemini ACP process shape: top-level Pi may keep prompt/search warm subprocesses plus live chat/tool subprocesses, and each Gemini CLI wrapper can appear as a `node` parent plus `node-22` child. Recursive Gemini-spawned `pi` loads are guarded separately via `GEMINI_CLI=1`.
+- Documented the supported nested `pi -p ...` prompt-mode batch-worker pattern from Gemini terminal sessions, plus a TODO for a future narrow safety guard around bare interactive nested `pi` invocations.
 
 ## [0.20.0] - 2026-05-16
 
