@@ -16,9 +16,24 @@ pi install npm:pi-gemini-acp
 > sudo pi install npm:pi-gemini-acp
 > ```
 
-### Install from local source
+### Local development from a clone
 
-If you have a local clone and want to run directly from source, run from inside the repo directory — no `sudo` needed, no build step:
+After cloning the repo, use the helper script to symlink it into Pi and disable the npm version:
+
+```bash
+cd pi-gemini-acp
+./scripts/develop.sh link
+```
+
+To switch back to the npm version later:
+
+```bash
+./scripts/develop.sh unlink
+```
+
+### Alternative: install from local source
+
+If you want to install the local clone directly instead of using the development symlink, run from inside the repo directory — no `sudo` needed for user-local npm setups:
 
 ```bash
 pi install .
@@ -26,15 +41,16 @@ pi install .
 
 ### Update local source installation
 
-Just re-run from the repo directory:
+If you installed from local source with `pi install .`, re-run it after pulling updates:
 
 ```bash
+git pull
 pi install .
 ```
 
-### Switch from npm to local source
+### Manual switch from npm to local source
 
-Remove the npm version first to avoid tool conflicts, then install from source:
+If you are not using `scripts/develop.sh`, remove the npm version first to avoid tool conflicts, then install from source:
 
 ```bash
 sudo pi uninstall npm:pi-gemini-acp
