@@ -46,11 +46,12 @@ export async function preflightSearchProvider(
 	options: GeminiAcpProviderPreflightOptions,
 	useCache: boolean,
 ): Promise<StructuredError | undefined> {
-	if (!useCache) return await preflightGeminiAcpProvider(settings, options);
+	const preflightOptions = { ...options, accountEnv: options.accountEnv ?? commandSettings.env };
+	if (!useCache) return await preflightGeminiAcpProvider(settings, preflightOptions);
 	const key = searchPreflightCacheKey(commandSettings, true);
 	const cached = cachedSearchPreflight(key);
 	if (cached) return cached.result;
-	const result = await preflightGeminiAcpProvider(settings, options);
+	const result = await preflightGeminiAcpProvider(settings, preflightOptions);
 	if (!result) setSuccessfulSearchPreflight(key, commandSettings, result);
 	return result;
 }
@@ -77,7 +78,7 @@ function setSuccessfulSearchPreflight(
 	result: undefined,
 ): void {
 	searchPreflightCache.set(key, {
-		clientCacheKey: geminiAcpClientCacheKey(settings),
+		clientCacheKey: geminiAcpClientCacheKey(settings, "search"),
 		result,
 		expiresAt: Date.now() + searchPreflightTtlMs(),
 	});
@@ -93,7 +94,7 @@ function searchPreflightCacheKey(
 	requireSearchGrounding: boolean,
 ): string {
 	return JSON.stringify({
-		clientCacheKey: geminiAcpClientCacheKey(settings),
+		clientCacheKey: geminiAcpClientCacheKey(settings, "search"),
 		requireSearchGrounding,
 	});
 }

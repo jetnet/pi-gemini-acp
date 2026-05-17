@@ -1,4 +1,3 @@
-import { closeGeminiAcpClientCache } from "./acp/client-cache.ts";
 /** @file Pi extension entrypoint for Gemini ACP tools, commands, adapters, and models. */
 import { registerModelAdapter, type ModelAdapterRegistrar } from "./adapter/register.ts";
 import type { PiCommandRegistrar } from "./commands/define.ts";
@@ -19,16 +18,22 @@ export interface GeminiAcpRegistrar extends PiToolRegistrar, ModelAdapterRegistr
 
 export interface GeminiAcpExtensionState {
 	piScraper: PiScraperPresence;
-	/** Clean up all warm ACP child processes. Call during Pi shutdown. */
-	disconnect?: () => Promise<void>;
 }
 
 export default async function registerPiGeminiAcpExtension(
 	pi: GeminiAcpRegistrar,
 ): Promise<GeminiAcpExtensionState> {
 	registerGeminiAcpTools(pi);
-	registerModelAdapter(pi);
 	if (hasCommandRegistrar(pi)) registerGeminiAcpCommands(pi);
+	// Recursion guard: Gemini CLI's run_shell_command tool may autonomously invoke `pi`
+	// subcommands (e.g. `pi mcp list`), which re-loads this extension inside the Gemini
+	// subprocess. Gemini-spawned children carry GEMINI_CLI=1. To break the recursive ACP
+	// spawn cycle, skip every activation path that could spawn another `gemini --acp`
+	// process (model adapter, model provider with its auth probe, prewarms, retention
+	// sweep). Tools and commands remain registered so `pi mcp list` still surfaces the
+	// extension's tool inventory inside the nested process.
+	if (process.env.GEMINI_CLI === "1") return { piScraper: detectPiScraper(pi) };
+	registerModelAdapter(pi);
 	scheduleGeminiSearchPrewarm();
 	scheduleCacheRetentionSweep();
 	if (hasModelProviderRegistrar(pi)) {
@@ -43,32 +48,7 @@ export default async function registerPiGeminiAcpExtension(
 			console.error("[pi-gemini-acp] Model provider registration failed:", reason);
 		}
 	}
-	const removeHandlers = setupShutdownHooks();
-	return {
-		piScraper: detectPiScraper(pi),
-		disconnect: async () => {
-			removeHandlers();
-			await closeGeminiAcpClientCache();
-		},
-	};
-}
-
-/** Registers process signal handlers that clean up ACP child processes on Pi exit. */
-function setupShutdownHooks(): () => void {
-	let shuttingDown = false;
-	const handler = () => {
-		if (shuttingDown) return;
-		shuttingDown = true;
-		void closeGeminiAcpClientCache();
-	};
-	process.on("SIGTERM", handler);
-	process.on("SIGINT", handler);
-	process.on("SIGHUP", handler);
-	return () => {
-		process.off("SIGTERM", handler);
-		process.off("SIGINT", handler);
-		process.off("SIGHUP", handler);
-	};
+	return { piScraper: detectPiScraper(pi) };
 }
 
 function hasModelProviderRegistrar(

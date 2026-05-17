@@ -103,11 +103,6 @@ export class JsonRpcStdioClient {
 		return this.stderrBuffer;
 	}
 
-	/** The child process pid for process-group kill escalation. */
-	get pid(): number | undefined {
-		return this.child.pid;
-	}
-
 	/** Sends a JSON-RPC request and resolves with the response result. */
 	request<T = unknown>(
 		method: string,
@@ -170,7 +165,7 @@ export class JsonRpcStdioClient {
 		this.write({ jsonrpc: "2.0", id, error });
 	}
 
-	/** Closes stdio, terminates the child (and descendants), and rejects pending requests. */
+	/** Closes stdio, terminates the child, and rejects pending requests. */
 	async close(): Promise<void> {
 		if (this.closed) return;
 		this.closed = true;
@@ -180,45 +175,7 @@ export class JsonRpcStdioClient {
 		} catch {
 			/* The subprocess may already have closed stdio after failure/abort. */
 		}
-		const stillAlive = (): boolean => {
-			if (this.child.killed) return false;
-			// Real ChildProcess: exitCode is null before exit. Undefined means fake/test child.
-			// eslint-disable-next-line eqeqeq -- intentional == null check for both null and undefined
-			if (this.child.exitCode == null) return true;
-			return false;
-		};
-		if (stillAlive()) {
-			this.killProcessGroup("SIGTERM");
-			// Escalate to SIGKILL after a grace period so the Gemini CLI wrapper's own Node child
-			// (--max-old-space-size=8192) is reliably terminated.
-			const pid = this.child.pid;
-			if (pid) {
-				const timer = setTimeout(() => {
-					if (stillAlive()) this.killProcessGroup("SIGKILL");
-				}, 3_000);
-				timer.unref();
-				// Clear the escalation timer if the child exits before it fires.
-				this.child.once("exit", () => clearTimeout(timer));
-			}
-		}
-	}
-
-	/**
-	 * Sends a signal to the entire process group (child + grandchildren). On Windows
-	 * process.kill(-pid) throws, so it falls back to child.kill() which may orphan grandchildren — a
-	 * pre-existing platform limitation, not a regression.
-	 */
-	private killProcessGroup(signal: NodeJS.Signals): void {
-		const pid = this.child.pid;
-		if (pid) {
-			try {
-				process.kill(-pid, signal);
-				return;
-			} catch {
-				/* Process group may already be gone; fall through to direct child kill. */
-			}
-		}
-		this.child.kill(signal);
+		if (!this.child.killed) this.child.kill("SIGTERM");
 	}
 
 	/** Rejects all pending requests with the supplied error. */

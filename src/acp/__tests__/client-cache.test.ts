@@ -141,7 +141,7 @@ describe("GeminiAcpClientCache", () => {
 		const cwdRoot = await mkdtemp(path.join(tmpdir(), "pi-gemini-prompt-cwd-"));
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
-		const client = cache.get(settings("gemini"));
+		const client = cache.get(settings("gemini"), "prompt");
 		try {
 			process.chdir(cwdRoot);
 			const callerCwd = process.cwd();
@@ -163,7 +163,7 @@ describe("GeminiAcpClientCache", () => {
 	it("evicts the cached prompt session after a prompt error", async () => {
 		const factory = new FakeSessionFactory({ failPromptAfterCount: 1 });
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
-		const client = cache.get(settings("gemini"));
+		const client = cache.get(settings("gemini"), "prompt");
 		await client.prompt({ prompt: "ok" });
 		await expect(client.prompt({ prompt: "fail" })).rejects.toThrow("planned failure");
 		// After eviction the next prompt creates a new session (in a fresh process because
@@ -180,7 +180,7 @@ describe("GeminiAcpClientCache", () => {
 		const factory = new FakeSessionFactory({ waitForClosePrompt: true });
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const controller = new AbortController();
-		const client = cache.get(settings("gemini"));
+		const client = cache.get(settings("gemini"), "prompt");
 
 		const aborted = client.prompt({ prompt: "slow" }, controller.signal);
 		await factory.waitForPromptStart();
@@ -190,7 +190,7 @@ describe("GeminiAcpClientCache", () => {
 		expect(factory.sessions[0]?.promptSignals).toEqual([controller.signal]);
 		expect(factory.sessions[0]?.closeCalls).toBe(1);
 
-		await cache.get(settings("gemini")).prompt({ prompt: "ok" });
+		await cache.get(settings("gemini"), "prompt").prompt({ prompt: "ok" });
 		expect(factory.sessions).toHaveLength(2);
 		await cache.close();
 	});
@@ -198,7 +198,7 @@ describe("GeminiAcpClientCache", () => {
 	it("passes parts through cached prompt when provided", async () => {
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
-		const client = cache.get(settings("gemini"));
+		const client = cache.get(settings("gemini"), "prompt");
 
 		await client.prompt({
 			prompt: "",
@@ -214,16 +214,14 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
-	it("shares one cache entry between search and prompt", async () => {
+	it("keeps search and prompt cache entries separate", async () => {
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 
-		await cache.get(settings("gemini")).search({ query: "one", maxResults: 5 });
-		await cache.get(settings("gemini")).prompt({ prompt: "two" });
+		await cache.get(settings("gemini"), "search").search({ query: "one", maxResults: 5 });
+		await cache.get(settings("gemini"), "prompt").prompt({ prompt: "two" });
 
-		// Search and prompt share one ACP subprocess with separate sessions.
-		expect(factory.sessions).toHaveLength(1);
-		expect(factory.sessions[0]?.newSessionCalls).toBe(2);
+		expect(factory.sessions).toHaveLength(2);
 		await cache.close();
 	});
 

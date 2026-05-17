@@ -12,30 +12,32 @@ import {
 	type TextContent,
 } from "@earendil-works/pi-ai";
 
+import { executeWithAccountPool } from "../acp/account-pool-singleton.ts";
+import { getCachedGeminiAcpClient } from "../acp/client-cache.ts";
 import type {
 	GeminiAcpClient,
+	GeminiAcpCommandSettings,
 	GeminiAcpPromptPart,
 	GeminiAcpPromptUpdateHandler,
 } from "../acp/client.ts";
 import { estimateCostChars } from "../tools/cost-estimate.ts";
-import type { GeminiAcpChatSettings } from "../types.ts";
+import type {
+	GeminiAcpChatSettings,
+	GeminiAcpConfig,
+	GeminiAcpProviderSettings,
+} from "../types.ts";
 import { createPreambleBuilder, type PiToolsSource } from "./preamble.ts";
 import type { GeminiAcpStreamSimple } from "./types.ts";
 
 // Pi's Api type is KnownApi | (string & {}); it accepts any string routing key.
 // We use "gemini-acp" as a custom provider identifier, matching pi-claude-bridge's pattern.
 const GEMINI_ACP_API: Api = "gemini-acp";
-const DEFAULT_CHAT_MAX_HISTORY_MESSAGES = 1;
-const DEFAULT_CHAT_MAX_HISTORY_MESSAGE_CHARS = 80;
-const DEFAULT_CHAT_MAX_SYSTEM_PROMPT_CHARS = 32;
-const DEFAULT_CHAT_MAX_TOOL_NAMES = 32;
 
 /** Builds a single ACP prompt request from Pi's multi-turn Context. */
 function buildAcpPromptRequest(
 	context: Context,
 	preamble?: string,
 	maxHistoryMessages?: number,
-	maxHistoryMessageChars?: number,
 ): { parts: GeminiAcpPromptPart[] } {
 	const parts: GeminiAcpPromptPart[] = [];
 	if (preamble) {
@@ -43,55 +45,28 @@ function buildAcpPromptRequest(
 	} else if (context.systemPrompt) {
 		parts.push({ type: "text", text: context.systemPrompt });
 	}
-	const messages = selectChatMessages(context.messages, maxHistoryMessages);
-	for (const [index, msg] of messages.entries()) {
-		const isLatest = index === messages.length - 1;
-		const includeRolePrefix = !(isLatest && messages.length === 1 && msg.role === "user");
-		const text = messageToText(
-			msg,
-			isLatest ? undefined : maxHistoryMessageChars,
-			includeRolePrefix,
-		);
+	const messages =
+		maxHistoryMessages !== undefined && maxHistoryMessages >= 0
+			? context.messages.slice(-maxHistoryMessages)
+			: context.messages;
+	for (const msg of messages) {
+		const text = messageToText(msg);
 		if (text) parts.push({ type: "text", text });
 	}
 	return { parts };
 }
 
-function selectChatMessages(messages: Context["messages"], maxHistoryMessages: number | undefined) {
-	if (maxHistoryMessages === undefined || maxHistoryMessages < 0) return messages;
-	if (maxHistoryMessages !== 1) return messages.slice(-maxHistoryMessages);
-	const latest = messages.at(-1);
-	if (!latest) return [];
-	if (latest.role === "user") return [latest];
-	const previous = messages.at(-2);
-	return previous?.role === "user" ? [previous, latest] : [latest];
-}
-
 /** Flattens one Pi Message into a text fragment for the ACP prompt. */
-function messageToText(
-	msg: Message,
-	maxChars?: number,
-	includeRolePrefix = true,
-): string | undefined {
+function messageToText(msg: Message): string | undefined {
 	if (msg.role === "user") {
 		const text = typeof msg.content === "string" ? msg.content : extractText(msg.content);
-		return includeRolePrefix ? formatRoleText("U", text, maxChars) : clampText(text, maxChars);
+		return `User: ${text}`;
 	}
 	if (msg.role === "assistant") {
-		return formatRoleText("A", extractText(msg.content), maxChars);
+		return `Assistant: ${extractText(msg.content)}`;
 	}
 	// Remaining Message union member is toolResult; TypeScript narrows here.
-	return formatRoleText(`T(${msg.toolName})`, extractText(msg.content), maxChars);
-}
-
-function formatRoleText(role: string, text: string, maxChars?: number): string {
-	return `${role}: ${clampText(text, maxChars)}`;
-}
-
-function clampText(text: string, maxChars?: number): string {
-	return maxChars !== undefined && maxChars >= 0 && text.length > maxChars
-		? `${text.slice(0, maxChars)}…`
-		: text;
+	return `Tool (${msg.toolName}): ${extractText(msg.content)}`;
 }
 
 /** Extracts plain text from Pi content blocks. */
@@ -161,17 +136,20 @@ function resolveCwd(options: unknown): string {
 
 /** Factory that returns a Pi-compatible streamSimple function backed by our ACP client. */
 export function createGeminiAcpStreamSimple(
-	client: GeminiAcpClient,
+	config: GeminiAcpConfig,
+	settings: GeminiAcpProviderSettings | undefined,
 	pi: PiToolsSource,
 	chatConfig: GeminiAcpChatSettings,
+	/** Override for tests: replaces executeWithAccountPool + getCachedGeminiAcpClient. */
+	clientFactory?: (commandSettings: GeminiAcpCommandSettings) => GeminiAcpClient,
+	/** Storage root for the cooldown store; defaults to ~/.pi/gemini-acp. */
+	rootDir?: string,
 ): GeminiAcpStreamSimple {
 	const buildPreamble = createPreambleBuilder({
-		appendSystemPrompt: chatConfig.appendSystemPrompt === true,
-		appendAgents: chatConfig.appendAgents === true,
-		appendTools: chatConfig.appendTools === true,
+		appendSystemPrompt: chatConfig.appendSystemPrompt !== false,
+		appendAgents: chatConfig.appendAgents !== false,
+		appendTools: chatConfig.appendTools !== false,
 		pi,
-		maxSystemPromptChars: chatConfig.maxSystemPromptChars ?? DEFAULT_CHAT_MAX_SYSTEM_PROMPT_CHARS,
-		maxToolNames: chatConfig.maxToolNames ?? DEFAULT_CHAT_MAX_TOOL_NAMES,
 	});
 
 	return (model, context, options) => {
@@ -188,12 +166,7 @@ export function createGeminiAcpStreamSimple(
 					upstreamSystemPrompt: context.systemPrompt,
 				});
 
-				const request = buildAcpPromptRequest(
-					context,
-					preamble,
-					chatConfig.maxHistoryMessages ?? DEFAULT_CHAT_MAX_HISTORY_MESSAGES,
-					chatConfig.maxHistoryMessageChars ?? DEFAULT_CHAT_MAX_HISTORY_MESSAGE_CHARS,
-				);
+				const request = buildAcpPromptRequest(context, preamble, chatConfig.maxHistoryMessages);
 				const inputChars = request.parts.reduce(
 					(sum, p) => sum + (p.type === "text" ? p.text.length : 0),
 					0,
@@ -214,7 +187,18 @@ export function createGeminiAcpStreamSimple(
 					});
 				};
 
-				const result = await client.prompt(request, options?.signal, onUpdate);
+				const result = await executeWithAccountPool(
+					config,
+					settings,
+					async (commandSettings: GeminiAcpCommandSettings) => {
+						const client: GeminiAcpClient = clientFactory
+							? clientFactory(commandSettings)
+							: getCachedGeminiAcpClient(commandSettings, "prompt");
+						return await client.prompt(request, options?.signal, onUpdate);
+					},
+					options?.signal,
+					rootDir,
+				);
 
 				const final: AssistantMessage = {
 					...partial,

@@ -32,6 +32,8 @@ type CacheRemovalListener = (key: string) => void;
 
 const cacheRemovalListeners = new Set<CacheRemovalListener>();
 
+export type GeminiAcpClientCachePurpose = "search" | "prompt";
+
 interface ActiveProcess {
 	session: GeminiAcpProcessSession;
 	searchSessions: Map<string, SearchSessionEntry[]>;
@@ -73,9 +75,12 @@ export class GeminiAcpClientCache {
 		this.sessionFactory = options.sessionFactory ?? AcpProcessSession.start;
 	}
 
-	/** Returns a cached client keyed by effective command args/capabilities. */
-	get(settings: GeminiAcpCommandSettings): GeminiAcpClient {
-		const key = clientCacheKey(settings);
+	/** Returns a cached client keyed by effective command args/capabilities/purpose. */
+	get(
+		settings: GeminiAcpCommandSettings,
+		purpose: GeminiAcpClientCachePurpose = "search",
+	): GeminiAcpClient {
+		const key = clientCacheKey(settings, purpose);
 		const entry = this.entries.get(key);
 		if (entry) return entry.client;
 		let client!: CachedGeminiAcpClient;
@@ -89,12 +94,12 @@ export class GeminiAcpClientCache {
 		return client;
 	}
 
-	/** Warms the shared ACP subprocess and default neutral search session. */
+	/** Warms the cached search subprocess and default neutral search session. */
 	async warmSearch(
 		settings: GeminiAcpCommandSettings,
 		options: GeminiAcpClientWarmOptions = {},
 	): Promise<void> {
-		await (this.get(settings) as CachedGeminiAcpClient).warmSearchSession(options.signal);
+		await this.cachedClient(settings, "search").warmSearchSession(options.signal);
 	}
 
 	/** Closes every warm ACP subprocess currently retained by this cache. */
@@ -102,6 +107,13 @@ export class GeminiAcpClientCache {
 		const clients = [...this.entries.values()].map((entry) => entry.client);
 		this.entries.clear();
 		await Promise.all(clients.map((client) => client.close()));
+	}
+
+	private cachedClient(
+		settings: GeminiAcpCommandSettings,
+		purpose: GeminiAcpClientCachePurpose,
+	): CachedGeminiAcpClient {
+		return this.get(settings, purpose) as CachedGeminiAcpClient;
 	}
 }
 
@@ -124,16 +136,22 @@ export function onGeminiAcpClientCacheEntryRemoved(listener: CacheRemovalListene
 }
 
 /** Returns the stable key used for warm Gemini ACP client cache entries. */
-export function geminiAcpClientCacheKey(settings: GeminiAcpCommandSettings): string {
-	return clientCacheKey(settings);
+export function geminiAcpClientCacheKey(
+	settings: GeminiAcpCommandSettings,
+	purpose: GeminiAcpClientCachePurpose,
+): string {
+	return clientCacheKey(settings, purpose);
 }
 
 /** Returns the process-cached Gemini ACP client for production workflows. */
-export function getCachedGeminiAcpClient(settings: GeminiAcpCommandSettings): GeminiAcpClient {
-	return defaultCache.get(settings);
+export function getCachedGeminiAcpClient(
+	settings: GeminiAcpCommandSettings,
+	purpose: GeminiAcpClientCachePurpose = "search",
+): GeminiAcpClient {
+	return defaultCache.get(settings, purpose);
 }
 
-/** Warms the shared ACP subprocess with a neutral search session. */
+/** Warms the production Gemini ACP search cache without sending user-visible work. */
 export async function warmCachedGeminiAcpSearchClient(
 	settings: GeminiAcpCommandSettings,
 	options: GeminiAcpClientWarmOptions = {},
@@ -141,13 +159,13 @@ export async function warmCachedGeminiAcpSearchClient(
 	await defaultCache.warmSearch(settings, options);
 }
 
-/** Warms the shared ACP subprocess with a prompt session for the given cwd. */
+/** Warms the production Gemini ACP prompt cache without sending user-visible work. */
 export async function warmCachedGeminiAcpPromptClient(
 	settings: GeminiAcpCommandSettings,
 	cwd: string,
 	options: GeminiAcpClientWarmOptions = {},
 ): Promise<void> {
-	await (defaultCache.get(settings) as CachedGeminiAcpClient).warmPromptSession(
+	await (defaultCache.get(settings, "prompt") as CachedGeminiAcpClient).warmPromptSession(
 		cwd,
 		options.signal,
 	);
