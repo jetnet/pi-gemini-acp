@@ -1,3 +1,6 @@
+import { homedir } from "node:os";
+import path from "node:path";
+
 import type { AccountEntry, AccountFailoverConfig, AccountsConfig } from "../types.ts";
 
 export interface ResolvedFailoverConfig {
@@ -38,7 +41,22 @@ export function resolveAccountsConfig(
 export function resolveEnabledAccounts(entries: AccountEntry[]): ResolvedAccountEntry[] {
 	return entries
 		.filter((entry) => entry.enabled !== false)
-		.map((entry) => ({ name: entry.name, env: entry.env }));
+		.map((entry) => ({ name: entry.name, env: expandEnvValues(entry.env) }));
+}
+
+function expandEnvValues(env: Record<string, string>): Record<string, string> {
+	return Object.fromEntries(
+		Object.entries(env).map(([key, value]) => [key, expandEnvValue(value, process.env)]),
+	);
+}
+
+export function expandEnvValue(value: string, env: NodeJS.ProcessEnv = process.env): string {
+	if (value.startsWith("~/")) return path.join(homedir(), value.slice(2));
+	return value.replaceAll(/\$([A-Z_][A-Z0-9_]*)|%([^%]+)%/giu, (match, unix, win) => {
+		const name = (unix ?? win) as string;
+		const resolved = env[name];
+		return typeof resolved === "string" ? resolved : match;
+	});
 }
 
 /** Returns the first enabled account env for startup paths that do not rotate accounts. */
