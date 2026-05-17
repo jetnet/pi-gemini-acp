@@ -228,10 +228,12 @@ Each account entry points to a separate `GEMINI_CLI_HOME` with its own authentic
 - On HTTP 429 (or codes listed in `failover.codes`): retry the same account up to `failover.retries` times, then switch to the next healthy account.
 - On other errors: switch to the next healthy account immediately.
 - Quota reset time is parsed from the error message (e.g. "Your quota will reset after 2h21m46s"). If not parseable, `coolDownSeconds` is used as fallback.
-- Cooldown tracking is in-memory only; process restart clears all cooldowns.
+- Cooldown state is persisted to `~/.pi/gemini-acp/config/account-cooldowns.json` and reloaded on each call, so failover survives across tool invocations and chat turns.
 - When no accounts are configured, behavior is identical to previous versions.
 
 **Prerequisites:** each `GEMINI_CLI_HOME` path must contain a valid authenticated Gemini CLI installation (`gemini auth login` completed under that home).
+
+`GEMINI_CLI_HOME` values support tilde expansion (`~/`) and Unix/Windows env var references (`$HOME`, `%USERPROFILE%`). An empty string uses the Gemini CLI default (`~/.gemini`).
 
 Set `enabled: false` on any entry to temporarily disable an account without removing it from config.
 
