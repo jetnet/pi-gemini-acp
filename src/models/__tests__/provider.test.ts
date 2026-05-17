@@ -48,7 +48,7 @@ describe("registerGeminiAcpModelProvider", () => {
 		});
 	});
 
-	it("uses the primary account env for provider client and prompt prewarm", async () => {
+	it("registers the provider and prewarms prompt with primary account env when accounts are configured", async () => {
 		await writeConfig(rootDir, {
 			providers: {
 				"gemini-acp": {
@@ -70,10 +70,13 @@ describe("registerGeminiAcpModelProvider", () => {
 
 		await registerGeminiAcpModelProvider(pi, rootDir);
 
-		const clientSettings = vi.mocked(getCachedGeminiAcpClient).mock.calls[0]?.[0];
+		// Provider must be registered — the streamSimple will route through executeWithAccountPool
+		// at call time, so no getCachedGeminiAcpClient call happens during registration.
+		expect(pi.registerProvider).toHaveBeenCalledTimes(1);
+		// Prewarm still uses primary account env (best-effort startup warm, not pool-aware).
 		const warmSettings = vi.mocked(warmCachedGeminiAcpPromptClient).mock.calls[0]?.[0];
-		expect(clientSettings?.env).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
 		expect(warmSettings?.env).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
+		expect(vi.mocked(getCachedGeminiAcpClient)).not.toHaveBeenCalled();
 	});
 
 	it("does not let best-effort prompt prewarm rejection escape provider registration", async () => {
