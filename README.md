@@ -10,50 +10,24 @@ Gemini ACP chat, prompt, search, and research provider for Pi.
 pi install npm:pi-gemini-acp
 ```
 
-> If your global npm prefix is system-owned, you may need to fix your npm setup or use sudo:
+> If your global npm prefix is system-owned, prefix with `sudo`:
 >
 > ```bash
 > sudo pi install npm:pi-gemini-acp
 > ```
 
-### Local development from a clone
-
-After cloning the repo, use the helper script to symlink it into Pi and disable the npm version:
+### Local development
 
 ```bash
 cd pi-gemini-acp
-./scripts/develop.sh link
+./scripts/develop.sh link   # symlink into Pi
+./scripts/develop.sh unlink # restore npm version
 ```
 
-To switch back to the npm version later:
+Or install from source:
 
 ```bash
-./scripts/develop.sh unlink
-```
-
-### Alternative: install from local source
-
-If you want to install the local clone directly instead of using the development symlink, run from inside the repo directory — no `sudo` needed for user-local npm setups:
-
-```bash
-pi install .
-```
-
-### Update local source installation
-
-If you installed from local source with `pi install .`, re-run it after pulling updates:
-
-```bash
-git pull
-pi install .
-```
-
-### Manual switch from npm to local source
-
-If you are not using `scripts/develop.sh`, remove the npm version first to avoid tool conflicts, then install from source:
-
-```bash
-sudo pi uninstall npm:pi-gemini-acp
+cd pi-gemini-acp
 pi install .
 ```
 
