@@ -21,6 +21,8 @@ export interface GeminiAcpRegistrar extends PiToolRegistrar, ModelAdapterRegistr
 
 export interface GeminiAcpExtensionState {
 	piScraper: PiScraperPresence;
+	/** Clean up all warm ACP child processes. Call during Pi shutdown. */
+	disconnect?: () => Promise<void>;
 }
 
 export default async function registerPiGeminiAcpExtension(
@@ -34,6 +36,7 @@ export default async function registerPiGeminiAcpExtension(
 	(pi as unknown as ExtensionAPI).on("session_shutdown", async () => {
 		await closeGeminiAcpClientCache();
 	});
+
 	// Recursion guard: Gemini CLI's run_shell_command tool may autonomously invoke `pi`
 	// subcommands (e.g. `pi mcp list`), which re-loads this extension inside the Gemini
 	// subprocess. Gemini-spawned children carry GEMINI_CLI=1. To break the recursive ACP
@@ -57,7 +60,32 @@ export default async function registerPiGeminiAcpExtension(
 			console.error("[pi-gemini-acp] Model provider registration failed:", reason);
 		}
 	}
-	return { piScraper: detectPiScraper(pi) };
+	const removeProcessHandlers = setupShutdownHooks();
+	return {
+		piScraper: detectPiScraper(pi),
+		disconnect: async () => {
+			removeProcessHandlers();
+			await closeGeminiAcpClientCache();
+		},
+	};
+}
+
+/** Registers process signal handlers that clean up ACP child processes on Pi exit. */
+function setupShutdownHooks(): () => void {
+	let shuttingDown = false;
+	const handler = () => {
+		if (shuttingDown) return;
+		shuttingDown = true;
+		void closeGeminiAcpClientCache();
+	};
+	process.on("SIGTERM", handler);
+	process.on("SIGINT", handler);
+	process.on("SIGHUP", handler);
+	return () => {
+		process.off("SIGTERM", handler);
+		process.off("SIGINT", handler);
+		process.off("SIGHUP", handler);
+	};
 }
 
 function hasModelProviderRegistrar(
