@@ -1,3 +1,6 @@
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+import { closeGeminiAcpClientCache } from "./acp/client-cache.ts";
 /** @file Pi extension entrypoint for Gemini ACP tools, commands, adapters, and models. */
 import { registerModelAdapter, type ModelAdapterRegistrar } from "./adapter/register.ts";
 import type { PiCommandRegistrar } from "./commands/define.ts";
@@ -25,6 +28,12 @@ export default async function registerPiGeminiAcpExtension(
 ): Promise<GeminiAcpExtensionState> {
 	registerGeminiAcpTools(pi);
 	if (hasCommandRegistrar(pi)) registerGeminiAcpCommands(pi);
+	// Wire ACP subprocess cleanup to Pi lifecycle events so subprocesses are
+	// terminated when Pi exits, reloads, or switches sessions. Without this,
+	// every session spawns 4 ACP child processes that accumulate as orphans.
+	(pi as unknown as ExtensionAPI).on("session_shutdown", async () => {
+		await closeGeminiAcpClientCache();
+	});
 	// Recursion guard: Gemini CLI's run_shell_command tool may autonomously invoke `pi`
 	// subcommands (e.g. `pi mcp list`), which re-loads this extension inside the Gemini
 	// subprocess. Gemini-spawned children carry GEMINI_CLI=1. To break the recursive ACP
