@@ -51,6 +51,7 @@ describe("registerPiGeminiAcpExtension startup", () => {
 		const { default: registerPiGeminiAcpExtension } = await import("../../index.ts");
 
 		const pi = {
+			on: vi.fn(),
 			registerProvider: vi.fn(),
 			registerTool: vi.fn(),
 		};
@@ -73,7 +74,12 @@ describe("registerPiGeminiAcpExtension startup", () => {
 	it("registers only tools and commands when loaded inside a Gemini shell subprocess", async () => {
 		vi.stubEnv("GEMINI_CLI", "1");
 		const { default: registerPiGeminiAcpExtension } = await import("../../index.ts");
-		const pi = { registerCommand: vi.fn(), registerProvider: vi.fn(), registerTool: vi.fn() };
+		const pi = {
+			on: vi.fn(),
+			registerCommand: vi.fn(),
+			registerProvider: vi.fn(),
+			registerTool: vi.fn(),
+		};
 		await registerPiGeminiAcpExtension(pi);
 		expect(mocks.registerGeminiAcpTools).toHaveBeenCalledWith(pi);
 		expect(mocks.registerGeminiAcpCommands).toHaveBeenCalledWith(pi);
@@ -85,7 +91,7 @@ describe("registerPiGeminiAcpExtension startup", () => {
 	it("runs activation paths when not inside a Gemini shell subprocess", async () => {
 		vi.stubEnv("GEMINI_CLI", "");
 		const { default: registerPiGeminiAcpExtension } = await import("../../index.ts");
-		const pi = { registerProvider: vi.fn(), registerTool: vi.fn() };
+		const pi = { on: vi.fn(), registerProvider: vi.fn(), registerTool: vi.fn() };
 		await registerPiGeminiAcpExtension(pi);
 		expect(mocks.registerModelAdapter).toHaveBeenCalledWith(pi);
 		expect(mocks.scheduleGeminiSearchPrewarm).toHaveBeenCalledTimes(1);
