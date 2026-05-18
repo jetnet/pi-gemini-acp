@@ -41,6 +41,24 @@ function makeIsolatedExecute(tmpDir: string) {
 	};
 }
 
+function requiredGeminiCliHome(settings: GeminiAcpCommandSettings): string {
+	const home = settings.env?.GEMINI_CLI_HOME;
+	if (home === undefined) throw new Error("expected GEMINI_CLI_HOME to be set");
+	return home;
+}
+
+function quotaExhaustedError(): never {
+	throw new Error(
+		"You have exhausted your capacity on this model. Your quota will reset after 1h.",
+	);
+}
+
+function callHomeHandler(handlers: ReadonlyMap<string, () => string>, home: string): string {
+	const handler = handlers.get(home);
+	if (!handler) throw new Error(`unexpected GEMINI_CLI_HOME: ${home}`);
+	return handler();
+}
+
 describe("account pool integration (no accounts / single account)", () => {
 	it("returns false for hasAccountPool when no accounts configured", () => {
 		const config: GeminiAcpConfig = {
@@ -123,15 +141,14 @@ describe("account pool integration (multi-account, isolated store)", () => {
 			},
 		};
 		const calls: string[] = [];
+		const handlers = new Map<string, () => string>([
+			["/a", quotaExhaustedError],
+			["/b", () => "from-b"],
+		]);
 		const result = await execute(config, async (settings: GeminiAcpCommandSettings) => {
-			const home = settings.env?.GEMINI_CLI_HOME ?? "none";
+			const home = requiredGeminiCliHome(settings);
 			calls.push(home);
-			if (home === "/a") {
-				throw new Error(
-					"You have exhausted your capacity on this model. Your quota will reset after 1h.",
-				);
-			}
-			return "from-b";
+			return callHomeHandler(handlers, home);
 		});
 		expect(result).toBe("from-b");
 		expect(calls).toEqual(["/a", "/b"]);
@@ -150,7 +167,7 @@ describe("account pool integration (multi-account, isolated store)", () => {
 			},
 		};
 		const result = await execute(config, async (settings: GeminiAcpCommandSettings) => {
-			return settings.env?.GEMINI_CLI_HOME ?? "none";
+			return requiredGeminiCliHome(settings);
 		});
 		expect(result).toBe("/active");
 	});
@@ -171,15 +188,14 @@ describe("account pool integration (multi-account, isolated store)", () => {
 			},
 		};
 		const seenHomes: string[] = [];
+		const handlers = new Map<string, () => string>([
+			["", quotaExhaustedError],
+			[`${homedir()}/.gemini-secondary`, () => "ok"],
+		]);
 		await execute(config, async (settings) => {
-			const home = settings.env?.GEMINI_CLI_HOME ?? "unset";
+			const home = requiredGeminiCliHome(settings);
 			seenHomes.push(home);
-			if (home === "") {
-				throw new Error(
-					"You have exhausted your capacity on this model. Your quota will reset after 1h.",
-				);
-			}
-			return "ok";
+			return callHomeHandler(handlers, home);
 		});
 		expect(seenHomes).toEqual(["", `${homedir()}/.gemini-secondary`]);
 	});
@@ -203,15 +219,14 @@ describe("account pool integration (multi-account, isolated store)", () => {
 
 		// First call: primary fails, cooldown written to disk, secondary succeeds.
 		const callsFirst: string[] = [];
+		const firstHandlers = new Map<string, () => string>([
+			["/primary", quotaExhaustedError],
+			["/secondary", () => "ok"],
+		]);
 		await execute(reloadConfig(config), async (settings) => {
-			const home = settings.env?.GEMINI_CLI_HOME ?? "none";
+			const home = requiredGeminiCliHome(settings);
 			callsFirst.push(home);
-			if (home === "/primary") {
-				throw new Error(
-					"You have exhausted your capacity on this model. Your quota will reset after 1h.",
-				);
-			}
-			return "ok";
+			return callHomeHandler(firstHandlers, home);
 		});
 		expect(callsFirst).toEqual(["/primary", "/secondary"]);
 
@@ -219,7 +234,7 @@ describe("account pool integration (multi-account, isolated store)", () => {
 		// Cooldown is loaded from disk — primary must still be skipped.
 		const callsSecond: string[] = [];
 		const result = await execute(reloadConfig(config), async (settings) => {
-			const home = settings.env?.GEMINI_CLI_HOME ?? "none";
+			const home = requiredGeminiCliHome(settings);
 			callsSecond.push(home);
 			return `from-${home}`;
 		});
@@ -249,7 +264,7 @@ describe("account pool integration (multi-account, isolated store)", () => {
 		// Primary should be healthy again.
 		const calls: string[] = [];
 		await execute(config, async (settings) => {
-			calls.push(settings.env?.GEMINI_CLI_HOME ?? "none");
+			calls.push(requiredGeminiCliHome(settings));
 			return "ok";
 		});
 		expect(calls).toEqual(["/primary"]);
