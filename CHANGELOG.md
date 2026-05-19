@@ -6,22 +6,16 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 
 ## [0.13.1] - 2026-05-19
 
-### Added
-
-- Client-server abort signal merge in `CachedGeminiAcpClient` so `Escape` cancels in-flight ACP searches without killing the shared warm process.
-- `JsonRpcStdioClient.pid` getter and process-group kill (`SIGTERM` → `SIGKILL` escalation) for reliable background child termination.
-- `error-classifier.ts`: centralized error classification (`classifyGeminiError`, `isRetryableOnSameAccount`, `cooldownMs`) for consistent retry/failover decisions.
-
 ### Changed
 
 - Remove unavailable `gemini-3.1-flash-preview` from curated model choices; `flash` alias now resolves to `gemini-3.1-flash-lite-preview`.
 - API-key fallback default changed from `gemini-3.1-flash-preview` to `gemini-3.1-flash-lite-preview`.
-- Account-pool error classification extracted into shared `error-classifier.ts`; inline status-code/message heuristics replaced with centralized `classifyGeminiError`.
+- Extract inline account-pool error classification into shared `error-classifier.ts` (`classifyGeminiError`, `isRetryableOnSameAccount`, `cooldownMs`).
 - Warm ACP subprocess cleanup wired to Pi `session_shutdown` lifecycle event and `disconnect` hook.
 
 ### Fixed
-- `gemini_search` hangs forever on user Esc/abort when ACP resolves partial JSON text with `returnTextOnAbort`. Caller abort signal is now merged with the internal JSON early-stop signal; caller abort throws `AbortError` instead of being swallowed.
-- `JsonRpcStdioClient.close()` now kills the entire process group (wrapper + its Node child), preventing orphaned `--max-old-space-size=8192` children.
+- Merge caller + JSON early-stop AbortSignals in `CachedGeminiAcpClient` so Esc cancels in-flight ACP searches without killing the warm process. Previously the caller signal was dropped and early-stop aborts were silently swallowed.
+- Kill entire ACP process group (wrapper + its Node child) in `JsonRpcStdioClient.close()` via SIGTERM → SIGKILL escalation, preventing orphaned `--max-old-space-size=8192` children.
 
 ## [0.13.0] - 2026-05-17
 
