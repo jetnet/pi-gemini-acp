@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe("Gemini ACP search early stop", () => {
-	it("waits for turn end by default after a complete top-level JSON array", async () => {
+	it("stops early on complete JSON array by default", async () => {
 		const factory = new FakeSessionFactory({
 			chunks: [
 				'[{"title":"Early","url":"https://example.com/early","snippet":"done"}]',
@@ -26,8 +26,8 @@ describe("Gemini ACP search early stop", () => {
 		const results = await cache.get(settings()).search({ query: "early", maxResults: 5 });
 
 		expect(results[0]?.title).toBe("Early");
-		expect(factory.session?.emittedChunks).toBe(2);
-		expect(factory.session?.earlyAbortSignals).toBe(0);
+		expect(factory.session?.emittedChunks).toBe(1);
+		expect(factory.session?.earlyAbortSignals).toBe(1);
 		expect(factory.session?.closeCalls).toBe(0);
 		await cache.close();
 	});
@@ -48,8 +48,7 @@ describe("Gemini ACP search early stop", () => {
 		await cache.close();
 	});
 
-	it("keeps the warm process reusable when search early-stop is enabled", async () => {
-		vi.stubEnv("PI_GEMINI_ACP_SEARCH_EARLY_STOP", "1");
+	it("keeps the warm process reusable with early-stop", async () => {
 		const factory = new FakeSessionFactory({
 			chunks: [
 				'[{"title":"Reusable","url":"https://example.com/reuse","snippet":"done"}]',
@@ -71,7 +70,6 @@ describe("Gemini ACP search early stop", () => {
 	});
 
 	it("does not treat brackets inside JSON strings as array completion", async () => {
-		vi.stubEnv("PI_GEMINI_ACP_SEARCH_EARLY_STOP", "1");
 		const factory = new FakeSessionFactory({
 			chunks: [
 				'[{"title":"Bracket ] ',
@@ -87,36 +85,40 @@ describe("Gemini ACP search early stop", () => {
 		expect(factory.session?.earlyAbortSignals).toBe(1);
 	});
 
-	it("propagates caller abort as AbortError instead of early-stop success", async () => {
-		const factory = new FakeSessionFactory({ waitForClose: true });
+	it("propagates caller abort as AbortError without closing the warm process", async () => {
+		const factory = new FakeSessionFactory({});
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
-		const controller = new AbortController();
 
+		// Warm the process first
+		await cache.get(settings()).search({ query: "warm", maxResults: 5 });
+		expect(factory.session?.closeCalls).toBe(0);
+
+		// Abort before the next search starts
+		const controller = new AbortController();
+		controller.abort();
 		const search = cache
 			.get(settings())
 			.search({ query: "slow", maxResults: 5 }, controller.signal);
-		await factory.waitForPromptStart();
-		controller.abort();
 
 		await expect(search).rejects.toMatchObject({ name: "AbortError" });
-		expect(factory.session?.closeCalls).toBe(1);
+		expect(factory.session?.closeCalls).toBe(0);
 	});
 
-	it("enables streamed search cancellation via environment opt-in", async () => {
-		vi.stubEnv("PI_GEMINI_ACP_SEARCH_EARLY_STOP", "1");
+	it("waits for full turn when early-stop is disabled", async () => {
+		vi.stubEnv("PI_GEMINI_ACP_SEARCH_EARLY_STOP", "0");
 		const factory = new FakeSessionFactory({
 			chunks: [
-				'[{"title":"Baseline","url":"https://example.com/base","snippet":"done"}]',
+				'[{"title":"Full","url":"https://example.com/full","snippet":"done"}]',
 				" trailing text",
 			],
 		});
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 
-		const results = await cache.get(settings()).search({ query: "baseline", maxResults: 5 });
+		const results = await cache.get(settings()).search({ query: "full", maxResults: 5 });
 
-		expect(results[0]?.title).toBe("Baseline");
-		expect(factory.session?.emittedChunks).toBe(1);
-		expect(factory.session?.earlyAbortSignals).toBe(1);
+		expect(results[0]?.title).toBe("Full");
+		expect(factory.session?.emittedChunks).toBe(2);
+		expect(factory.session?.earlyAbortSignals).toBe(0);
 		expect(factory.session?.closeCalls).toBe(0);
 		await cache.close();
 	});

@@ -86,7 +86,7 @@ describe("runFileAnalyze", () => {
 			pathToFileURL(path.join(rootDir, "notes.txt")).href,
 		);
 		expect(updates).toContain(
-			'Sending file analysis prompt: "notes.txt" with fileCount 1 via Gemini ACP default.\n\n● Waiting for Gemini backend...',
+			'Sending file analysis prompt: "notes.txt" with fileCount 1 via Gemini ACP default.\n\n● Querying Gemini model; awaiting first token (backend/network latency)...',
 		);
 		expect(updates).toContain(
 			'Sending file analysis prompt: "notes.txt" with fileCount 1 via Gemini ACP default.\n\n● First token received; LLM generating tokens...',

@@ -6,6 +6,10 @@ This changelog is maintained from git history and follows a Keep-a-Changelog-sty
 
 ## [Unreleased]
 
+### Changed
+
+- Remove unavailable `gemini-3.1-flash-preview` from curated model choices; `flash` now resolves to `gemini-3.1-flash-lite-preview`, which is also the API-key fallback default.
+
 ## [0.13.0] - 2026-05-17
 
 ### Added

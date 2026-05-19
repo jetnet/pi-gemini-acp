@@ -35,22 +35,23 @@ export const GEMINI_MODEL_CHOICES = [
 		aliases: ["pro", "3.1-pro", "3.1-pro-preview", "pro-preview"],
 	},
 	{
-		id: "gemini-3.1-flash-preview",
-		label: "Gemini 3.1 Flash Preview",
-		description: "Latest Flash preview optimized for fast, cost-effective tasks.",
-		aliases: ["flash", "3.1-flash", "3.1-flash-preview", "flash-preview"],
+		id: "gemini-3.1-flash-lite-preview",
+		label: "Gemini 3.1 Flash-Lite Preview",
+		description: "Default Flash-Lite preview optimized for latency-sensitive tasks.",
+		aliases: [
+			"flash",
+			"flash-preview",
+			"flash-lite",
+			"lite",
+			"3.1-flash-lite",
+			"3.1-flash-lite-preview",
+		],
 	},
 	{
 		id: "gemini-3-flash-preview",
 		label: "Gemini 3 Flash Preview",
 		description: "Gemini 3 Flash preview retained for provider compatibility.",
 		aliases: ["3-flash", "3-flash-preview"],
-	},
-	{
-		id: "gemini-3.1-flash-lite-preview",
-		label: "Gemini 3.1 Flash-Lite Preview",
-		description: "Latest Flash-Lite preview optimized for latency-sensitive tasks.",
-		aliases: ["flash-lite", "lite", "3.1-flash-lite", "3.1-flash-lite-preview"],
 	},
 	{
 		id: "gemini-3-pro-preview",

@@ -47,17 +47,16 @@ pi install .
 
 When the ACP command is configured and `gemini_status` reports ready, the extension calls `pi.registerProvider("gemini-acp", ...)` and registers the following models in Pi's chat model picker.
 
-| Model id                        | Picker label                  | Aliases                                                          |
-| ------------------------------- | ----------------------------- | ---------------------------------------------------------------- |
-| `gemini-3.1-pro-preview`        | Gemini 3.1 Pro Preview        | `pro`, `3.1-pro`, `3.1-pro-preview`, `pro-preview`               |
-| `gemini-3.1-flash-preview`      | Gemini 3.1 Flash Preview      | `flash`, `3.1-flash`, `3.1-flash-preview`, `flash-preview`       |
-| `gemini-3-flash-preview`        | Gemini 3 Flash Preview        | `3-flash`, `3-flash-preview`                                     |
-| `gemini-3.1-flash-lite-preview` | Gemini 3.1 Flash-Lite Preview | `flash-lite`, `lite`, `3.1-flash-lite`, `3.1-flash-lite-preview` |
-| `gemini-3-pro-preview`          | Gemini 3 Pro Preview          | `3-pro`, `3-pro-preview`                                         |
-| `gemini-2.5-pro`                | Gemini 2.5 Pro                | `2.5-pro`                                                        |
-| `gemini-2.5-flash`              | Gemini 2.5 Flash              | `2.5-flash`                                                      |
-| `gemini-2.5-flash-lite`         | Gemini 2.5 Flash-Lite         | `2.5-flash-lite`                                                 |
-| `gemini-2.0-flash`              | Gemini 2.0 Flash              | `2.0-flash`                                                      |
+| Model id                        | Picker label                  | Aliases                                                                                    |
+| ------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------ |
+| `gemini-3.1-pro-preview`        | Gemini 3.1 Pro Preview        | `pro`, `3.1-pro`, `3.1-pro-preview`, `pro-preview`                                         |
+| `gemini-3.1-flash-lite-preview` | Gemini 3.1 Flash-Lite Preview | `flash`, `flash-preview`, `flash-lite`, `lite`, `3.1-flash-lite`, `3.1-flash-lite-preview` |
+| `gemini-3-flash-preview`        | Gemini 3 Flash Preview        | `3-flash`, `3-flash-preview`                                                               |
+| `gemini-3-pro-preview`          | Gemini 3 Pro Preview          | `3-pro`, `3-pro-preview`                                                                   |
+| `gemini-2.5-pro`                | Gemini 2.5 Pro                | `2.5-pro`                                                                                  |
+| `gemini-2.5-flash`              | Gemini 2.5 Flash              | `2.5-flash`                                                                                |
+| `gemini-2.5-flash-lite`         | Gemini 2.5 Flash-Lite         | `2.5-flash-lite`                                                                           |
+| `gemini-2.0-flash`              | Gemini 2.0 Flash              | `2.0-flash`                                                                                |
 
 ## Tools
 
@@ -122,8 +121,8 @@ export PI_GEMINI_ACP_COMMAND=gemini
 export PI_GEMINI_ACP_ARGS="--acp"
 export PI_GEMINI_ACP_IDLE_TTL_MS=900000
 export PI_GEMINI_ACP_NO_PREWARM=1
-export PI_GEMINI_ACP_SEARCH_EARLY_STOP=1 # optional: opt into streamed JSON early-stop
-export PI_GEMINI_ACP_SEARCH_PARALLEL=1 # optional: opt into parallel live searches
+export PI_GEMINI_ACP_SEARCH_EARLY_STOP=0 # optional: opt out of streamed JSON early-stop (enabled by default)
+export PI_GEMINI_ACP_SEARCH_PARALLEL=0 # optional: opt out of parallel live searches (enabled by default)
 export PI_GEMINI_ACP_CACHE=0 # optional: disable persistent response cache
 export PI_GEMINI_ACP_RECALL=0 # optional: disable recall tool registration and FTS recall
 export GEMINI_API_KEY=your_api_key_here # optional: fallback when ACP is unavailable
@@ -141,11 +140,11 @@ Or persist the API key in `~/.pi/gemini-acp/config/settings.json`:
 }
 ```
 
-Environment variables take precedence over `settings.json` values. The model used for API key fallback is the same model configured for ACP (via `/gemini-model` or tool parameters), defaulting to `gemini-3.1-flash-preview` if none is set.
+Environment variables take precedence over `settings.json` values. The model used for API key fallback is the same model configured for ACP (via `/gemini-model` or tool parameters), defaulting to `gemini-3.1-flash-lite-preview` if none is set.
 
 ### Runtime behavior
 
-- **Search:** defaults to 4 results. Live ACP searches are serialized and wait for the full turn; opt into parallel calls (`PI_GEMINI_ACP_SEARCH_PARALLEL=1`) or streamed early-stop (`PI_GEMINI_ACP_SEARCH_EARLY_STOP=1`).
+- **Search:** defaults to 4 results. Live ACP searches run in parallel and stop early once a complete JSON result array is streamed (both enabled by default). Use `PI_GEMINI_ACP_SEARCH_PARALLEL=0` to serialize, or `PI_GEMINI_ACP_SEARCH_EARLY_STOP=0` to wait for the full turn.
 - **ACP sessions:** prompts and search reuse warm subprocesses for 15 minutes. Extension activation prewarms one prompt session for the Pi chat provider and one neutral search session (`PI_GEMINI_ACP_NO_PREWARM=1` disables search prewarm; prompt prewarm is skipped automatically in Gemini-spawned subprocesses).
 - **Streaming UI:** Gemini-backed calls surface backend-wait/first-token progress and a `~N tokens · ~$X` cost estimate on the completed title row (informational, may not match billing).
 - **Cache & recall:** successful responses are stored in `~/.pi/gemini-acp/cache.db` + `results/`. Pass `bypassCache: true` to force a live call; `gemini_ask` prompt tasks and `gemini_research` only read cache when `useCache: true`. `gemini_search` and `gemini_research` accept `useRecall: true` / `bypassRecall: true` — exact cache hits win first, recall reuse is marked with similarity, age, and `responseId`. `gemini_results` with `action: "recall"` searches the local SQLite FTS5 query cache; vector/semantic recall is currently disabled.

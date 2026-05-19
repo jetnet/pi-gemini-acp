@@ -154,12 +154,29 @@ describe("JsonRpcStdioClient", () => {
 		await expect(result).rejects.toThrow("JSON-RPC stdio client closed");
 		expect(child.killed).toBe(true);
 	});
+
+	it("silently ignores non-JSON stdout noise without crashing pending requests", async () => {
+		const child = new FakeChildProcess();
+		const client = new JsonRpcStdioClient(child.asChild());
+		const writes = collectClientMessages(child, 1);
+
+		const result = client.request("example/do", { ok: true });
+		const [request] = await writes;
+
+		child.stdout.write("Gemini CLI v1.2.3\n");
+		child.stdout.write("  some progress output\n");
+		child.stdout.write("warning: something happened\n");
+		child.send({ jsonrpc: "2.0", id: request?.id, result: { done: true } });
+
+		await expect(result).resolves.toEqual({ done: true });
+	});
 });
 
 class FakeChildProcess extends EventEmitter {
 	readonly stdin = new PassThrough();
 	readonly stdout = new PassThrough();
 	readonly stderr = new PassThrough();
+	exitCode: number | null = null;
 	killed = false;
 
 	asChild() {

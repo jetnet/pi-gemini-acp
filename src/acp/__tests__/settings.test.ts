@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildGeminiAcpCommandSettings } from "../settings.ts";
 
 describe("buildGeminiAcpCommandSettings", () => {
-	it("appends the selected model when no model flag is already configured", () => {
+	it("appends --skip-trust and the selected model when not already configured", () => {
 		expect(
 			buildGeminiAcpCommandSettings({
 				command: "gemini",
@@ -12,17 +12,17 @@ describe("buildGeminiAcpCommandSettings", () => {
 			}),
 		).toEqual({
 			command: "gemini",
-			args: ["--acp", "--model", "gemini-2.5-pro"],
+			args: ["--acp", "--skip-trust", "--model", "gemini-2.5-pro"],
 		});
 	});
 
-	it("does not duplicate existing model flags", () => {
+	it("does not duplicate --skip-trust or existing model flags", () => {
 		expect(
 			buildGeminiAcpCommandSettings({
 				command: "gemini",
-				args: ["--acp", "--model=gemini-2.5-flash"],
+				args: ["--acp", "--skip-trust", "--model=gemini-2.5-flash"],
 				model: "gemini-2.5-pro",
 			}).args,
-		).toEqual(["--acp", "--model=gemini-2.5-flash"]);
+		).toEqual(["--acp", "--skip-trust", "--model=gemini-2.5-flash"]);
 	});
 });

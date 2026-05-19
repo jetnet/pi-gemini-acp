@@ -75,12 +75,12 @@ export class GeminiAcpClientCache {
 		this.sessionFactory = options.sessionFactory ?? AcpProcessSession.start;
 	}
 
-	/** Returns a cached client keyed by effective command args/capabilities/purpose. */
+	/** Returns a cached client keyed by effective command args/capabilities. */
 	get(
 		settings: GeminiAcpCommandSettings,
-		purpose: GeminiAcpClientCachePurpose = "search",
+		_purpose: GeminiAcpClientCachePurpose = "search",
 	): GeminiAcpClient {
-		const key = clientCacheKey(settings, purpose);
+		const key = clientCacheKey(settings);
 		const entry = this.entries.get(key);
 		if (entry) return entry.client;
 		let client!: CachedGeminiAcpClient;
@@ -138,9 +138,9 @@ export function onGeminiAcpClientCacheEntryRemoved(listener: CacheRemovalListene
 /** Returns the stable key used for warm Gemini ACP client cache entries. */
 export function geminiAcpClientCacheKey(
 	settings: GeminiAcpCommandSettings,
-	purpose: GeminiAcpClientCachePurpose,
+	_purpose: GeminiAcpClientCachePurpose,
 ): string {
-	return clientCacheKey(settings, purpose);
+	return clientCacheKey(settings);
 }
 
 /** Returns the process-cached Gemini ACP client for production workflows. */
@@ -284,23 +284,27 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 					onProgress?.("search", `${header}\n\n● Creating search session...`);
 				}
 				const sessionId = await claim.entry.sessionId;
-				onProgress?.("search", geminiBackendProgressText("waiting", header));
+				onProgress?.("search", geminiBackendProgressText("waiting", header, "search"));
 				const wrappedOnUpdate = withGeminiBackendProgress(
 					onUpdate,
 					(message) => onProgress?.("search", message),
 					header,
+					"search",
 				);
 
-				// Start Gemini prompt
-				const promptPromise = active.session.prompt(sessionId, text, wrappedOnUpdate, {
-					signal: promptSignal,
-					returnTextOnAbort: true,
-				});
-
+				// Search has two abort sources: the caller/tool cancel signal and the internal
+				// early-stop signal fired once a complete JSON result array streams in. Both must
+				// cancel the ACP prompt, but only caller cancellation should reject the tool call.
+				const promptAbort = mergeAbortSignals(signal, promptSignal);
 				try {
-					return await promptPromise;
+					const result = await active.session.prompt(sessionId, text, wrappedOnUpdate, {
+						signal: promptAbort.signal,
+						returnTextOnAbort: true,
+					});
+					if (signal?.aborted) throw abortError();
+					return result;
 				} finally {
-					// No interval to clear - using real events
+					promptAbort.dispose();
 				}
 			} finally {
 				claim.entry.busy = false;
@@ -384,44 +388,34 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 		operation: (active: ActiveProcess) => Promise<T>,
 	): Promise<T> {
 		if (signal?.aborted) {
-			await this.close();
 			throw abortError();
 		}
 		this.clearIdleTimer();
 		this.activeOperations += 1;
-		const abort = () => {
-			void this.close();
-		};
-		signal?.addEventListener("abort", abort, { once: true });
-		let keepWarm = false;
 		try {
-			const active = await this.ensureActive(signal);
-			const response = await operation(active);
-			keepWarm = true;
-			return response;
+			const active = await this.ensureActive();
+			return await operation(active);
 		} catch (error) {
-			await this.close();
 			if (signal?.aborted) throw abortError();
 			throw error;
 		} finally {
-			signal?.removeEventListener("abort", abort);
 			this.activeOperations = Math.max(0, this.activeOperations - 1);
-			if (keepWarm && !signal?.aborted && this.activeOperations === 0) {
+			if (this.activeOperations === 0) {
 				this.scheduleIdleCleanup();
 			}
 		}
 	}
 
-	private ensureActive(signal?: AbortSignal): Promise<ActiveProcess> {
-		this.active ??= this.createActive(signal).catch((error) => {
+	private ensureActive(): Promise<ActiveProcess> {
+		this.active ??= this.createActive().catch((error) => {
 			this.active = undefined;
 			throw error;
 		});
 		return this.active;
 	}
 
-	private async createActive(signal?: AbortSignal): Promise<ActiveProcess> {
-		const session = await this.sessionFactory(this.settings, signal);
+	private async createActive(): Promise<ActiveProcess> {
+		const session = await this.sessionFactory(this.settings);
 		try {
 			await session.initialize();
 			return { session, searchSessions: new Map(), promptSessions: new Map() };
@@ -469,6 +463,45 @@ class CachedGeminiAcpClient implements GeminiAcpClient {
 			/* Failed starts are already invalidated; callers get the original error. */
 		}
 	}
+}
+
+interface MergedAbortSignal {
+	signal?: AbortSignal;
+	dispose(): void;
+}
+
+function mergeAbortSignals(...signals: Array<AbortSignal | undefined>): MergedAbortSignal {
+	const presentSignals = signals.filter((signal): signal is AbortSignal => signal !== undefined);
+	if (presentSignals.length === 0) return { dispose: noop };
+	if (presentSignals.length === 1) return { signal: presentSignals[0], dispose: noop };
+
+	const controller = new AbortController();
+	const disposers: Array<() => void> = [];
+	let disposed = false;
+	const dispose = () => {
+		if (disposed) return;
+		disposed = true;
+		for (const disposer of disposers) disposer();
+		disposers.length = 0;
+	};
+	const abortFrom = (source: AbortSignal) => {
+		dispose();
+		controller.abort(source.reason);
+	};
+	for (const source of presentSignals) {
+		if (source.aborted) {
+			abortFrom(source);
+			return { signal: controller.signal, dispose };
+		}
+		const abort = () => abortFrom(source);
+		source.addEventListener("abort", abort, { once: true });
+		disposers.push(() => source.removeEventListener("abort", abort));
+	}
+	return { signal: controller.signal, dispose };
+}
+
+function noop(): void {
+	// no-op
 }
 
 function notifyGeminiAcpClientCacheEntryRemoved(key: string): void {

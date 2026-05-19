@@ -30,9 +30,9 @@ export default async function registerPiGeminiAcpExtension(
 ): Promise<GeminiAcpExtensionState> {
 	registerGeminiAcpTools(pi);
 	if (hasCommandRegistrar(pi)) registerGeminiAcpCommands(pi);
-	// Wire ACP subprocess cleanup to Pi lifecycle events so subprocesses are
-	// terminated when Pi exits, reloads, or switches sessions. Without this,
-	// every session spawns 4 ACP child processes that accumulate as orphans.
+	// Wire ACP subprocess cleanup to Pi lifecycle events so cached Gemini ACP
+	// process pairs are terminated when Pi exits, reloads, or switches sessions.
+	// Without this, stale warm clients can accumulate as orphaned subprocesses.
 	(pi as unknown as ExtensionAPI).on("session_shutdown", async () => {
 		await closeGeminiAcpClientCache();
 	});

@@ -316,13 +316,15 @@ describe("Gemini ACP command registration", () => {
 		const result = await setGeminiModel({}, { rootDir });
 		expect(result.content[0]?.text).toContain("/gemini-model <choice>");
 		expect(result.content[0]?.text).toContain("gemini-3.1-pro-preview");
-		expect((result.details as ResultEnvelope).data).toMatchObject({
-			choices: expect.arrayContaining([
-				expect.objectContaining({ id: "gemini-3.1-flash-preview" }),
+		const choices = ((result.details as ResultEnvelope).data as { choices: Array<{ id: string }> })
+			.choices;
+		expect(choices).toEqual(
+			expect.arrayContaining([
 				expect.objectContaining({ id: "gemini-3-flash-preview" }),
 				expect.objectContaining({ id: "gemini-3.1-flash-lite-preview" }),
 			]),
-		});
+		);
+		expect(choices.map((choice) => choice.id)).not.toContain("gemini-3.1-flash-preview");
 	});
 
 	it("accepts latest model aliases from selectable choices", async () => {
@@ -349,9 +351,9 @@ describe("Gemini ACP command registration", () => {
 			},
 		);
 
-		expect(flashResult.content[0]?.text).toContain("gemini-3.1-flash-preview");
+		expect(flashResult.content[0]?.text).toContain("gemini-3.1-flash-lite-preview");
 		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]?.model).toBe(
-			"gemini-3.1-flash-preview",
+			"gemini-3.1-flash-lite-preview",
 		);
 	});
 
@@ -360,7 +362,6 @@ describe("Gemini ACP command registration", () => {
 			expect.objectContaining({ value: "gemini-3.1-pro-preview" }),
 		]);
 		expect(getGeminiModelCompletions("flash")).toEqual([
-			expect.objectContaining({ value: "gemini-3.1-flash-preview" }),
 			expect.objectContaining({ value: "gemini-3.1-flash-lite-preview" }),
 		]);
 		expect(getGeminiModelCompletions("missing-model")).toBeNull();

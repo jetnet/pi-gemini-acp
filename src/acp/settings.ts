@@ -6,6 +6,7 @@ export function buildGeminiAcpCommandSettings(
 	accountEnv?: Record<string, string>,
 ): GeminiAcpCommandSettings {
 	const args = [...(settings?.args ?? ["--acp"])] as string[];
+	if (!args.includes("--skip-trust")) args.push("--skip-trust");
 	if (settings?.model && !hasModelArg(args)) args.push("--model", settings.model);
 	return {
 		command: settings?.command ?? "gemini",

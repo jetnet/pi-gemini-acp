@@ -170,7 +170,8 @@ describe("runResearch", () => {
 				}),
 				expect.objectContaining({
 					phase: "search",
-					message: "● Waiting for Gemini backend...",
+					message:
+						"● Querying Gemini search; awaiting grounded results (backend + web grounding + first-token latency)...",
 				}),
 			]),
 		);
@@ -241,7 +242,10 @@ class FakeGeminiClient implements GeminiAcpClient {
 
 	async search(request: GeminiAcpSearchRequest): Promise<SearchResultItem[]> {
 		request.onProgress?.("session", "Reusing warm search session for alpha.");
-		request.onProgress?.("search", "● Waiting for Gemini backend...");
+		request.onProgress?.(
+			"search",
+			"● Querying Gemini search; awaiting grounded results (backend + web grounding + first-token latency)...",
+		);
 		return [
 			{
 				title: "Alpha result",

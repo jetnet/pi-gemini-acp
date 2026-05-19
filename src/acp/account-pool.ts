@@ -1,10 +1,10 @@
-import { parseQuotaResetMs } from "../api/quota-cache.ts";
 import type {
 	ResolvedAccountEntry,
 	ResolvedAccountsConfig,
 	ResolvedFailoverConfig,
 } from "./account-config.ts";
 import type { CooldownStore } from "./cooldown-store.ts";
+import { cooldownMs, isRetryableOnSameAccount } from "./error-classifier.ts";
 
 export interface CooldownEntry {
 	accountName: string;
@@ -119,27 +119,15 @@ export class AccountPool {
 	}
 
 	private isRetryableOnSameAccount(error: unknown): boolean {
-		const statusCode = extractStatusCode(error);
-		if (statusCode !== undefined) {
-			return this.failover.codes.includes(statusCode);
-		}
-		const message = error instanceof Error ? error.message : String(error);
-		// When the upstream error advertises a concrete quota reset window, retrying the same
-		// account inside that window is guaranteed to fail; cool it down and fail over instead.
-		if (parseQuotaResetMs(message) !== undefined) {
-			return false;
-		}
-		return /exhausted|quota|capacity|rate.limit/iu.test(message);
+		return isRetryableOnSameAccount(error, this.failover.codes);
 	}
 
 	private async coolDownAccount(account: ResolvedAccountEntry, error: unknown): Promise<void> {
-		const message = error instanceof Error ? error.message : String(error);
-		const parsedMs = parseQuotaResetMs(message);
-		const durationMs = parsedMs ?? this.failover.coolDownSeconds * 1000;
+		const durationMs = cooldownMs(error, this.failover.coolDownSeconds);
 		this.cooldowns.set(account.name, {
 			accountName: account.name,
 			coolUntil: Date.now() + durationMs,
-			reason: message,
+			reason: extractMessage(error),
 		});
 		await this.cooldownStore?.save(this.cooldowns);
 	}
@@ -182,15 +170,9 @@ export class AccountPoolExhaustedError extends Error {
 	}
 }
 
-function extractStatusCode(error: unknown): number | undefined {
-	if (typeof error !== "object" || error === null) return undefined;
-	const record = error as Record<string, unknown>;
-	if (typeof record.statusCode === "number") return record.statusCode;
-	if (typeof record.status === "number") return record.status;
-	const message = record.message;
-	if (typeof message === "string") {
-		const match = /\((\d{3})\)/u.exec(message);
-		if (match) return parseInt(match[1], 10);
-	}
-	return undefined;
+function extractMessage(error: unknown): string {
+	if (error instanceof Error) return error.message;
+	if (typeof error === "object" && error !== null) return JSON.stringify(error);
+	if (typeof error === "string") return error;
+	return "";
 }

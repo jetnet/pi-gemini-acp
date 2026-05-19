@@ -155,21 +155,16 @@ describe("runSearch", () => {
 				enabled: true,
 				command: "gemini",
 				args: ["--acp"],
-				authenticated: false,
+				authenticated: true,
 				searchGroundingAvailable: true,
 			},
 			{ rootDir },
 		);
 		let commandChecks = 0;
-		let authProbes = 0;
 		const deps = {
 			commandExists: async () => {
 				commandChecks += 1;
 				return true;
-			},
-			authProbe: async () => {
-				authProbes += 1;
-				return { authenticated: true };
 			},
 			geminiAcpClient: new FakeGeminiClient(),
 		};
@@ -178,7 +173,6 @@ describe("runSearch", () => {
 		await runSearch({ query: "two", rootDir }, deps);
 
 		expect(commandChecks).toBe(1);
-		expect(authProbes).toBe(1);
 	});
 
 	it("does not cache failed provider preflight results", async () => {
@@ -274,13 +268,12 @@ describe("runSearch", () => {
 
 	it("bypasses process preflight cache for caller-supplied config", async () => {
 		let commandChecks = 0;
-		let authProbes = 0;
 		const config = {
 			providers: {
 				"gemini-acp": {
 					enabled: true,
 					command: "gemini",
-					authenticated: false,
+					authenticated: true,
 					searchGroundingAvailable: true,
 				},
 			},
@@ -290,10 +283,6 @@ describe("runSearch", () => {
 				commandChecks += 1;
 				return true;
 			},
-			authProbe: async () => {
-				authProbes += 1;
-				return { authenticated: true };
-			},
 			geminiAcpClient: new FakeGeminiClient(),
 		};
 
@@ -301,11 +290,9 @@ describe("runSearch", () => {
 		await runSearch({ query: "two", rootDir, config }, deps);
 
 		expect(commandChecks).toBe(2);
-		expect(authProbes).toBe(2);
 	});
 
-	it("uses the selected account env for account-pool search auth and client creation", async () => {
-		let probedEnv: Record<string, string> | undefined;
+	it("uses the selected account env for account-pool search client creation", async () => {
 		let clientSettings: GeminiAcpCommandSettings | undefined;
 
 		const result = await runSearch(
@@ -317,7 +304,7 @@ describe("runSearch", () => {
 						"gemini-acp": {
 							enabled: true,
 							command: "gemini",
-							authenticated: false,
+							authenticated: true,
 							searchGroundingAvailable: true,
 						},
 						accounts: {
@@ -328,10 +315,6 @@ describe("runSearch", () => {
 			},
 			{
 				commandExists: async () => true,
-				authProbe: async (_settings, _signal, accountEnv) => {
-					probedEnv = accountEnv;
-					return { authenticated: true };
-				},
 				geminiAcpClientFactory: (settings) => {
 					clientSettings = settings;
 					return new FakeGeminiClient();
@@ -340,12 +323,10 @@ describe("runSearch", () => {
 		);
 
 		expect(result.error).toBeUndefined();
-		expect(probedEnv).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
 		expect(clientSettings?.env).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
 	});
 
-	it("fails over to the next account when search auth preflight fails", async () => {
-		const probedHomes: string[] = [];
+	it("fails over to the next account when search fails on the primary", async () => {
 		const clientHomes: string[] = [];
 
 		const result = await runSearch(
@@ -357,7 +338,7 @@ describe("runSearch", () => {
 						"gemini-acp": {
 							enabled: true,
 							command: "gemini",
-							authenticated: false,
+							authenticated: true,
 							searchGroundingAvailable: true,
 						},
 						accounts: {
@@ -372,22 +353,16 @@ describe("runSearch", () => {
 			},
 			{
 				commandExists: async () => true,
-				authProbe: async (_settings, _signal, accountEnv) => {
-					const home = accountEnv?.GEMINI_CLI_HOME ?? "";
-					probedHomes.push(home);
-					return { authenticated: home === "/tmp/gemini-secondary" };
-				},
 				geminiAcpClientFactory: (settings) => {
-					clientHomes.push(settings.env?.GEMINI_CLI_HOME ?? "");
-					return new FakeGeminiClient();
+					clientHomes.push(settings.env!.GEMINI_CLI_HOME);
+					return new AccountFailoverClient(settings);
 				},
 			},
 		);
 
 		expect(result.error).toBeUndefined();
 		expect(result.results).toHaveLength(1);
-		expect(probedHomes).toEqual(["/tmp/gemini-primary", "/tmp/gemini-secondary"]);
-		expect(clientHomes).toEqual(["/tmp/gemini-secondary"]);
+		expect(clientHomes).toEqual(["/tmp/gemini-primary", "/tmp/gemini-secondary"]);
 	});
 
 	it("maps provider search aborts to GEMINI_ACP_ABORTED", async () => {
@@ -542,6 +517,23 @@ class FakeGeminiClient implements GeminiAcpClient {
 
 	async search(request: GeminiAcpSearchRequest): Promise<SearchResultItem[]> {
 		this.requests.push(request);
+		return [searchResult()];
+	}
+}
+
+class AccountFailoverClient implements GeminiAcpClient {
+	constructor(private readonly settings: GeminiAcpCommandSettings) {}
+
+	async prompt(): Promise<string> {
+		return "";
+	}
+
+	async search(): Promise<SearchResultItem[]> {
+		if (this.settings.env?.GEMINI_CLI_HOME === "/tmp/gemini-primary") {
+			const error = new Error("429 Too Many Requests");
+			error.name = "GEMINI_ACP_QUOTA_EXHAUSTED";
+			throw error;
+		}
 		return [searchResult()];
 	}
 }

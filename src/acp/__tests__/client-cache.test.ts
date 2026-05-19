@@ -129,7 +129,9 @@ describe("GeminiAcpClientCache", () => {
 			expect.arrayContaining([
 				"Started ACP process (Gemini ACP).",
 				'Creating new search session for "one" (4 results).',
-				expect.stringContaining("● Waiting for Gemini backend..."),
+				expect.stringContaining(
+					"● Querying Gemini search; awaiting grounded results (backend + web grounding + first-token latency)...",
+				),
 				"Using existing warm ACP process (Gemini ACP).",
 				'Reusing warm search session for "two" (4 results).',
 			]),
@@ -160,23 +162,22 @@ describe("GeminiAcpClientCache", () => {
 		}
 	});
 
-	it("evicts the cached prompt session after a prompt error", async () => {
+	it("evicts the cached prompt session after a prompt error while keeping the process warm", async () => {
 		const factory = new FakeSessionFactory({ failPromptAfterCount: 1 });
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const client = cache.get(settings("gemini"), "prompt");
 		await client.prompt({ prompt: "ok" });
 		await expect(client.prompt({ prompt: "fail" })).rejects.toThrow("planned failure");
-		// After eviction the next prompt creates a new session (in a fresh process because
-		// withWarmProcess closes the active process on error).
+		// After eviction the next prompt creates a new session in the same warm process.
 		await client.prompt({ prompt: "recover" });
-		expect(factory.sessions).toHaveLength(2);
-		expect(factory.sessions[0]?.newSessionCalls).toBe(1);
-		expect(factory.sessions[1]?.newSessionCalls).toBe(1);
-		expect(factory.sessions[0]?.promptCalls + factory.sessions[1]?.promptCalls).toBe(3);
+		expect(factory.sessions).toHaveLength(1);
+		expect(factory.sessions[0]?.newSessionCalls).toBe(2);
+		expect(factory.sessions[0]?.promptCalls).toBe(3);
+		expect(factory.sessions[0]?.closeCalls).toBe(0);
 		await cache.close();
 	});
 
-	it("passes prompt AbortSignal into fresh cached prompt sessions", async () => {
+	it("passes prompt AbortSignal into fresh cached prompt sessions without closing the warm process", async () => {
 		const factory = new FakeSessionFactory({ waitForClosePrompt: true });
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const controller = new AbortController();
@@ -188,10 +189,10 @@ describe("GeminiAcpClientCache", () => {
 
 		await expect(aborted).rejects.toMatchObject({ name: "AbortError" });
 		expect(factory.sessions[0]?.promptSignals).toEqual([controller.signal]);
-		expect(factory.sessions[0]?.closeCalls).toBe(1);
+		expect(factory.sessions[0]?.closeCalls).toBe(0);
 
 		await cache.get(settings("gemini"), "prompt").prompt({ prompt: "ok" });
-		expect(factory.sessions).toHaveLength(2);
+		expect(factory.sessions).toHaveLength(1);
 		await cache.close();
 	});
 
@@ -214,14 +215,17 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
-	it("keeps search and prompt cache entries separate", async () => {
+	it("shares one warm process for search and prompt while keeping separate ACP sessions", async () => {
 		const factory = new FakeSessionFactory();
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 
 		await cache.get(settings("gemini"), "search").search({ query: "one", maxResults: 5 });
 		await cache.get(settings("gemini"), "prompt").prompt({ prompt: "two" });
 
-		expect(factory.sessions).toHaveLength(2);
+		expect(factory.sessions).toHaveLength(1);
+		expect(factory.sessions[0]?.newSessionCalls).toBe(2);
+		expect(factory.sessions[0]?.cwds).toEqual([homedir(), originalCwd]);
+		expect(factory.sessions[0]?.promptCalls).toBe(2);
 		await cache.close();
 	});
 
@@ -288,7 +292,7 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
-	it("invalidates a failed warm session so the next search starts fresh", async () => {
+	it("reuses the warm process after a search error and retries on a fresh session", async () => {
 		const factory = new FakeSessionFactory({ failFirstPrompt: true });
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const client = cache.get(settings("gemini"));
@@ -298,27 +302,76 @@ describe("GeminiAcpClientCache", () => {
 		);
 		await cache.get(settings("gemini")).search({ query: "ok", maxResults: 5 });
 
-		expect(factory.sessions).toHaveLength(2);
-		expect(factory.sessions[0]?.closeCalls).toBe(1);
-		expect(factory.sessions[1]?.promptCalls).toBe(1);
+		expect(factory.sessions).toHaveLength(1);
+		expect(factory.sessions[0]?.closeCalls).toBe(0);
+		expect(factory.sessions[0]?.promptCalls).toBe(2);
 		await cache.close();
 	});
 
-	it("surfaces mid-prompt aborts as AbortError and invalidates the session", async () => {
+	it("does not close the warm process when a search is aborted", async () => {
+		const factory = new FakeSessionFactory();
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const client = cache.get(settings("gemini"));
+
+		// Warm the process first
+		await client.search({ query: "warm", maxResults: 5 });
+		expect(factory.sessions).toHaveLength(1);
+		expect(factory.sessions[0]?.closeCalls).toBe(0);
+
+		// Abort before the next search starts
+		const controller = new AbortController();
+		controller.abort();
+		const aborted = client.search({ query: "slow", maxResults: 5 }, controller.signal);
+
+		await expect(aborted).rejects.toMatchObject({ name: "AbortError" });
+		expect(factory.sessions[0]?.closeCalls).toBe(0);
+		expect(factory.sessions).toHaveLength(1);
+
+		// Next search reuses the warm process
+		await client.search({ query: "ok", maxResults: 5 });
+		expect(factory.sessions).toHaveLength(1);
+		await cache.close();
+	});
+
+	it("passes caller abort into in-flight search prompts without closing the warm process", async () => {
 		const factory = new FakeSessionFactory({ waitForClosePrompt: true });
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
-		const controller = new AbortController();
 		const client = cache.get(settings("gemini"));
+		const controller = new AbortController();
 
 		const aborted = client.search({ query: "slow", maxResults: 5 }, controller.signal);
 		await factory.waitForPromptStart();
 		controller.abort();
 
 		await expect(aborted).rejects.toMatchObject({ name: "AbortError" });
-		expect(factory.sessions[0]?.closeCalls).toBe(1);
+		expect(factory.sessions[0]?.promptSignals[0]?.aborted).toBe(true);
+		expect(factory.sessions[0]?.closeCalls).toBe(0);
 
-		await cache.get(settings("gemini")).search({ query: "ok", maxResults: 5 });
-		expect(factory.sessions).toHaveLength(2);
+		await client.search({ query: "ok", maxResults: 5 });
+		expect(factory.sessions).toHaveLength(1);
+		await cache.close();
+	});
+
+	it("rejects caller-aborted search prompts when ACP resolves partial text on abort", async () => {
+		const factory = new FakeSessionFactory({
+			resolvePromptOnAbort: true,
+			waitForClosePrompt: true,
+		});
+		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
+		const client = cache.get(settings("gemini"));
+		const controller = new AbortController();
+
+		const aborted = client.search({ query: "slow", maxResults: 5 }, controller.signal);
+		await factory.waitForPromptStart();
+		controller.abort();
+
+		await expect(aborted).rejects.toMatchObject({ name: "AbortError" });
+		expect(factory.sessions[0]?.promptSignals[0]).not.toBe(controller.signal);
+		expect(factory.sessions[0]?.promptSignals[0]?.aborted).toBe(true);
+		expect(factory.sessions[0]?.closeCalls).toBe(0);
+
+		await client.search({ query: "ok", maxResults: 5 });
+		expect(factory.sessions).toHaveLength(1);
 		await cache.close();
 	});
 
@@ -336,7 +389,8 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
-	it("serializes concurrent search turns by default", async () => {
+	it("serializes concurrent search turns when parallel is disabled", async () => {
+		vi.stubEnv("PI_GEMINI_ACP_SEARCH_PARALLEL", "0");
 		const factory = new FakeSessionFactory({ delayedPrompt: true });
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const client = cache.get(settings("gemini"));
@@ -351,8 +405,7 @@ describe("GeminiAcpClientCache", () => {
 		await cache.close();
 	});
 
-	it("allows parallel search turns when explicitly enabled", async () => {
-		vi.stubEnv("PI_GEMINI_ACP_SEARCH_PARALLEL", "1");
+	it("allows parallel search turns by default", async () => {
 		const factory = new FakeSessionFactory({ delayedPrompt: true });
 		const cache = new GeminiAcpClientCache({ sessionFactory: factory.create });
 		const client = cache.get(settings("gemini"));
@@ -386,6 +439,7 @@ class FakeSessionFactory {
 			failFirstPrompt?: boolean;
 			failPromptAfterCount?: number;
 			delayedPrompt?: boolean;
+			resolvePromptOnAbort?: boolean;
 			waitForClosePrompt?: boolean;
 		} = {},
 	) {
@@ -419,6 +473,10 @@ class FakeSessionFactory {
 		if (this.waitForClosePromptsRemaining <= 0) return false;
 		this.waitForClosePromptsRemaining -= 1;
 		return true;
+	}
+
+	shouldResolvePromptOnAbort(): boolean {
+		return this.options.resolvePromptOnAbort === true;
 	}
 
 	waitForPromptStart(): Promise<void> {
@@ -482,10 +540,31 @@ class FakeSession implements GeminiAcpProcessSession {
 		try {
 			if (this.factory.shouldDelayPrompt()) await Promise.resolve();
 			if (this.factory.shouldWaitForClosePrompt()) {
-				await new Promise<never>((_, reject) => {
+				const abortText = await new Promise<string | undefined>((resolve, reject) => {
 					this.closePromptReject = reject;
 					this.factory.recordPromptStart();
+					const abort = () => {
+						if (this.factory.shouldResolvePromptOnAbort()) {
+							resolve(
+								JSON.stringify([
+									{
+										title: "Partial",
+										url: "https://example.com/partial",
+										snippet: "partial",
+									},
+								]),
+							);
+							return;
+						}
+						reject(new DOMException("FakeSession prompt aborted", "AbortError"));
+					};
+					if (options?.signal?.aborted) {
+						abort();
+						return;
+					}
+					options?.signal?.addEventListener("abort", abort, { once: true });
 				});
+				if (abortText) return abortText;
 			}
 			this.factory.recordPromptStart();
 			return JSON.stringify([

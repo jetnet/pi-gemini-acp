@@ -70,22 +70,17 @@ describe("Gemini search prewarm", () => {
 				enabled: true,
 				command: "gemini",
 				args: ["--acp"],
-				authenticated: false,
+				authenticated: true,
 				searchGroundingAvailable: true,
 			},
 			{ rootDir },
 		);
 		let commandChecks = 0;
-		let authProbes = 0;
 		let warmedSettings: GeminiAcpCommandSettings | undefined;
 		const deps = {
 			commandExists: async () => {
 				commandChecks += 1;
 				return true;
-			},
-			authProbe: async () => {
-				authProbes += 1;
-				return { authenticated: true };
 			},
 		};
 
@@ -112,11 +107,9 @@ describe("Gemini search prewarm", () => {
 		expect(warmedSettings?.command).toBe("gemini");
 		expect(result.error).toBeUndefined();
 		expect(commandChecks).toBe(1);
-		expect(authProbes).toBe(1);
 	});
 
-	it("uses the primary account env for auth probe and warm cache when accounts are configured", async () => {
-		let probedEnv: Record<string, string> | undefined;
+	it("uses the primary account env for warm cache when accounts are configured", async () => {
 		let warmedSettings: GeminiAcpCommandSettings | undefined;
 
 		const prewarm = await prewarmGeminiSearchClient(
@@ -128,7 +121,7 @@ describe("Gemini search prewarm", () => {
 							enabled: true,
 							command: "gemini",
 							args: ["--acp"],
-							authenticated: false,
+							authenticated: true,
 							searchGroundingAvailable: true,
 						},
 						accounts: {
@@ -146,10 +139,6 @@ describe("Gemini search prewarm", () => {
 					},
 				}),
 				commandExists: async () => true,
-				authProbe: async (_settings, _signal, accountEnv) => {
-					probedEnv = accountEnv;
-					return { authenticated: true };
-				},
 				warmSearchClient: async (settings) => {
 					warmedSettings = settings;
 				},
@@ -157,7 +146,6 @@ describe("Gemini search prewarm", () => {
 		);
 
 		expect(prewarm).toMatchObject({ attempted: true, warmed: true });
-		expect(probedEnv).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
 		expect(warmedSettings?.env).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
 	});
 

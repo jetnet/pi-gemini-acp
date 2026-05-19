@@ -11,7 +11,7 @@ import type {
 	GeminiAcpPromptUpdateHandler,
 	GeminiAcpSearchRequest,
 } from "../../acp/client.ts";
-import { loadConfig, saveGeminiAcpSettings } from "../../config/settings.ts";
+import { saveGeminiAcpSettings } from "../../config/settings.ts";
 import { getStoredResult } from "../../storage/results.ts";
 import type { SearchResultItem } from "../../types.ts";
 import { PROMPT_RESPONSE_INLINE_LIMIT, runPrompt } from "../run.ts";
@@ -63,7 +63,7 @@ describe("runPrompt", () => {
 				geminiAcpClientFactory: (settings) => {
 					factoryCalls += 1;
 					expect(settings.command).toBe("custom-gemini");
-					expect(settings.args).toEqual(["--acp", "--model", "gemini-test"]);
+					expect(settings.args).toEqual(["--acp", "--model", "gemini-test", "--skip-trust"]);
 					return new FakeGeminiClient(["factory response"]);
 				},
 			},
@@ -109,7 +109,7 @@ describe("runPrompt", () => {
 			{ commandExists: async () => true, geminiAcpClientFactory: factory },
 		);
 
-		const client = clients.get("gemini --acp");
+		const client = clients.get("gemini --acp --skip-trust");
 		expect(clients.size).toBe(1);
 		expect(client?.promptCalls).toBe(2);
 		expect(client?.promptText).toBe("two");
@@ -157,7 +157,7 @@ describe("runPrompt", () => {
 			}),
 			{
 				type: "progress",
-				text: "Sending prompt with promptLength 6 via Gemini ACP default.\n\n● Waiting for Gemini backend...",
+				text: "Sending prompt with promptLength 6 via Gemini ACP default.\n\n● Querying Gemini model; awaiting first token (backend/network latency)...",
 				request: undefined,
 			},
 			{
@@ -191,38 +191,30 @@ describe("runPrompt", () => {
 		expect(stored.value.text).toBe(fullText);
 	});
 
-	it("probes and persists authentication before a provider prompt", async () => {
+	it("runs prompt when auth is already confirmed", async () => {
 		await saveGeminiAcpSettings(
 			{
 				enabled: true,
 				command: "gemini",
 				args: ["--acp"],
-				authenticated: false,
+				authenticated: true,
 			},
 			{ rootDir },
 		);
-		let probeCalls = 0;
 
 		const result = await runPrompt(
 			{ prompt: "Hi", rootDir },
 			{
 				commandExists: async () => true,
-				authProbe: async () => {
-					probeCalls += 1;
-					return { authenticated: true };
-				},
 				geminiAcpClient: new FakeGeminiClient(["ok"]),
 			},
 		);
 
 		expect(result.error).toBeUndefined();
 		expect(result.text).toBe("ok");
-		expect(probeCalls).toBe(1);
-		expect((await loadConfig({ rootDir })).providers?.["gemini-acp"]?.authenticated).toBe(true);
 	});
 
-	it("uses the selected account env for account-pool prompt auth and client creation", async () => {
-		let probedEnv: Record<string, string> | undefined;
+	it("uses the selected account env for account-pool prompt client creation", async () => {
 		let clientSettings: GeminiAcpCommandSettings | undefined;
 
 		const result = await runPrompt(
@@ -235,7 +227,7 @@ describe("runPrompt", () => {
 							enabled: true,
 							command: "gemini",
 							args: ["--acp"],
-							authenticated: false,
+							authenticated: true,
 							searchGroundingAvailable: true,
 						},
 						accounts: {
@@ -246,10 +238,6 @@ describe("runPrompt", () => {
 			},
 			{
 				commandExists: async () => true,
-				authProbe: async (_settings, _signal, accountEnv) => {
-					probedEnv = accountEnv;
-					return { authenticated: true };
-				},
 				geminiAcpClientFactory: (settings) => {
 					clientSettings = settings;
 					return new FakeGeminiClient(["ok"]);
@@ -259,12 +247,10 @@ describe("runPrompt", () => {
 
 		expect(result.error).toBeUndefined();
 		expect(result.text).toBe("ok");
-		expect(probedEnv).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
 		expect(clientSettings?.env).toEqual({ GEMINI_CLI_HOME: "/tmp/gemini-primary" });
 	});
 
-	it("fails over to the next account when prompt auth preflight fails", async () => {
-		const probedHomes: string[] = [];
+	it("fails over to the next account when prompt fails on the primary", async () => {
 		const clientHomes: string[] = [];
 
 		const result = await runPrompt(
@@ -276,7 +262,7 @@ describe("runPrompt", () => {
 						"gemini-acp": {
 							enabled: true,
 							command: "gemini",
-							authenticated: false,
+							authenticated: true,
 							searchGroundingAvailable: true,
 						},
 						accounts: {
@@ -291,25 +277,19 @@ describe("runPrompt", () => {
 			},
 			{
 				commandExists: async () => true,
-				authProbe: async (_settings, _signal, accountEnv) => {
-					const home = accountEnv?.GEMINI_CLI_HOME ?? "";
-					probedHomes.push(home);
-					return { authenticated: home === "/tmp/gemini-secondary" };
-				},
 				geminiAcpClientFactory: (settings) => {
-					clientHomes.push(settings.env?.GEMINI_CLI_HOME ?? "");
-					return new FakeGeminiClient(["ok"]);
+					clientHomes.push(requiredGeminiCliHome(settings.env));
+					return new AccountFailoverPromptClient(settings);
 				},
 			},
 		);
 
 		expect(result.error).toBeUndefined();
 		expect(result.text).toBe("ok");
-		expect(probedHomes).toEqual(["/tmp/gemini-primary", "/tmp/gemini-secondary"]);
-		expect(clientHomes).toEqual(["/tmp/gemini-secondary"]);
+		expect(clientHomes).toEqual(["/tmp/gemini-primary", "/tmp/gemini-secondary"]);
 	});
 
-	it("returns structured provider preflight errors", async () => {
+	it("returns structured provider preflight errors when unauthenticated", async () => {
 		const result = await runPrompt(
 			{
 				prompt: "Hi",
@@ -326,7 +306,6 @@ describe("runPrompt", () => {
 			},
 			{
 				commandExists: async () => true,
-				authProbe: async () => ({ authenticated: false }),
 			},
 		);
 
@@ -494,6 +473,13 @@ describe("runPrompt", () => {
 	});
 });
 
+function requiredGeminiCliHome(env: GeminiAcpCommandSettings["env"] | undefined): string {
+	if (!env) throw new Error("Expected account environment.");
+	const home = env.GEMINI_CLI_HOME;
+	if (!home) throw new Error("Expected GEMINI_CLI_HOME in account environment.");
+	return home;
+}
+
 class FakeGeminiClient implements GeminiAcpClient {
 	promptText = "";
 	promptCalls = 0;
@@ -530,6 +516,21 @@ class AbortAwareGeminiClient extends FakeGeminiClient {
 			throw new DOMException("aborted", "AbortError");
 		}
 		return "not aborted";
+	}
+}
+
+class AccountFailoverPromptClient extends FakeGeminiClient {
+	constructor(private readonly settings: GeminiAcpCommandSettings) {
+		super(["ok"]);
+	}
+
+	override async prompt(): Promise<string> {
+		if (this.settings.env?.GEMINI_CLI_HOME === "/tmp/gemini-primary") {
+			const error = new Error("429 Too Many Requests");
+			error.name = "GEMINI_ACP_QUOTA_EXHAUSTED";
+			throw error;
+		}
+		return await super.prompt({ prompt: "ok" });
 	}
 }
 

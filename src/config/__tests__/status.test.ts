@@ -120,8 +120,7 @@ describe("Gemini ACP status", () => {
 		expect(status.capabilities.fileAnalysisAvailable).toBe(true);
 	});
 
-	it("skips the default auth probe without spawning inside a Gemini CLI subprocess", async () => {
-		vi.stubEnv("GEMINI_CLI", "1");
+	it("returns unauthenticated when auth has not been confirmed", async () => {
 		const error = await preflightGeminiAcpProvider(
 			{
 				enabled: true,
@@ -134,7 +133,7 @@ describe("Gemini ACP status", () => {
 		);
 
 		expect(error?.code).toBe("GEMINI_ACP_UNAUTHENTICATED");
-		expect(error?.message).toContain("skipped inside a Gemini CLI subprocess");
+		expect(error?.message).toContain("authentication has not been confirmed");
 		expect(mocks.startSession).not.toHaveBeenCalled();
 	});
 });

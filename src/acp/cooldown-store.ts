@@ -37,9 +37,14 @@ export function createFileCooldownStore(options: StorageOptions = {}): CooldownS
 		},
 		async save(cooldowns: Map<string, CooldownEntry>): Promise<void> {
 			try {
-				await ensureDir(resolveStoragePaths(options).config);
 				const now = Date.now();
-				const active = [...cooldowns.values()].filter((e) => e.coolUntil > now);
+				// Merge with on-disk cooldowns so concurrent Pi processes don't clobber each other.
+				const merged = await this.load();
+				for (const [name, entry] of cooldowns) {
+					if (entry.coolUntil > now) merged.set(name, entry);
+				}
+				await ensureDir(resolveStoragePaths(options).config);
+				const active = [...merged.values()].filter((e) => e.coolUntil > now);
 				await writeFile(filePath, JSON.stringify(active, null, 2), { mode: 0o600 });
 			} catch {
 				// Non-fatal: cooldown won't persist but failover still works within this call.

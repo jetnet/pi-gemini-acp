@@ -92,7 +92,7 @@ describe("gemini image describe", () => {
 			pathToFileURL(path.join(rootDir, "sample.png")).href,
 		);
 		expect(updates).toContain(
-			"Analyzing image sample.png (image/png) via Gemini ACP.\n\n● Waiting for Gemini backend...",
+			"Analyzing image sample.png (image/png) via Gemini ACP.\n\n● Querying Gemini model; awaiting first token (backend/network latency)...",
 		);
 		expect(updates).toContain(
 			"Analyzing image sample.png (image/png) via Gemini ACP.\n\n● First token received; LLM generating tokens...",
