@@ -4,6 +4,10 @@ Gemini ACP chat, prompt, search, and research provider for Pi.
 
 `pi-gemini-acp` adds a compact Gemini ACP tool surface — status, supplied-text tasks, search, research, file/image analysis, stored results, recall — and registers Gemini ACP as a selectable Pi chat model. Local/no-key search over supplied documents still works without Gemini.
 
+## Note: Gemini CLI cold starts can be slow
+
+First use after Pi starts, reloads, or warm-process cleanup may take several seconds while `gemini --acp` boots and creates a session. This is largely upstream Gemini CLI behavior; see google-gemini/gemini-cli [#10726](https://github.com/google-gemini/gemini-cli/issues/10726), [#22157](https://github.com/google-gemini/gemini-cli/pull/22157), and [#20700](https://github.com/google-gemini/gemini-cli/pull/20700). `pi-gemini-acp` keeps sessions warm when possible.
+
 ## Install
 
 ```bash
