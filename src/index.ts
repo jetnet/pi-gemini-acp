@@ -37,8 +37,9 @@ export default async function registerPiGeminiAcpExtension(
 	// Wire ACP subprocess cleanup to Pi lifecycle events so cached Gemini ACP
 	// process pairs are terminated when Pi exits, reloads, or switches sessions.
 	// Without this, stale warm clients can accumulate as orphaned subprocesses.
-	// Also abort the prewarm and cancel its pending schedule handle so no timer
-	// or background subprocess keeps the Node.js event loop alive after shutdown.
+	// Also tear down the prewarm so it cannot keep the Node.js event loop alive
+	// past shutdown: if the schedule timer has not fired yet, cancel it; if the
+	// prewarm is already in flight, abort its subprocess via the AbortController.
 	let cancelPrewarmSchedule: (() => void) | undefined;
 	(pi as unknown as ExtensionAPI).on("session_shutdown", async () => {
 		prewarmAbort.abort();

@@ -240,6 +240,107 @@ describe("Gemini search prewarm", () => {
 		expect(typeof scheduled).toBe("function");
 		expect(unrefCalls).toBe(1);
 	});
+
+	it("returned cancel clears the pending schedule handle and is idempotent", () => {
+		let cancelCalls = 0;
+		let scheduled: (() => void) | undefined;
+
+		const cancel = scheduleGeminiSearchPrewarm(
+			{ env: {} },
+			{
+				schedule: (callback) => {
+					scheduled = callback;
+					return {
+						cancel: () => {
+							cancelCalls += 1;
+						},
+					};
+				},
+			},
+		);
+
+		expect(typeof scheduled).toBe("function");
+		expect(typeof cancel).toBe("function");
+
+		cancel();
+		cancel();
+
+		expect(cancelCalls).toBe(1);
+	});
+
+	it("returned cancel is a no-op after the callback has fired", () => {
+		let cancelCalls = 0;
+		let scheduled: (() => void) | undefined;
+
+		const cancel = scheduleGeminiSearchPrewarm(
+			// Disable the actual prewarm work the callback would kick off; we only care
+			// that cancel() does not call handle.cancel() after the timer fires.
+			{ env: { PI_GEMINI_ACP_NO_PREWARM: "1" } },
+			{
+				schedule: (callback) => {
+					scheduled = callback;
+					return {
+						cancel: () => {
+							cancelCalls += 1;
+						},
+					};
+				},
+			},
+		);
+
+		scheduled?.();
+		cancel();
+
+		expect(cancelCalls).toBe(0);
+	});
+
+	it("returns a safe no-op cancel when prewarm is disabled", () => {
+		let scheduleCalls = 0;
+
+		const cancel = scheduleGeminiSearchPrewarm(
+			{ env: { PI_GEMINI_ACP_NO_PREWARM: "1" } },
+			{
+				schedule: () => {
+					scheduleCalls += 1;
+					return {};
+				},
+			},
+		);
+
+		expect(scheduleCalls).toBe(0);
+		expect(() => {
+			cancel();
+			cancel();
+		}).not.toThrow();
+	});
+
+	it("short-circuits prewarmGeminiSearchClient when the abort signal is already aborted", async () => {
+		const controller = new AbortController();
+		controller.abort();
+		let loaded = false;
+		let warmed = false;
+
+		const result = await prewarmGeminiSearchClient(
+			{ env: {}, signal: controller.signal },
+			{
+				loadConfig: async () => {
+					loaded = true;
+					return {};
+				},
+				warmSearchClient: async () => {
+					warmed = true;
+				},
+			},
+		);
+
+		expect(result).toMatchObject({
+			attempted: false,
+			warmed: false,
+			skippedReason: "aborted",
+		});
+		expect(loaded).toBe(false);
+		expect(warmed).toBe(false);
+	});
 });
 
 class FakeGeminiClient implements GeminiAcpClient {

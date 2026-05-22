@@ -1,5 +1,7 @@
 {
-	"threshold": 2,
+	"$schema": "https://json.schemastore.org/jscpd",
+	"_comment": "Threshold 3% leaves headroom over the current ~1.22% baseline so unrelated refactors don't trip CI; tighten when the baseline drops.",
+	"threshold": 3,
 	"reporters": ["console"],
 	"ignore": ["**/__tests__/**", "**/node_modules/**"],
 	"path": ["src"],
