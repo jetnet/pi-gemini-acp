@@ -1,0 +1,8 @@
+{
+	"threshold": 2,
+	"reporters": ["console"],
+	"ignore": ["**/__tests__/**", "**/node_modules/**"],
+	"path": ["src"],
+	"minLines": 10,
+	"minTokens": 70
+}
