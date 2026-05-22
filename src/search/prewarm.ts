@@ -74,19 +74,33 @@ export function __resetGeminiSearchPrewarmStatus(): void {
 /** Timer-like handle returned by the activation prewarm scheduler. */
 export interface PrewarmScheduleHandle {
 	unref?: () => void;
+	cancel?: () => void;
 }
 
-/** Schedules search prewarm after extension activation has returned. */
+/**
+ * Schedules search prewarm after extension activation has returned.
+ *
+ * Returns a cancel function that clears the pending timer and aborts any in-flight prewarm when
+ * called (e.g. from a `session_shutdown` handler).
+ */
 export function scheduleGeminiSearchPrewarm(
 	options: GeminiSearchPrewarmOptions = {},
 	deps: GeminiSearchPrewarmDeps = {},
-): void {
-	if (prewarmDisabled(options.env ?? process.env)) return;
+): () => void {
+	if (prewarmDisabled(options.env ?? process.env)) return noop;
+	let handle: PrewarmScheduleHandle | void;
 	const callback = () => {
+		handle = undefined;
 		void prewarmGeminiSearchClient(options, deps);
 	};
-	const handle = (deps.schedule ?? defaultSchedule)(callback);
+	handle = (deps.schedule ?? defaultSchedule)(callback);
 	handle?.unref?.();
+	return () => {
+		if (handle) {
+			handle.cancel?.();
+			handle = undefined;
+		}
+	};
 }
 
 /**
@@ -187,5 +201,24 @@ function prewarmDisabled(env: NodeJS.ProcessEnv): boolean {
 }
 
 function defaultSchedule(callback: () => void): PrewarmScheduleHandle {
-	return typeof setImmediate === "function" ? setImmediate(callback) : setTimeout(callback, 0);
+	if (typeof setImmediate === "function") {
+		const id = setImmediate(callback);
+		return {
+			unref: () => {
+				id.unref();
+			},
+			cancel: () => clearImmediate(id),
+		};
+	}
+	const id = setTimeout(callback, 0);
+	return {
+		unref: () => {
+			id.unref();
+		},
+		cancel: () => clearTimeout(id),
+	};
+}
+
+function noop(): void {
+	// intentional no-op
 }
