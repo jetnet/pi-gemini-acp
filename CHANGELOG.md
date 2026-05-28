@@ -4,6 +4,13 @@ All notable changes to `pi-gemini-acp` are documented here.
 
 This changelog is maintained from git history and follows a Keep-a-Changelog-style format.
 
+## [Unreleased]
+
+### Fixed
+
+- Properly tear down prewarm on `session_shutdown`: abort any in-flight prewarm subprocess via `AbortController` and cancel the pending schedule handle so the Node.js event loop drains cleanly. Fixes `pi -p` hanging after completion when this extension is loaded (earendil-works/pi#4617).
+- `scheduleGeminiSearchPrewarm()` now returns a cancel function and `PrewarmScheduleHandle` gains an optional `cancel()` method so callers can clear the timer before it fires.
+
 ## [0.13.1] - 2026-05-19
 
 ### Changed

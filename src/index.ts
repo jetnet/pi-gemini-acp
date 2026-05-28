@@ -30,10 +30,20 @@ export default async function registerPiGeminiAcpExtension(
 ): Promise<GeminiAcpExtensionState> {
 	registerGeminiAcpTools(pi);
 	if (hasCommandRegistrar(pi)) registerGeminiAcpCommands(pi);
+	// Create an abort controller scoped to this session's prewarm lifecycle.
+	// Aborting it on session_shutdown cancels any in-flight prewarm subprocess.
+	const prewarmAbort = new AbortController();
+
 	// Wire ACP subprocess cleanup to Pi lifecycle events so cached Gemini ACP
 	// process pairs are terminated when Pi exits, reloads, or switches sessions.
 	// Without this, stale warm clients can accumulate as orphaned subprocesses.
+	// Also tear down the prewarm so it cannot keep the Node.js event loop alive
+	// past shutdown: if the schedule timer has not fired yet, cancel it; if the
+	// prewarm is already in flight, abort its subprocess via the AbortController.
+	let cancelPrewarmSchedule: (() => void) | undefined;
 	(pi as unknown as ExtensionAPI).on("session_shutdown", async () => {
+		prewarmAbort.abort();
+		cancelPrewarmSchedule?.();
 		await closeGeminiAcpClientCache();
 	});
 
@@ -46,7 +56,7 @@ export default async function registerPiGeminiAcpExtension(
 	// extension's tool inventory inside the nested process.
 	if (process.env.GEMINI_CLI === "1") return { piScraper: detectPiScraper(pi) };
 	registerModelAdapter(pi);
-	scheduleGeminiSearchPrewarm();
+	cancelPrewarmSchedule = scheduleGeminiSearchPrewarm({ signal: prewarmAbort.signal });
 	scheduleCacheRetentionSweep();
 	if (hasModelProviderRegistrar(pi)) {
 		try {
