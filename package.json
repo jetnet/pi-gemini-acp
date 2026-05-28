@@ -30,7 +30,7 @@
 		"bench:gemini-search": "node scripts/bench.mjs",
 		"bench:gemini-chat": "node scripts/bench.mjs --bench chat",
 		"audit:strict": "npm audit --omit=dev --audit-level=high",
-		"dup-check": "npx --yes jscpd@^4",
+		"dup-check": "npx --yes jscpd@4.2.4",
 		"lint:workflows": "github-actionlint .github/workflows/*.yml",
 		"prepublishOnly": "npm run typecheck && npm test && npm run test:pack",
 		"test:pack": "npm pack --dry-run --json"
